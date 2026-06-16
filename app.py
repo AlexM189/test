@@ -161,6 +161,16 @@ def api_config():
     return jsonify({"ok": True, "config": out_cfg})
 
 
+def _normalize_shifts(raw, fallback="day"):
+    """Accept a list or comma-string of shift names; return a deduplicated list of valid ones."""
+    if isinstance(raw, str):
+        raw = [s.strip() for s in raw.split(",") if s.strip()]
+    if not isinstance(raw, list):
+        raw = [fallback]
+    valid = [s for s in raw if s in SHIFTS]
+    return valid if valid else [fallback]
+
+
 @app.route("/api/employees/add", methods=["POST"])
 def api_emp_add():
     body = request.get_json(silent=True) or {}
@@ -168,6 +178,9 @@ def api_emp_add():
         data = load_data()
         default_target = data["config"].get("targetDays", 2)
         names = body.get("names")
+        # shifts: accept array or single value from body
+        raw_shifts = body.get("shifts") or [body.get("shift", "day")]
+        shifts = _normalize_shifts(raw_shifts)
         if isinstance(names, list) and names:
             added = []
             for nm in names:
@@ -177,7 +190,8 @@ def api_emp_add():
                 emp = {
                     "id": _gen_id(),
                     "name": nm,
-                    "shift": body.get("shift", "day"),
+                    "shift": shifts[0],
+                    "shifts": shifts,
                     "department": body.get("department", ""),
                     "targetDays": int(body.get("targetDays", default_target)),
                 }
@@ -187,7 +201,8 @@ def api_emp_add():
             emp = {
                 "id": _gen_id(),
                 "name": (body.get("name") or "New Employee").strip() or "New Employee",
-                "shift": body.get("shift", "day"),
+                "shift": shifts[0],
+                "shifts": shifts,
                 "department": body.get("department", ""),
                 "targetDays": int(body.get("targetDays", default_target)),
             }
@@ -211,9 +226,18 @@ def api_emp_update():
                 break
         if not found:
             return jsonify({"error": "Employee not found"}), 404
-        for key in ("name", "shift", "department"):
+        for key in ("name", "department"):
             if key in body:
                 found[key] = body[key]
+        if "shifts" in body:
+            shifts = _normalize_shifts(body["shifts"])
+            found["shifts"] = shifts
+            found["shift"] = shifts[0]   # keep primary in sync
+        elif "shift" in body and body["shift"] in SHIFTS:
+            found["shift"] = body["shift"]
+            # if no multi-shift record yet, create one from the single value
+            if not found.get("shifts"):
+                found["shifts"] = [body["shift"]]
         if "targetDays" in body:
             try:
                 found["targetDays"] = int(body["targetDays"])
