@@ -243,7 +243,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
   </div>
   <div class="card">
     <h2>Presence vs Target</h2>
-    <div class="sub">Target: <strong id="targetLbl"></strong> days/week. ✓ = has a desk booking that day.</div>
+    <div class="sub">Target: <strong id="targetLbl"></strong> days/week. Cells show actual booked shift: <span style="background:var(--day);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">D</span> Day &nbsp;<span style="background:var(--eve);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">E</span> Eve &nbsp;<span style="background:var(--night);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">N</span> Night &nbsp;<span style="background:var(--weekend);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">W</span> Weekend</div>
     <div style="overflow-x:auto"><table id="presTable"><thead></thead><tbody></tbody></table></div>
   </div>
 </section>
@@ -470,6 +470,21 @@ function userHasDesk(userId, ds){
   const b=dayBookings(ds);
   for(const sh in b){ for(const k in (b[sh].desks||{})){ if(b[sh].desks[k]===userId) return true; } }
   return false;
+}
+
+/* Returns the shift keys where empId actually has a desk booked on ds */
+function empShiftsBookedOnDay(empId, ds){
+  const b=dayBookings(ds);
+  return SHIFT_KEYS.filter(sh=>Object.values(b[sh]?.desks||{}).includes(empId));
+}
+
+const SHIFT_LETTER={day:'D',evening:'E',night:'N',weekend:'W'};
+const SHIFT_COLOR={day:'var(--day)',evening:'var(--eve)',night:'var(--night)',weekend:'var(--weekend)'};
+
+function presenceDayCell(empId, ds){
+  const booked=empShiftsBookedOnDay(empId,ds);
+  if(!booked.length) return '<span style="color:var(--border)">·</span>';
+  return booked.map(sh=>`<span title="${sh}" style="display:inline-block;font-size:9px;font-weight:800;color:#fff;background:${SHIFT_COLOR[sh]};border-radius:3px;padding:0 3px;line-height:1.6;margin:0 1px">${SHIFT_LETTER[sh]}</span>`).join('');
 }
 
 /* ====================================================================
@@ -844,17 +859,17 @@ function renderDashboard(){
   // presence table
   const presHead=document.querySelector('#presTable thead');
   const presBod=document.querySelector('#presTable tbody');
-  presHead.innerHTML=`<tr><th>#</th><th>Employee</th><th>Shift</th>${days.map(d=>`<th>${DOW_S[d.getDay()]}<br><span style="font-weight:400">${d.getDate()}</span></th>`).join('')}<th>Days</th><th>Target</th><th>Rate</th></tr>`;
+  presHead.innerHTML=`<tr><th>#</th><th>Employee</th>${days.map(d=>`<th style="text-align:center">${DOW_S[d.getDay()]}<br><span style="font-weight:400">${d.getDate()}</span></th>`).join('')}<th>Days</th><th>Target</th><th>Rate</th></tr>`;
   presBod.innerHTML=state.employees.map((emp,i)=>{
-    const marks=days.map(d=>userHasDesk(emp.id,ymd(d)));
-    const total=marks.filter(Boolean).length;
+    const dayStrs=days.map(d=>ymd(d));
+    const total=dayStrs.filter(ds=>userHasDesk(emp.id,ds)).length;
     const target=emp.targetDays||state.config.targetDays;
     const p=pct(total,target*days.length/7);
     const pill=total>=target?'ok':total>=target*0.5?'warn':'bad';
-    const shiftPills=(emp.shifts||[emp.shift||'day']).map(s=>`<span class="pill ${SHIFT_META[s]?.cls||'day'}" style="font-size:10px;padding:1px 5px">${s}</span>`).join(' ');
-    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td style="white-space:nowrap">${shiftPills}</td>
-      ${marks.map(m=>`<td style="text-align:center">${m?'<span style="color:var(--success);font-weight:700">✓</span>':'<span style="color:var(--border)">·</span>'}</td>`).join('')}
-      <td><strong>${total}</strong></td><td>${target}</td><td><span class="pill ${pill}">${p}%</span></td></tr>`;
+    // cells show actual booked shift letters (D/E/N/W) per day, not static assignment
+    const cells=dayStrs.map(ds=>`<td style="text-align:center">${presenceDayCell(emp.id,ds)}</td>`).join('');
+    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td>${cells}
+      <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center">${target}</td><td><span class="pill ${pill}">${p}%</span></td></tr>`;
   }).join('');
 }
 
@@ -1114,7 +1129,7 @@ function openPresentation(t,ref){
   const deskSeries=activeSeries.map(s=>({...s, values:deskBuckets.map(b=>b[s.key]??null)}));
   const parkSeries=activeSeries.map(s=>({...s, values:parkBuckets.map(b=>b[s.key]??null)}));
 
-  // Shift summary table: avg util per shift across whole period
+  // Shift summary table: avg util per shift across whole period — purely from countBooked
   function shiftSummaryRows(kind,cap2){
     return shiftSeries.map(s=>{
       let tot=0,cnt=0;
@@ -1126,7 +1141,7 @@ function openPresentation(t,ref){
     }).join('');
   }
 
-  // Presence summary
+  // Presence summary — shifts column shows what was ACTUALLY booked, not assignment
   const presRows=state.employees.slice(0,40).map((emp,i)=>{
     const present=days.filter(d=>userHasDesk(emp.id,ymd(d))).length;
     const target=emp.targetDays||state.config.targetDays;
@@ -1134,8 +1149,10 @@ function openPresentation(t,ref){
     const targetTotal=Math.round(target*weeks);
     const p=pct(present,targetTotal);
     const col=present>=targetTotal?'#10b981':present>=targetTotal*0.5?'#f59e0b':'#ef4444';
-    const allShifts=(emp.shifts||[emp.shift||'day']).join(', ');
-    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${allShifts}</td><td>${present}</td><td>${targetTotal}</td><td style="font-weight:700;color:${col}">${p}%</td></tr>`;
+    // actual shifts used across the period
+    const actualShifts=[...new Set(days.flatMap(d=>empShiftsBookedOnDay(emp.id,ymd(d))))];
+    const shiftsLabel=actualShifts.length?actualShifts.join(', '):'—';
+    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${shiftsLabel}</td><td>${present}</td><td>${targetTotal}</td><td style="font-weight:700;color:${col}">${p}%</td></tr>`;
   }).join('');
 
   const periodLabel = t==='week'?`Week of ${weekLabel(parseYmd(ref))}`
@@ -1234,9 +1251,9 @@ tr:nth-child(even) td{background:#f8fafc}
 <!-- SLIDE 4: Employee Presence -->
 <div class="slide" style="position:relative">
   <h2>Employee Presence vs Target</h2>
-  <div class="sub">${periodLabel} &nbsp;·&nbsp; Target: ${state.config.targetDays} days/week &nbsp;·&nbsp; Showing ${Math.min(40,state.employees.length)} of ${state.employees.length} employees</div>
+  <div class="sub">${periodLabel} &nbsp;·&nbsp; Target: ${state.config.targetDays} days/week &nbsp;·&nbsp; Showing ${Math.min(40,state.employees.length)} of ${state.employees.length} employees<br><span style="font-size:12px;color:#64748b">Shifts shown = shifts actually used in reservations during this period</span></div>
   <table>
-    <thead><tr><th>#</th><th>Employee</th><th>Shift</th><th>Days present</th><th>Target</th><th>Rate</th></tr></thead>
+    <thead><tr><th>#</th><th>Employee</th><th>Shifts worked</th><th>Days present</th><th>Target</th><th>Rate</th></tr></thead>
     <tbody>${presRows}</tbody>
   </table>
   <span class="slide-num">4</span>
