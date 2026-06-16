@@ -977,73 +977,268 @@ function buildRptPreview(t,ref){
   return html;
 }
 
+/* ---- SVG grouped bar chart ----------------------------------------
+   series: [{label, color, values:[0-100]}]
+   labels: string[] (x-axis)
+   chartW, chartH: SVG dimensions
+------------------------------------------------------------------- */
+function makeSvgChart(labels, series, chartW=780, chartH=280){
+  if(!labels.length) return '<p style="color:#64748b">No data for this period.</p>';
+  // Limit to 31 labels max to keep readable
+  const maxL=31;
+  const lbls = labels.length>maxL ? labels.filter((_,i)=>i%Math.ceil(labels.length/maxL)===0) : labels;
+  const filteredIdxs = new Set(labels.map((l,i)=>lbls.includes(l)?i:-1).filter(i=>i>=0));
+
+  const padL=42, padR=14, padT=20, padB=52;
+  const gW=chartW-padL-padR, gH=chartH-padT-padB;
+  const nGrps=lbls.length, nSeries=series.length;
+  const grpW=gW/nGrps, barW=Math.max(4, Math.min(18, (grpW-6)/nSeries));
+  const grpGap=(grpW - barW*nSeries)/2;
+
+  // Y grid lines at 0,25,50,75,100
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" style="font-family:system-ui,sans-serif">`;
+  // background
+  svg+=`<rect width="${chartW}" height="${chartH}" fill="#f8fafc" rx="8"/>`;
+  // grid
+  [0,25,50,75,100].forEach(v=>{
+    const y=padT+gH*(1-v/100);
+    svg+=`<line x1="${padL}" y1="${y}" x2="${padL+gW}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    svg+=`<text x="${padL-5}" y="${y+4}" text-anchor="end" font-size="10" fill="#94a3b8">${v}%</text>`;
+  });
+  // bars
+  let grpIdx=0;
+  lbls.forEach((lbl,gi)=>{
+    const x0=padL+gi*grpW+grpGap;
+    series.forEach((s,si)=>{
+      const val=s.values[gi]||0;
+      const bh=Math.max(2,(val/100)*gH);
+      const bx=x0+si*barW;
+      const by=padT+gH-bh;
+      svg+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW-1}" height="${bh.toFixed(1)}" fill="${s.color}" rx="2" opacity="0.88"/>`;
+      if(val>0 && barW>12) svg+=`<text x="${(bx+barW/2-0.5).toFixed(1)}" y="${(by-3).toFixed(1)}" text-anchor="middle" font-size="8" fill="${s.color}" font-weight="600">${val}%</text>`;
+    });
+    // x label
+    const lx=padL+gi*grpW+grpW/2;
+    svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+16).toFixed(1)}" text-anchor="middle" font-size="10" fill="#475569">${lbl}</text>`;
+    grpIdx++;
+  });
+  // axes
+  svg+=`<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  svg+=`<line x1="${padL}" y1="${padT+gH}" x2="${padL+gW}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  svg+=`</svg>`;
+  return svg;
+}
+
+function makeLegendHtml(series){
+  return `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">`+
+    series.map(s=>`<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569">
+      <span style="width:14px;height:14px;border-radius:3px;background:${s.color};display:inline-block"></span>${s.label}</span>`).join('')+
+    `</div>`;
+}
+
+/* Aggregate daily shift data into displayable buckets based on period */
+function buildChartData(days, kind, cap){
+  // For weekly: show each day.  For monthly: group by week.  For quarter/year: group by month.
+  const bucketLen = days.length<=7?1 : days.length<=31?7 : 31;
+  const buckets=[];
+  for(let i=0;i<days.length;i+=bucketLen){
+    const slice=days.slice(i,i+bucketLen);
+    const label = bucketLen===1
+      ? `${DOW_S[slice[0].getDay()]} ${slice[0].getDate()}/${slice[0].getMonth()+1}`
+      : bucketLen===7
+        ? `${slice[0].getDate()}/${slice[0].getMonth()+1}`
+        : MONTHS[slice[0].getMonth()].slice(0,3)+' '+slice[0].getFullYear();
+    // per shift: avg utilization across days in bucket
+    const shiftTotals={day:0,evening:0,night:0,weekend:0};
+    const shiftCounts={day:0,evening:0,night:0,weekend:0};
+    slice.forEach(d=>{
+      const ds=ymd(d);
+      activeShifts(d).forEach(sh=>{
+        shiftTotals[sh]+=countBooked(ds,sh,kind);
+        shiftCounts[sh]++;
+      });
+    });
+    buckets.push({
+      label,
+      day:    shiftCounts.day    ? Math.round(pct(shiftTotals.day/shiftCounts.day,     cap)):null,
+      evening:shiftCounts.evening? Math.round(pct(shiftTotals.evening/shiftCounts.evening,cap)):null,
+      night:  shiftCounts.night  ? Math.round(pct(shiftTotals.night/shiftCounts.night,  cap)):null,
+      weekend:shiftCounts.weekend? Math.round(pct(shiftTotals.weekend/shiftCounts.weekend,cap)):null,
+    });
+  }
+  return buckets;
+}
+
 function openPresentation(t,ref){
   const days=getDaysForPeriod(t,ref);
   const dCap=capacity('desks'), pCap=capacity('parking');
   let totalDesk=0, totalPark=0;
-  const byDay=days.map(d=>{
-    const ds=ymd(d); const shifts=activeShifts(d);
-    let dB=0,pB=0; shifts.forEach(sh=>{ dB+=countBooked(ds,sh,'desks'); pB+=countBooked(ds,sh,'parking'); });
-    totalDesk+=dB; totalPark+=pB; return {d,dB,pB};
+  days.forEach(d=>{
+    const ds=ymd(d);
+    activeShifts(d).forEach(sh=>{ totalDesk+=countBooked(ds,sh,'desks'); totalPark+=countBooked(ds,sh,'parking'); });
   });
   const avgD=days.length?Math.round(totalDesk/days.length):0;
   const avgP=days.length?Math.round(totalPark/days.length):0;
 
-  const html=`<!DOCTYPE html><html><head><title>Office Report</title>
+  // Build per-shift chart data
+  const deskBuckets=buildChartData(days,'desks',dCap);
+  const parkBuckets=buildChartData(days,'parking',pCap);
+  const chartLabels=deskBuckets.map(b=>b.label);
+
+  const shiftSeries=[
+    {label:'Day (09–18)',    color:'#3b82f6', key:'day'},
+    {label:'Evening (16–24)',color:'#8b5cf6', key:'evening'},
+    {label:'Night (23–07)', color:'#334155', key:'night'},
+    {label:'Weekend (19–03)',color:'#ec4899', key:'weekend'},
+  ];
+  // Only include series that have at least one non-null value
+  const activeSeries=shiftSeries.filter(s=>deskBuckets.some(b=>b[s.key]!==null));
+
+  const deskSeries=activeSeries.map(s=>({...s, values:deskBuckets.map(b=>b[s.key]??0)}));
+  const parkSeries=activeSeries.map(s=>({...s, values:parkBuckets.map(b=>b[s.key]??0)}));
+
+  // Shift summary table: avg util per shift across whole period
+  function shiftSummaryRows(kind,cap2){
+    return shiftSeries.map(s=>{
+      let tot=0,cnt=0;
+      days.forEach(d=>{ if(activeShifts(d).includes(s.key)){ tot+=countBooked(ymd(d),s.key,kind); cnt++; } });
+      if(!cnt) return '';
+      const avg=Math.round(tot/cnt), p=pct(avg,cap2);
+      const col=p>=80?'#10b981':p>=50?'#f59e0b':'#4f46e5';
+      return `<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${s.color};vertical-align:middle;margin-right:6px"></span>${s.label}</td><td>${avg}</td><td>${cap2}</td><td style="font-weight:700;color:${col}">${p}%</td><td>${cnt}</td></tr>`;
+    }).join('');
+  }
+
+  // Presence summary
+  const presRows=state.employees.slice(0,40).map((emp,i)=>{
+    const present=days.filter(d=>userHasDesk(emp.id,ymd(d))).length;
+    const target=emp.targetDays||state.config.targetDays;
+    const weeks=Math.max(1,days.length/7);
+    const targetTotal=Math.round(target*weeks);
+    const p=pct(present,targetTotal);
+    const col=present>=targetTotal?'#10b981':present>=targetTotal*0.5?'#f59e0b':'#ef4444';
+    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${emp.shift}</td><td>${present}</td><td>${targetTotal}</td><td style="font-weight:700;color:${col}">${p}%</td></tr>`;
+  }).join('');
+
+  const periodLabel = t==='week'?`Week of ${weekLabel(parseYmd(ref))}`
+    :t==='month'?`${MONTHS[parseYmd(ref).getMonth()]} ${parseYmd(ref).getFullYear()}`
+    :t==='quarter'?`Q${Math.ceil((parseYmd(ref).getMonth()+1)/3)} ${parseYmd(ref).getFullYear()}`
+    :`Year ${parseYmd(ref).getFullYear()}`;
+
+  const html=`<!DOCTYPE html><html lang="en"><head><title>Office Report — ${periodLabel}</title>
 <style>
-body{font-family:system-ui,sans-serif;margin:0;background:#1e293b;color:#1e293b}
-.slide{background:#fff;margin:20px auto;padding:50px;max-width:900px;border-radius:12px;min-height:500px;page-break-after:always}
-h1{font-size:32px;margin:0 0 8px}h2{font-size:22px;margin:0 0 16px;color:#4f46e5}
-.sub{color:#64748b;font-size:16px;margin-bottom:28px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{background:#eef2ff;color:#4f46e5;padding:10px;text-align:left;font-size:12px;text-transform:uppercase}
-td{padding:9px 10px;border-bottom:1px solid #e2e8f0}
-.bar-row{display:flex;align-items:center;gap:10px}
-.bar{height:18px;border-radius:4px;background:#4f46e5;display:inline-block;min-width:4px}
-.stat-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:28px}
-.stat{background:#f5f7fb;padding:18px 24px;border-radius:10px;flex:1;min-width:140px}
-.stat .v{font-size:32px;font-weight:700;color:#4f46e5}.stat .l{font-size:13px;color:#64748b;margin-top:4px}
-.print-btn{position:fixed;top:20px;right:20px;background:#4f46e5;color:#fff;border:none;padding:12px 22px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600}
-@media print{.print-btn{display:none}body{background:#fff}.slide{margin:0;border-radius:0;box-shadow:none}}
+*{box-sizing:border-box}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#0f172a;color:#1e293b}
+.slide{background:#fff;margin:18px auto;padding:48px 52px;max-width:960px;border-radius:14px;page-break-after:always;box-shadow:0 8px 32px rgba(0,0,0,.25)}
+h1{font-size:34px;font-weight:800;margin:0 0 6px;color:#1e293b}
+h2{font-size:22px;font-weight:700;margin:0 0 6px;color:#4f46e5}
+.period{color:#4f46e5;font-size:15px;font-weight:600;margin-bottom:6px}
+.sub{color:#64748b;font-size:15px;margin-bottom:24px}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat{background:#f8fafc;padding:20px;border-radius:10px;border:1px solid #e2e8f0}
+.stat .v{font-size:34px;font-weight:800;color:#4f46e5;line-height:1}
+.stat .l{font-size:12px;color:#64748b;margin-top:6px;text-transform:uppercase;letter-spacing:.04em}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#eef2ff;color:#4f46e5;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:8px 12px;border-bottom:1px solid #f1f5f9}
+tr:last-child td{border-bottom:none}
+tr:nth-child(even) td{background:#f8fafc}
+.legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+.legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569}
+.swatch{width:13px;height:13px;border-radius:3px;display:inline-block}
+.chart-wrap{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:20px}
+.chart-title{font-size:13px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
+.print-btn{position:fixed;top:18px;right:18px;background:#4f46e5;color:#fff;border:none;padding:11px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;z-index:99;box-shadow:0 4px 14px rgba(79,70,229,.4)}
+.print-btn:hover{background:#4338ca}
+.slide-num{position:absolute;bottom:24px;right:40px;font-size:11px;color:#94a3b8}
+@media print{
+  .print-btn{display:none}
+  body{background:#fff}
+  .slide{margin:0;border-radius:0;box-shadow:none;padding:36px 44px;page-break-after:always}
+}
 </style></head><body>
 <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
-<div class="slide">
+
+<!-- SLIDE 1: Title & Summary -->
+<div class="slide" style="position:relative">
+  <div class="period">${periodLabel}</div>
   <h1>Office Reservations Report</h1>
-  <div class="sub">Period: ${days.length} days &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString()}</div>
+  <div class="sub">Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} &nbsp;·&nbsp; ${days.length} calendar days &nbsp;·&nbsp; ${dCap} desks · ${pCap} parking spots</div>
   <div class="stat-row">
     <div class="stat"><div class="v">${totalDesk}</div><div class="l">Total desk bookings</div></div>
-    <div class="stat"><div class="v">${pct(avgD,dCap)}%</div><div class="l">Avg desk utilization/day</div></div>
+    <div class="stat"><div class="v">${pct(avgD,dCap)}%</div><div class="l">Avg desk utilization / day</div></div>
     <div class="stat"><div class="v">${totalPark}</div><div class="l">Total parking bookings</div></div>
-    <div class="stat"><div class="v">${pct(avgP,pCap)}%</div><div class="l">Avg parking utilization/day</div></div>
+    <div class="stat"><div class="v">${pct(avgP,pCap)}%</div><div class="l">Avg parking utilization / day</div></div>
   </div>
+  <table>
+    <thead><tr><th>Shift</th><th>Avg desks booked</th><th>Capacity</th><th>Desk util %</th><th>Active days</th></tr></thead>
+    <tbody>${shiftSummaryRows('desks',dCap)}</tbody>
+  </table>
+  <span class="slide-num">1</span>
 </div>
-<div class="slide">
-  <h2>Desk Utilization by Day</h2>
-  <table><thead><tr><th>Date</th><th>Booked</th><th>Capacity</th><th>%</th><th>Bar</th></tr></thead><tbody>
-  ${byDay.slice(0,30).map(({d,dB})=>{
-    const p=pct(dB,dCap); const w=Math.round(p*4);
-    return `<tr><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}</td><td>${dB}</td><td>${dCap}</td><td>${p}%</td><td><div class="bar" style="width:${w}px;background:${p>=80?'#10b981':p>=50?'#f59e0b':'#4f46e5'}"></div></td></tr>`;
-  }).join('')}
-  </tbody></table>
+
+<!-- SLIDE 2: Desk Utilization Chart by Shift -->
+<div class="slide" style="position:relative">
+  <h2>Desk Utilization — by Shift</h2>
+  <div class="sub">${periodLabel} &nbsp;·&nbsp; Capacity: ${dCap} desks</div>
+  ${makeLegendHtml(deskSeries)}
+  <div class="chart-wrap">
+    <div class="chart-title">Avg desk utilization % per time slot</div>
+    ${makeSvgChart(chartLabels, deskSeries, 840, 300)}
+  </div>
+  <table style="margin-top:16px">
+    <thead><tr><th>Period</th>${activeSeries.map(s=>`<th>${s.label}</th>`).join('')}</tr></thead>
+    <tbody>${deskBuckets.map(b=>`<tr><td>${b.label}</td>${activeSeries.map(s=>`<td>${b[s.key]!==null?b[s.key]+'%':'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>
+  <span class="slide-num">2</span>
 </div>
-<div class="slide">
-  <h2>Parking Utilization by Day</h2>
-  <table><thead><tr><th>Date</th><th>Booked</th><th>Capacity</th><th>%</th><th>Bar</th></tr></thead><tbody>
-  ${byDay.slice(0,30).map(({d,pB})=>{
-    const p=pct(pB,pCap); const w=Math.round(p*4);
-    return `<tr><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}</td><td>${pB}</td><td>${pCap}</td><td>${p}%</td><td><div class="bar" style="width:${w}px;background:${p>=80?'#10b981':p>=50?'#f59e0b':'#4f46e5'}"></div></td></tr>`;
-  }).join('')}
-  </tbody></table>
+
+<!-- SLIDE 3: Parking Utilization Chart by Shift -->
+<div class="slide" style="position:relative">
+  <h2>Parking Utilization — by Shift</h2>
+  <div class="sub">${periodLabel} &nbsp;·&nbsp; Capacity: ${pCap} parking spots</div>
+  ${makeLegendHtml(parkSeries)}
+  <div class="chart-wrap">
+    <div class="chart-title">Avg parking utilization % per time slot</div>
+    ${makeSvgChart(chartLabels, parkSeries, 840, 300)}
+  </div>
+  <table style="margin-top:16px">
+    <thead><tr><th>Period</th>${activeSeries.map(s=>`<th>${s.label}</th>`).join('')}</tr></thead>
+    <tbody>${parkBuckets.map(b=>`<tr><td>${b.label}</td>${activeSeries.map(s=>`<td>${b[s.key]!==null?b[s.key]+'%':'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+  </table>
+  <table style="margin-top:16px">
+    <thead><tr><th>Shift</th><th>Avg parking booked</th><th>Capacity</th><th>Parking util %</th><th>Active days</th></tr></thead>
+    <tbody>${shiftSummaryRows('parking',pCap)}</tbody>
+  </table>
+  <span class="slide-num">3</span>
 </div>
-<div class="slide">
-  <h2>Employee Roster Overview</h2>
-  <table><thead><tr><th>#</th><th>Name</th><th>Shift</th><th>Department</th><th>Target days/wk</th></tr></thead><tbody>
-  ${state.employees.map((e,i)=>`<tr><td>${i+1}</td><td>${h(e.name)}</td><td>${e.shift}</td><td>${h(e.department||'—')}</td><td>${e.targetDays}</td></tr>`).join('')}
-  </tbody></table>
+
+<!-- SLIDE 4: Employee Presence -->
+<div class="slide" style="position:relative">
+  <h2>Employee Presence vs Target</h2>
+  <div class="sub">${periodLabel} &nbsp;·&nbsp; Target: ${state.config.targetDays} days/week &nbsp;·&nbsp; Showing ${Math.min(40,state.employees.length)} of ${state.employees.length} employees</div>
+  <table>
+    <thead><tr><th>#</th><th>Employee</th><th>Shift</th><th>Days present</th><th>Target</th><th>Rate</th></tr></thead>
+    <tbody>${presRows}</tbody>
+  </table>
+  <span class="slide-num">4</span>
 </div>
+
+<!-- SLIDE 5: Roster -->
+<div class="slide" style="position:relative">
+  <h2>Employee Roster</h2>
+  <div class="sub">${state.employees.length} employees &nbsp;·&nbsp; Default target: ${state.config.targetDays} days/week</div>
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>Default Shift</th><th>Department</th><th>Target days/wk</th></tr></thead>
+    <tbody>${state.employees.map((e,i)=>`<tr><td>${i+1}</td><td>${h(e.name)}</td><td>${e.shift}</td><td>${h(e.department||'—')}</td><td>${e.targetDays}</td></tr>`).join('')}</tbody>
+  </table>
+  <span class="slide-num">5</span>
+</div>
+
 </body></html>`;
 
   const w=window.open('','_blank');
+  if(!w){ toast('Pop-up blocked — allow pop-ups for this page','err'); return; }
   w.document.write(html); w.document.close();
 }
 
