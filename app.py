@@ -41,7 +41,7 @@ SHIFT_HOURS = {
 def _default_state():
     return {
         "config": {
-            "desks": 24,
+            "desks": 28,
             "parking": 10,
             "targetDays": 2,
             "year": 2026,

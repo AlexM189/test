@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Office Reservations</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box}
 :root{
@@ -162,6 +163,32 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 /* accessibility parking slot */
 .slot.access{border-color:#1d4ed8;border-width:2px}
 .slot.access .num{color:#1d4ed8}
+/* ── Floor-plan layout (booking modal) ──────────────────────────── */
+.fp-wrap{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:2px}
+.fp-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:8px}
+.fp-offices{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:0}
+.fp-office-room{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.fp-office-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
+.fp-office-desks{display:flex;gap:6px}
+.fp-openspace{display:flex;flex-direction:column;gap:6px}
+.fp-bench-pair{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.fp-bench-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.fp-park-row{grid-template-columns:repeat(5,1fr)!important}
+.fp-table-line{height:5px;background:linear-gradient(#cbd5e1,#e2e8f0);border-radius:3px;margin:4px 8px}
+.fp-cell{border:1.5px solid var(--border);background:#fff;border-radius:6px;padding:4px 3px;min-height:46px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .15s;text-align:center;font-family:inherit}
+.fp-cell:hover:not(.na):not(.taken){border-color:var(--primary);background:var(--primary-light)}
+.fp-cell.mine{background:var(--success-light);border-color:var(--success)}
+.fp-cell.taken{background:var(--day-light);border-color:var(--day);cursor:default}
+.fp-cell.na{background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 5px,#e2e8f0 5px,#e2e8f0 10px);cursor:not-allowed;border-color:#cbd5e1}
+.fp-cell.access{border-color:#1d4ed8;border-width:2px}
+.fp-cell.fp-park{min-height:54px}
+.fp-num{font-weight:700;font-size:10px;color:#64748b;line-height:1.2;display:flex;align-items:center;gap:2px;flex-wrap:wrap;justify-content:center}
+.fp-nm{font-size:9px;line-height:1.1;color:#94a3b8;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:56px}
+.fp-cell.mine .fp-num,.fp-cell.mine .fp-nm{color:#065f46}
+.fp-cell.taken .fp-num,.fp-cell.taken .fp-nm{color:var(--day);font-weight:600}
+.fp-cell.access .fp-num{color:#1d4ed8}
+.fp-cell.access.mine .fp-num{color:#065f46}
+.fp-parking-wrap{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px}
 </style>
 </head>
 <body>
@@ -319,6 +346,8 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
       <button class="btn" id="addEmpBtn">+ Add Employee</button>
       <button class="btn sec" id="pasteNamesBtn">📋 Paste name list</button>
+      <button class="btn sec" id="importXlsBtn">📁 Import Excel</button>
+      <input type="file" id="importXlsFile" accept=".xlsx,.xls,.csv" style="display:none">
       <button class="btn sec" id="exportEmpBtn">⬇ Export Excel</button>
       <input type="text" id="empSearch" placeholder="Search…" style="max-width:190px">
     </div>
@@ -338,7 +367,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     <div class="cfg-grid">
       <label class="field"><span>Desks (physical total)</span><input type="number" id="cfgDesks" min="1" max="500"></label>
       <label class="field"><span>Parking spots (physical total)</span><input type="number" id="cfgPark" min="0" max="500"></label>
-      <label class="field"><span>Default target days/week (1–5)</span><input type="number" id="cfgTarget" min="1" max="5" step="0.5"></label>
+      <label class="field"><span>Default target days/week (0–5, 0 = fully remote)</span><input type="number" id="cfgTarget" min="0" max="5" step="0.5"></label>
       <label class="field"><span>Calendar year</span><input type="number" id="cfgYear" min="2024" max="2035"></label>
     </div>
     <div style="border-top:1px solid var(--border);margin:6px 0 14px;padding-top:14px">
@@ -480,6 +509,19 @@ function empShiftsBookedOnDay(empId, ds){
 
 const SHIFT_LETTER={day:'D',evening:'E',night:'N',weekend:'W'};
 const SHIFT_COLOR={day:'var(--day)',evening:'var(--eve)',night:'var(--night)',weekend:'var(--weekend)'};
+
+const PARKING_CODES=[
+  {code:'S1-090',access:true},
+  {code:'S1-071'},
+  {code:'S1-075'},
+  {code:'S1-074'},
+  {code:'S1-073'},
+  {code:'S1-072'},
+  {code:'S1-044'},
+  {code:'S1-043'},
+  {code:'S1-042',pos:'front'},
+  {code:'S1-042',pos:'back'},
+];
 
 function presenceDayCell(empId, ds){
   const booked=empShiftsBookedOnDay(empId,ds);
@@ -693,15 +735,13 @@ function renderBookingModal(){
         <span class="stats">🪑 ${dBooked}/${dCap} &nbsp; 🚗 ${pBooked}/${pCap}</span>
       </div>
       <div class="shift-body${open?'':' hidden'}" id="sbody-${sh}">
-        <div class="res-row">
-          <div class="res-block">
-            <h4>🪑 Desks (${dCap} available)</h4>
-            <div class="slot-grid">${buildSlots('desks',sh,dCap)}</div>
-          </div>
-          <div class="res-block">
-            <h4>🚗 Parking (${pCap} spots)</h4>
-            <div class="park-grid">${buildSlots('parking',sh,pCap)}</div>
-          </div>
+        <div class="res-block" style="margin-bottom:12px">
+          <h4>🪑 Desks — Floor Plan (${dCap} available)</h4>
+          ${buildDeskFloorPlan(sh)}
+        </div>
+        <div class="res-block">
+          <h4>🚗 Parking (${pCap} spots)</h4>
+          ${buildParkingLayout(sh)}
         </div>
         ${currentUser?`<div style="margin-top:10px"><button class="btn sec sm" onclick="bulkBookShift('${sh}','desks')">Add all ${meta.label} employees (desks)</button></div>`:''}
       </div>
@@ -712,29 +752,77 @@ function renderBookingModal(){
 
 const ACCESS_ICON='<svg width="11" height="11" viewBox="0 0 24 24" fill="#1d4ed8" style="flex-shrink:0" aria-label="Accessible"><circle cx="12" cy="4" r="2"/><path d="M10 9h4l2 6h-2l-1-3v4l3 5h-2l-2-4-2 4H8l3-5v-4L10 15H8z"/></svg>';
 
-function buildSlots(kind,sh,cap){
-  const sd=shiftData(modalDate,sh);
-  const occupied=sd[kind]||{};
-  let html='';
-  for(let n=1;n<=cap;n++){
+/* Build a single floor-plan desk cell */
+function _fpDeskCell(n, sh){
+  const key=String(n);
+  const unavail=isUnavail('desks',n);
+  const owner=(shiftData(modalDate,sh).desks||{})[key];
+  const mine=owner===currentUser;
+  const taken=!!owner&&!mine;
+  let cls='fp-cell'+(unavail?' na':mine?' mine':taken?' taken':'');
+  const numHtml=`<span class="fp-num">${n}</span>`;
+  const nmHtml=unavail?`<span class="fp-nm">N/A</span>`:owner?`<span class="fp-nm">${h(empName(owner))}</span>`:'';
+  if(unavail||taken) return `<div class="${cls}" title="${taken?h(empName(owner)):'Out of service'}">${numHtml}${nmHtml}</div>`;
+  return `<div class="${cls}" onclick="handleSlot('${sh}','desks',${n})" title="${mine?'Cancel booking':'Book desk '+n}">${numHtml}${nmHtml}</div>`;
+}
+
+/* Build a 3+3 bench pair (6 desks starting at deskStart) */
+function _fpBenchPair(deskStart, sh){
+  let top='', bot='';
+  for(let i=0;i<3;i++) top+=_fpDeskCell(deskStart+i, sh);
+  for(let i=3;i<6;i++) bot+=_fpDeskCell(deskStart+i, sh);
+  return `<div class="fp-bench-pair">
+    <div class="fp-bench-row">${top}</div>
+    <div class="fp-table-line"></div>
+    <div class="fp-bench-row">${bot}</div>
+  </div>`;
+}
+
+function buildDeskFloorPlan(sh){
+  const offA=`<div class="fp-office-room"><div class="fp-office-label">Office A</div><div class="fp-office-desks">${_fpDeskCell(1,sh)}${_fpDeskCell(2,sh)}</div></div>`;
+  const offB=`<div class="fp-office-room"><div class="fp-office-label">Office B</div><div class="fp-office-desks">${_fpDeskCell(3,sh)}${_fpDeskCell(4,sh)}</div></div>`;
+
+  // Open space: desks 5-28 = 24 desks = 4 bench pairs of 6
+  let openSpace='';
+  for(let row=0;row<4;row++) openSpace+=_fpBenchPair(5+row*6, sh);
+
+  return `<div class="fp-wrap">
+    <div class="fp-section-hdr">🏢 Private Offices</div>
+    <div class="fp-offices">${offA}${offB}</div>
+  </div>
+  <div class="fp-wrap" style="margin-top:8px">
+    <div class="fp-section-hdr">🖥️ Open Space</div>
+    <div class="fp-openspace">${openSpace}</div>
+  </div>`;
+}
+
+function buildParkingLayout(sh){
+  const occupied=(shiftData(modalDate,sh).parking)||{};
+  let row1='', row2='';
+  PARKING_CODES.forEach((pk,idx)=>{
+    const n=idx+1;
     const key=String(n);
-    const unavail=isUnavail(kind,n);
+    const unavail=isUnavail('parking',n);
     const owner=occupied[key];
     const mine=owner===currentUser;
     const taken=!!owner&&!mine;
-    const isAccess=kind==='parking'&&n===1;
-    let cls='slot'+(isAccess?' access':'')+(unavail?' unavail':mine?' mine':taken?' taken':'');
-    const nm=owner?h(empName(owner)):'Free';
-    const accessBadge=isAccess?ACCESS_ICON:'';
-    if(unavail){
-      html+=`<div class="${cls}" title="Out of service"><span class="num">${accessBadge}${n}</span><span class="nm">N/A</span></div>`;
-    } else if(taken){
-      html+=`<div class="${cls}" title="${h(empName(owner))}${isAccess?' · Accessible parking':''}"><span class="num" style="display:flex;align-items:center;justify-content:center;gap:2px">${accessBadge}${n}</span><span class="nm">${nm}</span></div>`;
+    const isAccess=!!pk.access;
+    let cls='fp-cell fp-park'+(isAccess?' access':'')+(unavail?' na':mine?' mine':taken?' taken':'');
+    const label=pk.pos?`${pk.code}<br><span style="font-size:8px">(${pk.pos})</span>`:pk.code;
+    const numHtml=`<span class="fp-num">${isAccess?ACCESS_ICON:''}<span style="font-size:9px">${label}</span></span>`;
+    const nmHtml=owner?`<span class="fp-nm">${h(empName(owner))}</span>`:'';
+    let cell;
+    if(unavail||taken){
+      cell=`<div class="${cls}" title="${taken?h(empName(owner)):'Out of service'}">${numHtml}${nmHtml}</div>`;
     } else {
-      html+=`<div class="${cls}" onclick="handleSlot('${sh}','${kind}',${n})" title="${mine?'Cancel my booking':'Book slot '+n}${isAccess?' · Accessible parking':''}"><span class="num" style="display:flex;align-items:center;justify-content:center;gap:2px">${accessBadge}${n}</span><span class="nm">${mine?'You':''}</span></div>`;
+      cell=`<div class="${cls}" onclick="handleSlot('${sh}','parking',${n})" title="${mine?'Cancel booking':pk.code+(pk.pos?' ('+pk.pos+')':'')+(isAccess?' · Accessible':'')}">${numHtml}${nmHtml}</div>`;
     }
-  }
-  return html;
+    if(idx<5) row1+=cell; else row2+=cell;
+  });
+  return `<div class="fp-parking-wrap">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:6px">${row1}</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px">${row2}</div>
+  </div>`;
 }
 
 function toggleShift(sh){ shiftOpen[sh]=!shiftOpen[sh]; renderBookingModal(); }
@@ -863,11 +951,15 @@ function renderDashboard(){
   presBod.innerHTML=state.employees.map((emp,i)=>{
     const dayStrs=days.map(d=>ymd(d));
     const total=dayStrs.filter(ds=>userHasDesk(emp.id,ds)).length;
-    const target=emp.targetDays||state.config.targetDays;
+    const target=emp.targetDays??state.config.targetDays;
+    const isRemote=target===0;
+    const cells=dayStrs.map(ds=>`<td style="text-align:center">${presenceDayCell(emp.id,ds)}</td>`).join('');
+    if(isRemote){
+      return `<tr><td>${i+1}</td><td>${h(emp.name)}</td>${cells}
+        <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center"><span class="pill" style="background:#f1f5f9;color:#64748b">Remote</span></td><td>—</td></tr>`;
+    }
     const p=pct(total,target*days.length/7);
     const pill=total>=target?'ok':total>=target*0.5?'warn':'bad';
-    // cells show actual booked shift letters (D/E/N/W) per day, not static assignment
-    const cells=dayStrs.map(ds=>`<td style="text-align:center">${presenceDayCell(emp.id,ds)}</td>`).join('');
     return `<tr><td>${i+1}</td><td>${h(emp.name)}</td>${cells}
       <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center">${target}</td><td><span class="pill ${pill}">${p}%</span></td></tr>`;
   }).join('');
@@ -1144,14 +1236,17 @@ function openPresentation(t,ref){
   // Presence summary — shifts column shows what was ACTUALLY booked, not assignment
   const presRows=state.employees.slice(0,40).map((emp,i)=>{
     const present=days.filter(d=>userHasDesk(emp.id,ymd(d))).length;
-    const target=emp.targetDays||state.config.targetDays;
+    const target=emp.targetDays??state.config.targetDays;
+    const isRemote=target===0;
+    const actualShifts=[...new Set(days.flatMap(d=>empShiftsBookedOnDay(emp.id,ymd(d))))];
+    const shiftsLabel=actualShifts.length?actualShifts.join(', '):'—';
+    if(isRemote){
+      return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${shiftsLabel}</td><td>${present}</td><td style="color:#64748b">Remote</td><td style="color:#64748b">—</td></tr>`;
+    }
     const weeks=Math.max(1,days.length/7);
     const targetTotal=Math.round(target*weeks);
     const p=pct(present,targetTotal);
     const col=present>=targetTotal?'#10b981':present>=targetTotal*0.5?'#f59e0b':'#ef4444';
-    // actual shifts used across the period
-    const actualShifts=[...new Set(days.flatMap(d=>empShiftsBookedOnDay(emp.id,ymd(d))))];
-    const shiftsLabel=actualShifts.length?actualShifts.join(', '):'—';
     return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${shiftsLabel}</td><td>${present}</td><td>${targetTotal}</td><td style="font-weight:700;color:${col}">${p}%</td></tr>`;
   }).join('');
 
@@ -1339,7 +1434,7 @@ function renderEmployees(){
       <td><input type="text" value="${h(emp.name)}" data-id="${emp.id}" data-field="name" class="emp-inp" style="width:100%"></td>
       <td><div class="shift-tog" data-id="${emp.id}">${togBtns}</div></td>
       <td><input type="text" value="${h(emp.department||'')}" data-id="${emp.id}" data-field="department" class="emp-inp" style="width:100%"></td>
-      <td><input type="number" value="${emp.targetDays||state.config.targetDays}" data-id="${emp.id}" data-field="targetDays" class="emp-inp" min="1" max="5" style="width:70px"></td>
+      <td><input type="number" value="${emp.targetDays??state.config.targetDays}" data-id="${emp.id}" data-field="targetDays" class="emp-inp" min="0" max="5" style="width:70px" title="0 = remote employee"></td>
       <td><button class="btn danger sm" onclick="deleteEmp('${emp.id}')">✕</button></td>
     </tr>`;
   }).join('');
@@ -1382,6 +1477,40 @@ async function deleteEmp(id){
   const res=await api('/api/employees/delete','POST',{id});
   if(res){ state.employees=res.employees; renderEmployees(); syncUserInput(); }
 }
+
+document.getElementById('importXlsBtn').addEventListener('click',()=>document.getElementById('importXlsFile').click());
+document.getElementById('importXlsFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  e.target.value='';
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array'});
+    const ws=wb.Sheets[wb.SheetNames[0]];
+    const rows=XLSX.utils.sheet_to_json(ws,{defval:''});
+    if(!rows.length){ toast('No data found in file','err'); return; }
+    // Detect columns: Name/name, Department/dept, Shift/shift, Target/targetDays
+    const normalize=s=>String(s||'').toLowerCase().replace(/[\s_-]/g,'');
+    const headers=Object.keys(rows[0]);
+    const col=(candidates)=>headers.find(h=>candidates.some(c=>normalize(h).includes(normalize(c))))||null;
+    const nameCol=col(['name','fullname','employee','naam']);
+    if(!nameCol){ toast('No "Name" column found in Excel','err'); return; }
+    const deptCol=col(['department','dept','team','abteilung']);
+    const shiftCol=col(['shift','tura','schicht']);
+    const targetCol=col(['target','targetdays','zieldage','days/wk','days/week']);
+    let added=0, skipped=0;
+    for(const row of rows){
+      const name=String(row[nameCol]||'').trim();
+      if(!name){ skipped++; continue; }
+      const dept=deptCol?String(row[deptCol]||'').trim():'';
+      const rawShift=shiftCol?String(row[shiftCol]||'').trim().toLowerCase():'day';
+      const shift=Object.keys(SHIFT_META).find(k=>k.startsWith(rawShift.slice(0,3)))||'day';
+      const target=targetCol?parseInt(row[targetCol])||state.config.targetDays:state.config.targetDays;
+      await api('/api/employees/add','POST',{name,department:dept,shift,shifts:[shift],targetDays:target});
+      added++;
+    }
+    toast(`Imported ${added} employees${skipped?' ('+skipped+' skipped)':''}`, 'ok');
+  }catch(err){ toast('Failed to read file: '+err.message,'err'); }
+});
 
 document.getElementById('exportEmpBtn').addEventListener('click',()=>{
   const rows=[['#','Name','Shift','Department','Target days/wk'],...state.employees.map((e,i)=>[i+1,e.name,e.shift,e.department||'',e.targetDays])];
