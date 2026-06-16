@@ -1,0 +1,328 @@
+/* ── Reset & base ────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --clr-bg:       #f4f6f9;
+  --clr-surface:  #ffffff;
+  --clr-border:   #dde1e7;
+  --clr-text:     #1a1d23;
+  --clr-muted:    #6b7280;
+  --clr-free:     #22c55e;
+  --clr-free-bg:  #dcfce7;
+  --clr-mine:     #3b82f6;
+  --clr-mine-bg:  #dbeafe;
+  --clr-taken:    #ef4444;
+  --clr-taken-bg: #fee2e2;
+  --clr-primary:  #3b82f6;
+  --radius:       12px;
+  --shadow:       0 2px 8px rgba(0,0,0,.08);
+  --transition:   .18s ease;
+}
+
+body {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  min-height: 100vh;
+}
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0,0,0,0); white-space: nowrap; border: 0;
+}
+
+/* ── Header ──────────────────────────────────────────────────── */
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: var(--clr-surface);
+  border-bottom: 1px solid var(--clr-border);
+  box-shadow: var(--shadow);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.header-icon { font-size: 1.5rem; }
+
+h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -.01em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#user-name {
+  padding: 8px 14px;
+  border: 2px solid var(--clr-border);
+  border-radius: 8px;
+  font-size: .95rem;
+  outline: none;
+  transition: border-color var(--transition);
+  min-width: 180px;
+  background: var(--clr-bg);
+}
+
+#user-name:focus { border-color: var(--clr-primary); background: #fff; }
+
+/* ── Status dot ──────────────────────────────────────────────── */
+.status-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #9ca3af;
+  display: inline-block;
+  transition: background var(--transition);
+  flex-shrink: 0;
+}
+.status-dot.connected    { background: var(--clr-free); }
+.status-dot.disconnected { background: var(--clr-taken); }
+
+/* ── Date bar ────────────────────────────────────────────────── */
+.date-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 24px;
+  background: var(--clr-surface);
+  border-bottom: 1px solid var(--clr-border);
+  font-size: .85rem;
+  color: var(--clr-muted);
+}
+
+.live-badge {
+  font-size: .78rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  transition: color var(--transition);
+}
+.live-badge.live { color: var(--clr-free); }
+
+/* ── Tabs ────────────────────────────────────────────────────── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 16px 24px 0;
+  border-bottom: 2px solid var(--clr-border);
+  background: var(--clr-bg);
+}
+
+.tab {
+  padding: 10px 22px;
+  border: none;
+  background: transparent;
+  font-size: .95rem;
+  font-weight: 600;
+  color: var(--clr-muted);
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  border-radius: 6px 6px 0 0;
+  transition: color var(--transition), border-color var(--transition), background var(--transition);
+}
+.tab:hover  { color: var(--clr-text); background: rgba(0,0,0,.04); }
+.tab.active { color: var(--clr-primary); border-bottom-color: var(--clr-primary); }
+
+/* ── Panels ──────────────────────────────────────────────────── */
+.panel { padding: 24px; }
+.hidden { display: none !important; }
+
+/* ── Legend ──────────────────────────────────────────────────── */
+.legend {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .85rem;
+  color: var(--clr-muted);
+}
+
+.swatch {
+  width: 14px; height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+.swatch.free  { background: var(--clr-free-bg);  border: 2px solid var(--clr-free); }
+.swatch.mine  { background: var(--clr-mine-bg);  border: 2px solid var(--clr-mine); }
+.swatch.taken { background: var(--clr-taken-bg); border: 2px solid var(--clr-taken); }
+
+/* ── Spot grid ───────────────────────────────────────────────── */
+.spot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+  max-width: 960px;
+}
+
+/* ── Spot card ───────────────────────────────────────────────── */
+.spot {
+  background: var(--clr-surface);
+  border: 2px solid var(--clr-border);
+  border-radius: var(--radius);
+  padding: 14px 10px;
+  cursor: pointer;
+  text-align: center;
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition), background var(--transition);
+  user-select: none;
+  position: relative;
+  outline: none;
+}
+
+.spot:hover:not(.taken) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,.12);
+}
+
+.spot:focus-visible {
+  box-shadow: 0 0 0 3px rgba(59,130,246,.4);
+}
+
+.spot.free {
+  border-color: var(--clr-free);
+  background: var(--clr-free-bg);
+}
+.spot.free:hover {
+  background: #bbf7d0;
+}
+
+.spot.mine {
+  border-color: var(--clr-mine);
+  background: var(--clr-mine-bg);
+}
+.spot.mine:hover {
+  background: #bfdbfe;
+}
+
+.spot.taken {
+  border-color: var(--clr-taken);
+  background: var(--clr-taken-bg);
+  cursor: not-allowed;
+  opacity: .85;
+}
+
+.spot-icon  { font-size: 1.6rem; margin-bottom: 4px; display: block; }
+.spot-label { font-size: .9rem; font-weight: 700; display: block; margin-bottom: 4px; }
+.spot-name  { font-size: .75rem; color: var(--clr-muted); display: block;
+               white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.45);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 200;
+  backdrop-filter: blur(2px);
+  animation: fade-in .15s ease;
+}
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+.modal {
+  background: var(--clr-surface);
+  border-radius: var(--radius);
+  padding: 28px 32px;
+  width: min(90vw, 400px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.2);
+  position: relative;
+  animation: slide-up .18s ease;
+}
+
+@keyframes slide-up {
+  from { transform: translateY(16px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modal-close {
+  position: absolute; top: 12px; right: 14px;
+  background: none; border: none;
+  font-size: 1.4rem; cursor: pointer; color: var(--clr-muted);
+  line-height: 1; padding: 4px;
+  border-radius: 6px;
+}
+.modal-close:hover { background: var(--clr-bg); color: var(--clr-text); }
+
+#modal-title { font-size: 1.15rem; font-weight: 700; margin-bottom: 10px; }
+#modal-body  { color: var(--clr-muted); font-size: .95rem; margin-bottom: 22px; line-height: 1.5; }
+
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+
+/* ── Buttons ─────────────────────────────────────────────────── */
+.btn {
+  padding: 9px 20px;
+  border-radius: 8px;
+  font-size: .92rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity var(--transition), transform var(--transition);
+}
+.btn:hover  { opacity: .88; }
+.btn:active { transform: scale(.97); }
+
+.btn-primary {
+  background: var(--clr-primary);
+  color: #fff;
+}
+.btn-danger {
+  background: var(--clr-taken);
+  color: #fff;
+}
+.btn-ghost {
+  background: var(--clr-bg);
+  color: var(--clr-text);
+  border: 1px solid var(--clr-border);
+}
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: #1a1d23;
+  color: #fff;
+  padding: 12px 22px;
+  border-radius: 10px;
+  font-size: .9rem;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,.25);
+  pointer-events: none;
+  opacity: 0;
+  transition: transform .25s ease, opacity .25s ease;
+  white-space: nowrap;
+  z-index: 300;
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+.toast.success { background: #16a34a; }
+.toast.error   { background: #dc2626; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 540px) {
+  .app-header   { flex-wrap: wrap; gap: 10px; }
+  .header-right { width: 100%; }
+  #user-name    { flex: 1; min-width: 0; }
+  .spot-grid    { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); }
+  .panel        { padding: 16px; }
+}

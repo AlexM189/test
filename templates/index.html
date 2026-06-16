@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Office Reservations</title>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+
+  <!-- ── Header ───────────────────────────────────────────────── -->
+  <header class="app-header">
+    <div class="header-left">
+      <span class="header-icon" aria-hidden="true">🏢</span>
+      <h1>Office Reservations</h1>
+    </div>
+    <div class="header-right">
+      <label for="user-name" class="sr-only">Your name</label>
+      <input
+        id="user-name"
+        type="text"
+        placeholder="Enter your name…"
+        maxlength="40"
+        autocomplete="off"
+        aria-label="Your name"
+      />
+      <span id="status-dot" class="status-dot" title="Connection status" aria-live="polite" aria-label="Disconnected"></span>
+    </div>
+  </header>
+
+  <!-- ── Date bar ─────────────────────────────────────────────── -->
+  <div class="date-bar">
+    <span id="today-label"></span>
+    <span id="live-badge" class="live-badge" aria-live="polite">Connecting…</span>
+  </div>
+
+  <!-- ── Tabs ─────────────────────────────────────────────────── -->
+  <nav class="tabs" role="tablist" aria-label="Section">
+    <button class="tab active" role="tab" aria-selected="true"  aria-controls="panel-desks"   id="tab-desks"   data-tab="desks">
+      🪑 Desks
+    </button>
+    <button class="tab"        role="tab" aria-selected="false" aria-controls="panel-parking" id="tab-parking" data-tab="parking">
+      🚗 Parking
+    </button>
+  </nav>
+
+  <!-- ── Panels ───────────────────────────────────────────────── -->
+  <main>
+    <section id="panel-desks" class="panel" role="tabpanel" aria-labelledby="tab-desks">
+      <div class="legend">
+        <span class="legend-item"><span class="swatch free"></span>Free</span>
+        <span class="legend-item"><span class="swatch mine"></span>Mine</span>
+        <span class="legend-item"><span class="swatch taken"></span>Reserved</span>
+      </div>
+      <div id="grid-desks" class="spot-grid" aria-label="Desk grid"></div>
+    </section>
+
+    <section id="panel-parking" class="panel hidden" role="tabpanel" aria-labelledby="tab-parking">
+      <div class="legend">
+        <span class="legend-item"><span class="swatch free"></span>Free</span>
+        <span class="legend-item"><span class="swatch mine"></span>Mine</span>
+        <span class="legend-item"><span class="swatch taken"></span>Reserved</span>
+      </div>
+      <div id="grid-parking" class="spot-grid" aria-label="Parking grid"></div>
+    </section>
+  </main>
+
+  <!-- ── Modal ────────────────────────────────────────────────── -->
+  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal">
+      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
+      <h2 id="modal-title"></h2>
+      <p  id="modal-body"></p>
+      <div class="modal-actions">
+        <button id="modal-confirm" class="btn btn-primary">Confirm</button>
+        <button id="modal-cancel-btn" class="btn btn-ghost">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Toast ────────────────────────────────────────────────── -->
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
