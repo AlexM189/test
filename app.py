@@ -285,6 +285,11 @@ def api_book():
         current = day[shift][kind].get(slot)
         if current and current != user_id:
             return jsonify({"error": "Slot already taken", "by": current}), 409
+        # Prevent double-booking same kind in same shift
+        already = [k for k, v in day[shift][kind].items() if v == user_id]
+        if already and slot not in already:
+            label = "desk" if kind == "desks" else "parking spot"
+            return jsonify({"error": f"You already have a {label} booked for this shift"}), 409
         day[shift][kind][slot] = user_id
         _save_data(data)
         day_data = data["bookings"][dt]

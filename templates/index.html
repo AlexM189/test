@@ -836,6 +836,10 @@ async function handleSlot(sh,kind,n){
   const owner=(sd[kind]||{})[String(n)];
   if(owner && owner!==currentUser){ toast('Already taken by '+empName(owner),'err'); return; }
   const mine=owner===currentUser;
+  if(!mine){
+    const alreadyHas=Object.values(sd[kind]||{}).includes(currentUser);
+    if(alreadyHas){ toast('You already have a '+(kind==='desks'?'desk':'parking spot')+' booked for this shift','err'); return; }
+  }
   const endpoint=mine?'/api/unbook':'/api/book';
   await api(endpoint,'POST',{date:modalDate,shift:sh,kind,slot:n,userId:currentUser});
 }
