@@ -2,43 +2,72 @@ import json
 import os
 import threading
 import time
-from datetime import date
+import uuid
+import io
+from datetime import date, datetime, timedelta
 
-from flask import Flask, Response, jsonify, render_template, request, stream_with_context
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    render_template,
+    request,
+    stream_with_context,
+    send_file,
+)
 
 app = Flask(__name__)
 
 # ---------------------------------------------------------------------------
 # Storage configuration
-# Set DATA_DIR env var to point at a shared network drive/partition, e.g.:
 #   DATA_DIR=/mnt/shared/office-reservations  python app.py
 # ---------------------------------------------------------------------------
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 DATA_FILE = os.path.join(DATA_DIR, "reservations.json")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-DEFAULT_DATA = {
-    "desks": {
-        str(i): {"id": str(i), "label": f"Desk {i}", "reserved_by": None, "reserved_date": None}
-        for i in range(1, 21)
-    },
-    "parking": {
-        str(i): {"id": str(i), "label": f"P{i}", "reserved_by": None, "reserved_date": None}
-        for i in range(1, 11)
-    },
+SHIFTS = ["day", "evening", "night", "weekend"]
+WEEKDAY_SHIFTS = ["day", "evening", "night"]
+WEEKEND_SHIFTS = ["weekend"]
+
+SHIFT_HOURS = {
+    "day": "09:00-18:00",
+    "evening": "16:00-24:00",
+    "night": "23:00-07:00",
+    "weekend": "19:00-03:00",
 }
+
+
+def _default_state():
+    return {
+        "config": {
+            "desks": 24,
+            "parking": 10,
+            "targetDays": 2,
+            "year": 2026,
+            "unavailableDesks": [],
+            "unavailableParking": [],
+        },
+        "employees": [],
+        "bookings": {},
+    }
+
+
+def _empty_day():
+    return {s: {"desks": {}, "parking": {}} for s in SHIFTS}
+
 
 file_lock = threading.Lock()
 
 # ---------------------------------------------------------------------------
 # SSE broadcast helpers
 # ---------------------------------------------------------------------------
-_clients: list[list] = []
+_clients = []
 _clients_lock = threading.Lock()
 
 
-def _broadcast(payload: dict) -> None:
-    msg = f"data: {json.dumps(payload)}\n\n"
+def _broadcast(payload):
+    msg = "data: " + json.dumps(payload) + "\n\n"
     with _clients_lock:
         for q in _clients:
             q.append(msg)
@@ -47,19 +76,45 @@ def _broadcast(payload: dict) -> None:
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
-def load_data() -> dict:
+def load_data():
     if not os.path.exists(DATA_FILE):
-        _save_data(DEFAULT_DATA)
-        return DEFAULT_DATA
+        st = _default_state()
+        _save_data(st)
+        return st
     with open(DATA_FILE, "r") as fh:
-        return json.load(fh)
+        data = json.load(fh)
+    # normalize / migrate
+    base = _default_state()
+    cfg = base["config"]
+    cfg.update(data.get("config", {}))
+    data["config"] = cfg
+    data.setdefault("employees", [])
+    data.setdefault("bookings", {})
+    return data
 
 
-def _save_data(data: dict) -> None:
+def _save_data(data):
     tmp = DATA_FILE + ".tmp"
     with open(tmp, "w") as fh:
         json.dump(data, fh, indent=2)
-    os.replace(tmp, DATA_FILE)  # atomic on POSIX
+    os.replace(tmp, DATA_FILE)
+
+
+def _ensure_day(data, dt):
+    if dt not in data["bookings"]:
+        data["bookings"][dt] = _empty_day()
+    else:
+        # make sure all shifts/kinds exist
+        day = data["bookings"][dt]
+        for s in SHIFTS:
+            day.setdefault(s, {"desks": {}, "parking": {}})
+            day[s].setdefault("desks", {})
+            day[s].setdefault("parking", {})
+    return data["bookings"][dt]
+
+
+def _gen_id():
+    return "e_" + uuid.uuid4().hex[:8]
 
 
 # ---------------------------------------------------------------------------
@@ -70,79 +125,194 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/data")
-def api_data():
+@app.route("/api/state")
+def api_state():
     with file_lock:
         return jsonify(load_data())
 
 
-@app.route("/api/reserve", methods=["POST"])
-def api_reserve():
+@app.route("/api/config", methods=["POST"])
+def api_config():
     body = request.get_json(silent=True) or {}
-    spot_type = body.get("type")
-    spot_id = str(body.get("id", ""))
-    name = (body.get("name") or "").strip()
+    with file_lock:
+        data = load_data()
+        cfg = data["config"]
+        for key in ("desks", "parking", "targetDays", "year"):
+            if key in body:
+                try:
+                    cfg[key] = int(body[key])
+                except (TypeError, ValueError):
+                    pass
+        for key in ("unavailableDesks", "unavailableParking"):
+            if key in body:
+                vals = body[key]
+                if isinstance(vals, str):
+                    vals = [v.strip() for v in vals.split(",") if v.strip()]
+                cleaned = []
+                for v in vals:
+                    try:
+                        cleaned.append(int(v))
+                    except (TypeError, ValueError):
+                        pass
+                cfg[key] = cleaned
+        _save_data(data)
+        out_cfg = data["config"]
+    _broadcast({"action": "config", "config": out_cfg})
+    return jsonify({"ok": True, "config": out_cfg})
 
-    if spot_type not in ("desks", "parking"):
-        return jsonify({"error": "Invalid type"}), 400
-    if not name:
-        return jsonify({"error": "Name is required"}), 400
+
+@app.route("/api/employees/add", methods=["POST"])
+def api_emp_add():
+    body = request.get_json(silent=True) or {}
+    with file_lock:
+        data = load_data()
+        default_target = data["config"].get("targetDays", 2)
+        names = body.get("names")
+        if isinstance(names, list) and names:
+            added = []
+            for nm in names:
+                nm = (nm or "").strip()
+                if not nm:
+                    continue
+                emp = {
+                    "id": _gen_id(),
+                    "name": nm,
+                    "shift": body.get("shift", "day"),
+                    "department": body.get("department", ""),
+                    "targetDays": int(body.get("targetDays", default_target)),
+                }
+                data["employees"].append(emp)
+                added.append(emp)
+        else:
+            emp = {
+                "id": _gen_id(),
+                "name": (body.get("name") or "New Employee").strip() or "New Employee",
+                "shift": body.get("shift", "day"),
+                "department": body.get("department", ""),
+                "targetDays": int(body.get("targetDays", default_target)),
+            }
+            data["employees"].append(emp)
+        _save_data(data)
+        emps = data["employees"]
+    _broadcast({"action": "employees", "employees": emps})
+    return jsonify({"ok": True, "employees": emps})
+
+
+@app.route("/api/employees/update", methods=["POST"])
+def api_emp_update():
+    body = request.get_json(silent=True) or {}
+    emp_id = body.get("id")
+    with file_lock:
+        data = load_data()
+        found = None
+        for emp in data["employees"]:
+            if emp["id"] == emp_id:
+                found = emp
+                break
+        if not found:
+            return jsonify({"error": "Employee not found"}), 404
+        for key in ("name", "shift", "department"):
+            if key in body:
+                found[key] = body[key]
+        if "targetDays" in body:
+            try:
+                found["targetDays"] = int(body["targetDays"])
+            except (TypeError, ValueError):
+                pass
+        _save_data(data)
+        emps = data["employees"]
+    _broadcast({"action": "employees", "employees": emps})
+    return jsonify({"ok": True, "employees": emps})
+
+
+@app.route("/api/employees/delete", methods=["POST"])
+def api_emp_delete():
+    body = request.get_json(silent=True) or {}
+    emp_id = body.get("id")
+    with file_lock:
+        data = load_data()
+        before = len(data["employees"])
+        data["employees"] = [e for e in data["employees"] if e["id"] != emp_id]
+        if len(data["employees"]) == before:
+            return jsonify({"error": "Employee not found"}), 404
+        _save_data(data)
+        emps = data["employees"]
+    _broadcast({"action": "employees", "employees": emps})
+    return jsonify({"ok": True, "employees": emps})
+
+
+@app.route("/api/book", methods=["POST"])
+def api_book():
+    body = request.get_json(silent=True) or {}
+    dt = body.get("date")
+    shift = body.get("shift")
+    kind = body.get("kind")
+    slot = str(body.get("slot", ""))
+    user_id = body.get("userId")
+
+    if not dt or shift not in SHIFTS or kind not in ("desks", "parking") or not slot:
+        return jsonify({"error": "Invalid request"}), 400
+    if not user_id:
+        return jsonify({"error": "No user selected"}), 400
 
     with file_lock:
         data = load_data()
-        spot = data[spot_type].get(spot_id)
-        if not spot:
-            return jsonify({"error": "Spot not found"}), 404
-        if spot["reserved_by"]:
-            return jsonify({"error": "Already reserved", "spot": spot}), 409
-        spot["reserved_by"] = name
-        spot["reserved_date"] = date.today().isoformat()
+        day = _ensure_day(data, dt)
+        current = day[shift][kind].get(slot)
+        if current and current != user_id:
+            return jsonify({"error": "Slot already taken", "by": current}), 409
+        day[shift][kind][slot] = user_id
         _save_data(data)
+        day_data = data["bookings"][dt]
+    _broadcast({"action": "booking", "date": dt, "day": day_data})
+    return jsonify({"ok": True, "day": day_data})
 
-    _broadcast({"action": "update", "type": spot_type, "id": spot_id, "spot": spot})
-    return jsonify({"ok": True, "spot": spot})
 
-
-@app.route("/api/cancel", methods=["POST"])
-def api_cancel():
+@app.route("/api/unbook", methods=["POST"])
+def api_unbook():
     body = request.get_json(silent=True) or {}
-    spot_type = body.get("type")
-    spot_id = str(body.get("id", ""))
-    name = (body.get("name") or "").strip()
+    dt = body.get("date")
+    shift = body.get("shift")
+    kind = body.get("kind")
+    slot = str(body.get("slot", ""))
+    user_id = body.get("userId")
 
-    if spot_type not in ("desks", "parking"):
-        return jsonify({"error": "Invalid type"}), 400
+    if not dt or shift not in SHIFTS or kind not in ("desks", "parking") or not slot:
+        return jsonify({"error": "Invalid request"}), 400
 
     with file_lock:
         data = load_data()
-        spot = data[spot_type].get(spot_id)
-        if not spot:
-            return jsonify({"error": "Spot not found"}), 404
-        if spot["reserved_by"] != name:
-            return jsonify({"error": "Not your reservation"}), 403
-        spot["reserved_by"] = None
-        spot["reserved_date"] = None
+        day = _ensure_day(data, dt)
+        current = day[shift][kind].get(slot)
+        if current is None:
+            return jsonify({"ok": True, "day": data["bookings"][dt]})
+        if user_id and current != user_id:
+            return jsonify({"error": "Not your booking", "by": current}), 403
+        del day[shift][kind][slot]
         _save_data(data)
-
-    _broadcast({"action": "update", "type": spot_type, "id": spot_id, "spot": spot})
-    return jsonify({"ok": True, "spot": spot})
+        day_data = data["bookings"][dt]
+    _broadcast({"action": "booking", "date": dt, "day": day_data})
+    return jsonify({"ok": True, "day": day_data})
 
 
 @app.route("/api/stream")
 def api_stream():
-    """Server-Sent Events endpoint — pushes live updates to every connected browser."""
-    q: list = []
+    q = []
     with _clients_lock:
         _clients.append(q)
 
     def generate():
         try:
-            yield "data: {\"action\":\"connected\"}\n\n"
+            yield 'data: {"action":"connected"}\n\n'
+            last_ping = time.time()
             while True:
                 if q:
                     yield q.pop(0)
                 else:
                     time.sleep(0.05)
+                    if time.time() - last_ping > 20:
+                        last_ping = time.time()
+                        yield ": ping\n\n"
         finally:
             with _clients_lock:
                 try:
@@ -154,6 +324,283 @@ def api_stream():
         stream_with_context(generate()),
         mimetype="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Excel export
+# ---------------------------------------------------------------------------
+HEADER_FILL = "4f46e5"
+ALT_FILL = "f1f4f9"
+
+
+def _period_range(period, ref):
+    try:
+        ref_d = datetime.strptime(ref, "%Y-%m-%d").date()
+    except (TypeError, ValueError):
+        ref_d = date.today()
+    if period == "week":
+        start = ref_d - timedelta(days=ref_d.weekday())
+        end = start + timedelta(days=6)
+    elif period == "month":
+        start = ref_d.replace(day=1)
+        if start.month == 12:
+            nxt = start.replace(year=start.year + 1, month=1)
+        else:
+            nxt = start.replace(month=start.month + 1)
+        end = nxt - timedelta(days=1)
+    elif period == "quarter":
+        q = (ref_d.month - 1) // 3
+        start = date(ref_d.year, q * 3 + 1, 1)
+        em = q * 3 + 3
+        if em == 12:
+            end = date(ref_d.year, 12, 31)
+        else:
+            end = date(ref_d.year, em + 1, 1) - timedelta(days=1)
+    else:  # year
+        start = date(ref_d.year, 1, 1)
+        end = date(ref_d.year, 12, 31)
+    return start, end
+
+
+def _iter_dates(start, end):
+    d = start
+    while d <= end:
+        yield d
+        d += timedelta(days=1)
+
+
+def _shifts_for(d):
+    return WEEKEND_SHIFTS if d.weekday() >= 5 else WEEKDAY_SHIFTS
+
+
+@app.route("/api/export/excel")
+def api_export_excel():
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+    from openpyxl.utils import get_column_letter
+
+    period = request.args.get("period", "week")
+    ref = request.args.get("ref", date.today().isoformat())
+    start, end = _period_range(period, ref)
+
+    with file_lock:
+        data = load_data()
+
+    cfg = data["config"]
+    n_desks = cfg.get("desks", 24)
+    n_park = cfg.get("parking", 10)
+    employees = data["employees"]
+    emp_by_id = {e["id"]: e for e in employees}
+    bookings = data["bookings"]
+
+    header_font = Font(bold=True, color="FFFFFF")
+    header_fill = PatternFill("solid", fgColor=HEADER_FILL)
+    alt_fill = PatternFill("solid", fgColor=ALT_FILL)
+    thin = Side(style="thin", color="e2e8f0")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center = Alignment(horizontal="center", vertical="center")
+
+    wb = Workbook()
+    wb.remove(wb.active)
+
+    def style_sheet(ws, header_cols, rows, pct_cols=None):
+        pct_cols = pct_cols or set()
+        ws.append(header_cols)
+        for ci, _ in enumerate(header_cols, 1):
+            c = ws.cell(row=1, column=ci)
+            c.font = header_font
+            c.fill = header_fill
+            c.alignment = center
+            c.border = border
+        for ri, row in enumerate(rows, start=2):
+            ws.append(row)
+            for ci in range(1, len(header_cols) + 1):
+                c = ws.cell(row=ri, column=ci)
+                c.border = border
+                c.alignment = center
+                if ri % 2 == 0:
+                    c.fill = alt_fill
+                if (ci - 1) in pct_cols and isinstance(row[ci - 1], (int, float)):
+                    c.number_format = "0.0%"
+        # column widths
+        for ci, hdr in enumerate(header_cols, 1):
+            maxlen = len(str(hdr))
+            for row in rows:
+                if ci - 1 < len(row):
+                    maxlen = max(maxlen, len(str(row[ci - 1])))
+            ws.column_dimensions[get_column_letter(ci)].width = min(max(maxlen + 2, 10), 40)
+
+    def day_util(d):
+        """Return dict shift -> (desk_frac, park_frac) for a date."""
+        dt = d.isoformat()
+        day = bookings.get(dt, _empty_day())
+        out = {}
+        for s in _shifts_for(d):
+            sd = day.get(s, {"desks": {}, "parking": {}})
+            dfrac = (len(sd.get("desks", {})) / n_desks) if n_desks else 0
+            pfrac = (len(sd.get("parking", {})) / n_park) if n_park else 0
+            out[s] = (dfrac, pfrac)
+        return out
+
+    # ----- Summary stats -----
+    total_desk_book = 0
+    total_park_book = 0
+    desk_slots = 0
+    park_slots = 0
+    presence = {e["id"]: set() for e in employees}
+    for d in _iter_dates(start, end):
+        dt = d.isoformat()
+        day = bookings.get(dt)
+        for s in _shifts_for(d):
+            desk_slots += n_desks
+            park_slots += n_park
+            if not day:
+                continue
+            sd = day.get(s, {})
+            dd = sd.get("desks", {})
+            pp = sd.get("parking", {})
+            total_desk_book += len(dd)
+            total_park_book += len(pp)
+            for uid in list(dd.values()) + list(pp.values()):
+                if uid in presence:
+                    presence[uid].add(dt)
+
+    desk_util = (total_desk_book / desk_slots) if desk_slots else 0
+    park_util = (total_park_book / park_slots) if park_slots else 0
+
+    ws = wb.create_sheet("Summary")
+    summary_rows = [
+        ["Period", period.capitalize()],
+        ["Range", f"{start.isoformat()} to {end.isoformat()}"],
+        ["Total desks", n_desks],
+        ["Total parking", n_park],
+        ["Employees", len(employees)],
+        ["Desk bookings", total_desk_book],
+        ["Parking bookings", total_park_book],
+        ["Avg desk utilization", desk_util],
+        ["Avg parking utilization", park_util],
+    ]
+    style_sheet(ws, ["Metric", "Value"], summary_rows, pct_cols=set())
+    # format the two util rows as %
+    for ri in range(2, len(summary_rows) + 2):
+        label = ws.cell(row=ri, column=1).value
+        if "utilization" in str(label):
+            ws.cell(row=ri, column=2).number_format = "0.0%"
+
+    if period == "week":
+        # Daily sheet
+        ws_d = wb.create_sheet("Daily")
+        rows = []
+        for d in _iter_dates(start, end):
+            util = day_util(d)
+            for s in SHIFTS:
+                if s in util:
+                    dfrac, pfrac = util[s]
+                    rows.append([d.isoformat(), d.strftime("%a"), s,
+                                 SHIFT_HOURS[s], dfrac, pfrac])
+        style_sheet(ws_d, ["Date", "Day", "Shift", "Hours", "Desk Util", "Parking Util"],
+                    rows, pct_cols={4, 5})
+
+        # Presence
+        ws_p = wb.create_sheet("Presence")
+        days = list(_iter_dates(start, end))
+        hdr = ["Employee", "Shift"] + [d.strftime("%a %d") for d in days] + ["Total", "Target", "Met?"]
+        rows = []
+        for e in employees:
+            pres = presence.get(e["id"], set())
+            marks = ["X" if d.isoformat() in pres else "" for d in days]
+            total = len(pres)
+            target = e.get("targetDays", cfg.get("targetDays", 2))
+            rows.append([e["name"], e.get("shift", ""), *marks, total, target,
+                         "Yes" if total >= target else "No"])
+        style_sheet(ws_p, hdr, rows)
+
+    elif period == "month":
+        # Weekly Agg
+        ws_w = wb.create_sheet("Weekly Agg")
+        rows = []
+        wk_start = start - timedelta(days=start.weekday())
+        wk = wk_start
+        widx = 1
+        while wk <= end:
+            wk_end = wk + timedelta(days=6)
+            db, pb, ds, ps = 0, 0, 0, 0
+            for d in _iter_dates(max(wk, start), min(wk_end, end)):
+                util = day_util(d)
+                for s, (df, pf) in util.items():
+                    db += df
+                    pb += pf
+                    ds += 1
+                    ps += 1
+            rows.append([f"Week {widx}", wk.isoformat(),
+                         (db / ds) if ds else 0, (pb / ps) if ps else 0])
+            wk += timedelta(days=7)
+            widx += 1
+        style_sheet(ws_w, ["Week", "Starting", "Avg Desk Util", "Avg Parking Util"],
+                    rows, pct_cols={2, 3})
+
+        # Daily
+        ws_d = wb.create_sheet("Daily")
+        rows = []
+        for d in _iter_dates(start, end):
+            util = day_util(d)
+            db = sum(x[0] for x in util.values())
+            pb = sum(x[1] for x in util.values())
+            n = len(util) or 1
+            rows.append([d.isoformat(), d.strftime("%a"), db / n, pb / n])
+        style_sheet(ws_d, ["Date", "Day", "Avg Desk Util", "Avg Parking Util"],
+                    rows, pct_cols={2, 3})
+
+        # Presence matrix
+        ws_p = wb.create_sheet("Presence")
+        days = list(_iter_dates(start, end))
+        hdr = ["Employee"] + [d.strftime("%d") for d in days] + ["Total", "Target", "Met?"]
+        rows = []
+        for e in employees:
+            pres = presence.get(e["id"], set())
+            marks = ["X" if d.isoformat() in pres else "" for d in days]
+            total = len(pres)
+            target_days = e.get("targetDays", cfg.get("targetDays", 2))
+            weeks = max(1, (end - start).days // 7 + 1)
+            target = target_days * weeks
+            rows.append([e["name"], *marks, total, target,
+                         "Yes" if total >= target else "No"])
+        style_sheet(ws_p, hdr, rows)
+
+    else:  # quarter / year
+        ws_m = wb.create_sheet("Monthly Agg")
+        rows = []
+        cur = start.replace(day=1)
+        while cur <= end:
+            if cur.month == 12:
+                nxt = cur.replace(year=cur.year + 1, month=1)
+            else:
+                nxt = cur.replace(month=cur.month + 1)
+            m_end = min(nxt - timedelta(days=1), end)
+            db, pb, ds, ps = 0, 0, 0, 0
+            for d in _iter_dates(max(cur, start), m_end):
+                util = day_util(d)
+                for s, (df, pf) in util.items():
+                    db += df
+                    pb += pf
+                    ds += 1
+                    ps += 1
+            rows.append([cur.strftime("%B %Y"),
+                         (db / ds) if ds else 0, (pb / ps) if ps else 0])
+            cur = nxt
+        style_sheet(ws_m, ["Month", "Avg Desk Util", "Avg Parking Util"],
+                    rows, pct_cols={1, 2})
+
+    bio = io.BytesIO()
+    wb.save(bio)
+    bio.seek(0)
+    fname = f"office-report-{period}-{start.isoformat()}.xlsx"
+    return send_file(
+        bio,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=fname,
     )
 
 
