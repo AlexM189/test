@@ -4,10 +4,7 @@ import threading
 import time
 import uuid
 import io
-import hashlib
-import secrets as _secrets
 from datetime import date, datetime, timedelta
-from functools import wraps
 
 from flask import (
     Flask,
@@ -15,15 +12,11 @@ from flask import (
     jsonify,
     render_template,
     request,
-    session,
     stream_with_context,
     send_file,
 )
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", _secrets.token_hex(32))
-app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 
 # ---------------------------------------------------------------------------
 # Storage configuration
@@ -31,55 +24,7 @@ app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 # ---------------------------------------------------------------------------
 DATA_DIR = os.environ.get("DATA_DIR", os.path.join(os.path.dirname(__file__), "data"))
 DATA_FILE = os.path.join(DATA_DIR, "reservations.json")
-USERS_FILE = os.path.join(DATA_DIR, "users.json")
 os.makedirs(DATA_DIR, exist_ok=True)
-
-# ---------------------------------------------------------------------------
-# Auth helpers
-# ---------------------------------------------------------------------------
-
-def _hash_pw(password, salt=None):
-    if salt is None:
-        salt = _secrets.token_hex(16)
-    dk = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 100_000)
-    return salt, dk.hex()
-
-def _verify_pw(password, salt, hashed):
-    _, h = _hash_pw(password, salt)
-    return h == hashed
-
-def load_users():
-    if not os.path.exists(USERS_FILE):
-        return {"users": []}
-    with open(USERS_FILE) as f:
-        return json.load(f)
-
-def save_users(udata):
-    tmp = USERS_FILE + ".tmp"
-    with open(tmp, "w") as f:
-        json.dump(udata, f, indent=2)
-    os.replace(tmp, USERS_FILE)
-
-def _safe_users(users):
-    return [{"email": u["email"], "role": u.get("role", "user")} for u in users]
-
-def login_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get("user_email"):
-            return jsonify({"error": "Not authenticated"}), 401
-        return f(*args, **kwargs)
-    return decorated
-
-def admin_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get("user_email"):
-            return jsonify({"error": "Not authenticated"}), 401
-        if session.get("user_role") != "admin":
-            return jsonify({"error": "Admin access required"}), 403
-        return f(*args, **kwargs)
-    return decorated
 
 SHIFTS = ["day", "evening", "night", "weekend"]
 WEEKDAY_SHIFTS = ["day", "evening", "night"]
@@ -180,121 +125,6 @@ def index():
     return render_template("index.html")
 
 
-# ---------------------------------------------------------------------------
-# Auth routes
-# ---------------------------------------------------------------------------
-
-@app.route("/api/me")
-def api_me():
-    if session.get("user_email"):
-        return jsonify({"email": session["user_email"], "role": session.get("user_role", "user")})
-    return jsonify({"error": "Not authenticated"}), 401
-
-
-@app.route("/api/login", methods=["POST"])
-def api_login():
-    body = request.get_json(silent=True) or {}
-    email = (body.get("email") or "").strip().lower()
-    password = body.get("password") or ""
-    udata = load_users()
-    users = udata.get("users", [])
-    if not users:
-        return jsonify({"error": "No accounts exist yet.", "setup": True}), 401
-    user = next((u for u in users if u["email"].lower() == email), None)
-    if not user or not _verify_pw(password, user["salt"], user["hash"]):
-        return jsonify({"error": "Invalid email or password"}), 401
-    session.permanent = True
-    session["user_email"] = user["email"]
-    session["user_role"] = user.get("role", "user")
-    return jsonify({"ok": True, "email": user["email"], "role": user.get("role", "user")})
-
-
-@app.route("/api/logout", methods=["POST"])
-def api_logout():
-    session.clear()
-    return jsonify({"ok": True})
-
-
-@app.route("/api/users")
-@admin_required
-def api_users_list():
-    udata = load_users()
-    return jsonify({"users": _safe_users(udata.get("users", []))})
-
-
-@app.route("/api/users/add", methods=["POST"])
-def api_users_add():
-    body = request.get_json(silent=True) or {}
-    email = (body.get("email") or "").strip().lower()
-    password = body.get("password") or ""
-    role = body.get("role", "user")
-    if role not in ("admin", "user"):
-        role = "user"
-    if not email or not password:
-        return jsonify({"error": "Email and password required"}), 400
-    udata = load_users()
-    users = udata.get("users", [])
-    # First account can be created without auth (initial setup)
-    if users:
-        if not session.get("user_email"):
-            return jsonify({"error": "Not authenticated"}), 401
-        if session.get("user_role") != "admin":
-            return jsonify({"error": "Admin access required"}), 403
-    if any(u["email"].lower() == email for u in users):
-        return jsonify({"error": "Email already exists"}), 409
-    if len(password) < 4:
-        return jsonify({"error": "Password must be at least 4 characters"}), 400
-    salt, hashed = _hash_pw(password)
-    users.append({"email": email, "salt": salt, "hash": hashed, "role": role})
-    udata["users"] = users
-    save_users(udata)
-    return jsonify({"ok": True, "users": _safe_users(users)})
-
-
-@app.route("/api/users/delete", methods=["POST"])
-@admin_required
-def api_users_delete():
-    body = request.get_json(silent=True) or {}
-    email = (body.get("email") or "").strip().lower()
-    if email == session.get("user_email", "").lower():
-        return jsonify({"error": "Cannot delete your own account"}), 400
-    udata = load_users()
-    users = udata.get("users", [])
-    before = len(users)
-    users = [u for u in users if u["email"].lower() != email]
-    if len(users) == before:
-        return jsonify({"error": "User not found"}), 404
-    udata["users"] = users
-    save_users(udata)
-    return jsonify({"ok": True, "users": _safe_users(users)})
-
-
-@app.route("/api/users/change-password", methods=["POST"])
-@login_required
-def api_change_password():
-    body = request.get_json(silent=True) or {}
-    target_email = (body.get("email") or session["user_email"]).strip().lower()
-    new_password = body.get("password") or ""
-    if target_email != session["user_email"].lower() and session.get("user_role") != "admin":
-        return jsonify({"error": "Admin access required"}), 403
-    if not new_password or len(new_password) < 4:
-        return jsonify({"error": "Password must be at least 4 characters"}), 400
-    udata = load_users()
-    users = udata.get("users", [])
-    user = next((u for u in users if u["email"].lower() == target_email), None)
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    salt, hashed = _hash_pw(new_password)
-    user["salt"] = salt
-    user["hash"] = hashed
-    save_users(udata)
-    return jsonify({"ok": True})
-
-
-# ---------------------------------------------------------------------------
-# Data routes
-# ---------------------------------------------------------------------------
-
 @app.route("/api/state")
 def api_state():
     with file_lock:
@@ -302,7 +132,6 @@ def api_state():
 
 
 @app.route("/api/config", methods=["POST"])
-@login_required
 def api_config():
     body = request.get_json(silent=True) or {}
     with file_lock:
@@ -343,7 +172,6 @@ def _normalize_shifts(raw, fallback="day"):
 
 
 @app.route("/api/employees/add", methods=["POST"])
-@login_required
 def api_emp_add():
     body = request.get_json(silent=True) or {}
     with file_lock:
@@ -386,7 +214,6 @@ def api_emp_add():
 
 
 @app.route("/api/employees/update", methods=["POST"])
-@login_required
 def api_emp_update():
     body = request.get_json(silent=True) or {}
     emp_id = body.get("id")
@@ -423,7 +250,6 @@ def api_emp_update():
 
 
 @app.route("/api/employees/delete", methods=["POST"])
-@login_required
 def api_emp_delete():
     body = request.get_json(silent=True) or {}
     emp_id = body.get("id")
@@ -440,7 +266,6 @@ def api_emp_delete():
 
 
 @app.route("/api/book", methods=["POST"])
-@login_required
 def api_book():
     body = request.get_json(silent=True) or {}
     dt = body.get("date")
@@ -468,7 +293,6 @@ def api_book():
 
 
 @app.route("/api/unbook", methods=["POST"])
-@login_required
 def api_unbook():
     body = request.get_json(silent=True) or {}
     dt = body.get("date")
@@ -575,7 +399,6 @@ def _shifts_for(d):
 
 
 @app.route("/api/export/excel")
-@login_required
 def api_export_excel():
     from openpyxl import Workbook
     from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
@@ -589,7 +412,7 @@ def api_export_excel():
         data = load_data()
 
     cfg = data["config"]
-    n_desks = cfg.get("desks", 24)
+    n_desks = cfg.get("desks", 28)
     n_park = cfg.get("parking", 10)
     employees = data["employees"]
     emp_by_id = {e["id"]: e for e in employees}

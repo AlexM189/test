@@ -214,10 +214,6 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
       <div class="udrop" id="udrop"></div>
     </div>
     <span class="status-dot" id="statusDot" title="Live connection"></span>
-    <div style="display:flex;align-items:center;gap:6px;border-left:1px solid var(--border);padding-left:10px">
-      <span id="sessionEmail" style="font-size:11px;color:var(--text-muted);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
-      <button class="btn sec sm" id="logoutBtn" style="white-space:nowrap">Sign out</button>
-    </div>
   </div>
 </header>
 
@@ -400,29 +396,6 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
       ⚠ <strong>Overlap notice:</strong> Day (09–18) and Evening (16–24) shifts overlap 16:00–18:00.
     </div>
   </div>
-  <div class="card" id="accountsCard" style="display:none">
-    <h2>🔐 User Accounts</h2>
-    <div class="sub">Manage who can sign in. Only admins can add or remove accounts.</div>
-    <div id="accountsList" style="margin-bottom:16px;overflow-x:auto"></div>
-    <details style="margin-bottom:10px">
-      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--primary);user-select:none">+ Add new account</summary>
-      <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr auto auto;gap:8px;align-items:end">
-        <label class="field" style="margin:0"><span>Email</span><input type="email" id="newAccEmail" placeholder="user@company.com"></label>
-        <label class="field" style="margin:0"><span>Password</span><input type="password" id="newAccPwd" placeholder="Min 4 chars"></label>
-        <label class="field" style="margin:0"><span>Role</span>
-          <select id="newAccRole"><option value="user">User</option><option value="admin">Admin</option></select>
-        </label>
-        <button class="btn" style="align-self:end" id="addAccBtn">Add</button>
-      </div>
-    </details>
-    <details>
-      <summary style="cursor:pointer;font-weight:600;font-size:13px;color:var(--text-muted);user-select:none">Change my password</summary>
-      <div style="margin-top:12px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
-        <label class="field" style="margin:0;flex:1;min-width:160px"><span>New password</span><input type="password" id="changePwd" placeholder="Min 4 chars"></label>
-        <button class="btn sec" id="changePwdBtn">Update password</button>
-      </div>
-    </details>
-  </div>
   <div class="card">
     <h2>Data Management</h2>
     <div class="sub">Back up or restore all bookings and employee data.</div>
@@ -459,31 +432,6 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
         <button class="btn sec" id="cancelPaste">Cancel</button>
         <button class="btn" id="applyPaste">Add employees</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- LOGIN OVERLAY -->
-<div id="loginOverlay" style="display:none;position:fixed;inset:0;background:#0f172a;z-index:500;align-items:center;justify-content:center;padding:20px">
-  <div style="background:#fff;border-radius:16px;padding:36px 40px;width:100%;max-width:420px;box-shadow:0 25px 60px rgba(0,0,0,.4)">
-    <div style="text-align:center;margin-bottom:28px">
-      <div style="font-size:32px;margin-bottom:8px">🏢</div>
-      <h1 style="margin:0 0 4px;font-size:22px;color:#1e293b">Office Reservations</h1>
-      <p style="margin:0;color:#64748b;font-size:14px">Sign in to continue</p>
-    </div>
-    <div id="loginMsg" style="display:none;padding:10px 13px;border-radius:6px;margin-bottom:14px;font-size:13px"></div>
-    <!-- Setup form (first run) -->
-    <div id="setupForm" style="display:none">
-      <p style="font-size:13px;color:#64748b;margin-top:0;padding:10px 13px;background:#fef3c7;border-left:3px solid #f59e0b;border-radius:6px">No accounts exist yet. Create the first admin account.</p>
-      <label class="field"><span>Email</span><input type="email" id="setupEmail" placeholder="admin@company.com"></label>
-      <label class="field"><span>Password</span><input type="password" id="setupPwd" placeholder="Min 4 characters"></label>
-      <button class="btn" style="width:100%;margin-top:4px" id="setupBtn">Create admin account</button>
-    </div>
-    <!-- Login form -->
-    <div id="loginForm">
-      <label class="field"><span>Email</span><input type="email" id="loginEmail" placeholder="your@email.com" autocomplete="email"></label>
-      <label class="field"><span>Password</span><input type="password" id="loginPwd" placeholder="Password" autocomplete="current-password"></label>
-      <button class="btn" style="width:100%;margin-top:4px" id="loginBtn">Sign in</button>
     </div>
   </div>
 </div>
@@ -590,12 +538,6 @@ async function api(url, method='GET', body=null){
     if(body){ opts.body=JSON.stringify(body); opts.headers['Content-Type']='application/json'; }
     const r=await fetch(url,opts);
     const data=await r.json();
-    if(r.status===401 && url!=='/api/me' && url!=='/api/login'){
-      // Session expired — show login again
-      sessionUser=null;
-      showLoginOverlay(!!data.setup);
-      return null;
-    }
     if(!r.ok){ toast(data.error||'Error','err'); return null; }
     return data;
   }catch(e){ toast('Network error','err'); return null; }
@@ -1628,7 +1570,6 @@ function renderSettings(){
   document.getElementById('cfgYear').value=state.config.year;
   document.getElementById('cfgUnavailD').value=(state.config.unavailableDesks||[]).join(', ');
   document.getElementById('cfgUnavailP').value=(state.config.unavailableParking||[]).join(', ');
-  if(sessionUser?.role==='admin') loadAccounts();
 }
 document.getElementById('saveCfg').addEventListener('click',async()=>{
   const body={
@@ -1683,116 +1624,6 @@ function download(name,type,content){
 }
 
 /* ====================================================================
-   AUTH / LOGIN
-   ==================================================================== */
-let sessionUser = null; // {email, role}
-
-function showLoginOverlay(setupMode){
-  const ov = document.getElementById('loginOverlay');
-  ov.style.display = 'flex';
-  document.getElementById('loginForm').style.display = setupMode ? 'none' : 'block';
-  document.getElementById('setupForm').style.display = setupMode ? 'block' : 'none';
-  document.getElementById('loginMsg').style.display = 'none';
-  if(setupMode) setTimeout(()=>document.getElementById('setupEmail').focus(), 50);
-  else setTimeout(()=>document.getElementById('loginEmail').focus(), 50);
-}
-
-function hideLoginOverlay(){
-  document.getElementById('loginOverlay').style.display = 'none';
-}
-
-function setLoginMsg(msg, isErr=true){
-  const el = document.getElementById('loginMsg');
-  el.textContent = msg;
-  el.style.background = isErr ? 'var(--danger-light)' : 'var(--success-light)';
-  el.style.color = isErr ? '#991b1b' : '#065f46';
-  el.style.display = 'block';
-}
-
-async function doLogin(email, password){
-  const r = await fetch('/api/login', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password})});
-  const data = await r.json();
-  if(!r.ok){ setLoginMsg(data.error||'Login failed'); return; }
-  sessionUser = {email: data.email, role: data.role};
-  hideLoginOverlay();
-  document.getElementById('sessionEmail').textContent = data.email;
-  if(data.role === 'admin') document.getElementById('accountsCard').style.display = 'block';
-  await loadAppState();
-}
-
-async function doSetup(email, password){
-  const r = await fetch('/api/users/add', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({email,password,role:'admin'})});
-  const data = await r.json();
-  if(!r.ok){ setLoginMsg(data.error||'Setup failed'); return; }
-  setLoginMsg('Admin account created! Signing in…', false);
-  setTimeout(()=>doLogin(email,password), 800);
-}
-
-document.getElementById('loginBtn').addEventListener('click',()=>{
-  const email=document.getElementById('loginEmail').value.trim();
-  const pwd=document.getElementById('loginPwd').value;
-  if(!email||!pwd){ setLoginMsg('Enter email and password'); return; }
-  doLogin(email,pwd);
-});
-document.getElementById('loginPwd').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('loginBtn').click(); });
-document.getElementById('loginEmail').addEventListener('keydown',e=>{ if(e.key==='Enter') document.getElementById('loginPwd').focus(); });
-
-document.getElementById('setupBtn').addEventListener('click',()=>{
-  const email=document.getElementById('setupEmail').value.trim();
-  const pwd=document.getElementById('setupPwd').value;
-  if(!email||!pwd){ setLoginMsg('Enter email and password'); return; }
-  doSetup(email,pwd);
-});
-
-document.getElementById('logoutBtn').addEventListener('click',async()=>{
-  await fetch('/api/logout',{method:'POST'});
-  sessionUser=null;
-  document.getElementById('sessionEmail').textContent='';
-  document.getElementById('accountsCard').style.display='none';
-  showLoginOverlay(false);
-});
-
-/* ====================================================================
-   USER ACCOUNT MANAGEMENT (admin)
-   ==================================================================== */
-async function loadAccounts(){
-  if(!sessionUser||sessionUser.role!=='admin') return;
-  const data = await api('/api/users');
-  if(!data) return;
-  const users = data.users||[];
-  const tbl = `<table><thead><tr><th>Email</th><th>Role</th><th></th></tr></thead><tbody>
-    ${users.map(u=>`<tr>
-      <td>${h(u.email)}</td>
-      <td><span class="pill ${u.role==='admin'?'day':'ok'}">${u.role}</span></td>
-      <td>${u.email===sessionUser.email?'<span style="color:var(--text-muted);font-size:12px">(you)</span>':`<button class="btn danger sm" onclick="deleteAccount('${h(u.email)}')">✕</button>`}</td>
-    </tr>`).join('')}
-  </tbody></table>`;
-  document.getElementById('accountsList').innerHTML=tbl;
-}
-
-async function deleteAccount(email){
-  if(!confirm(`Remove account ${email}?`)) return;
-  const res = await api('/api/users/delete','POST',{email});
-  if(res) loadAccounts();
-}
-
-document.getElementById('addAccBtn').addEventListener('click',async()=>{
-  const email=document.getElementById('newAccEmail').value.trim();
-  const pwd=document.getElementById('newAccPwd').value;
-  const role=document.getElementById('newAccRole').value;
-  if(!email||!pwd){ toast('Email and password required','err'); return; }
-  const res=await api('/api/users/add','POST',{email,password:pwd,role});
-  if(res){ toast(`Account ${email} created`,'ok'); document.getElementById('newAccEmail').value=''; document.getElementById('newAccPwd').value=''; loadAccounts(); }
-});
-
-document.getElementById('changePwdBtn').addEventListener('click',async()=>{
-  const pwd=document.getElementById('changePwd').value;
-  if(!pwd){ toast('Enter new password','err'); return; }
-  const res=await api('/api/users/change-password','POST',{email:sessionUser.email,password:pwd});
-  if(res){ toast('Password updated','ok'); document.getElementById('changePwd').value=''; }
-});
-
-/* ====================================================================
    BOOT
    ==================================================================== */
 function normalizeEmployees(emps){
@@ -1803,7 +1634,7 @@ function normalizeEmployees(emps){
   }));
 }
 
-async function loadAppState(){
+async function init(){
   try{
     const data=await fetch('/api/state').then(r=>r.json());
     data.employees=normalizeEmployees(data.employees||[]);
@@ -1814,29 +1645,7 @@ async function loadAppState(){
   renderCalendar();
   renderToday();
   connectSSE();
-  if(activePanel==='settings') renderSettings();
 }
-
-async function init(){
-  // Check if user is already authenticated
-  const meR = await fetch('/api/me');
-  if(meR.status === 401){
-    const meData = await meR.json();
-    showLoginOverlay(!!meData.setup);
-    return; // wait for login
-  }
-  const me = await meR.json();
-  sessionUser = {email: me.email, role: me.role};
-  document.getElementById('sessionEmail').textContent = me.email;
-  if(me.role === 'admin') document.getElementById('accountsCard').style.display = 'block';
-  await loadAppState();
-}
-
-// Wire the settings tab to reload accounts when opened
-document.querySelectorAll('nav button').forEach(b=>{
-  if(b.dataset.panel==='settings') b.addEventListener('click',()=>{ if(sessionUser?.role==='admin') loadAccounts(); });
-});
-
 init();
 </script>
 </body>
