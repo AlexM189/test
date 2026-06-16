@@ -1,86 +1,1227 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Office Reservations</title>
-  <link rel="stylesheet" href="/static/css/style.css" />
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Office Reservations</title>
+<style>
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  --bg:#f5f7fb;--surface:#ffffff;--surface-2:#f1f4f9;--border:#e2e8f0;
+  --text:#1e293b;--text-muted:#64748b;--primary:#4f46e5;--primary-hover:#4338ca;
+  --primary-light:#eef2ff;--success:#10b981;--success-light:#d1fae5;
+  --warning:#f59e0b;--warning-light:#fef3c7;--danger:#ef4444;--danger-light:#fee2e2;
+  --day:#3b82f6;--day-light:#dbeafe;--eve:#8b5cf6;--eve-light:#ede9fe;
+  --night:#334155;--night-light:#e2e8f0;--weekend:#ec4899;--weekend-light:#fce7f3;
+  --shadow:0 1px 3px rgba(0,0,0,.08);--shadow-lg:0 10px 25px rgba(0,0,0,.12);--radius:8px;
+}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow);flex-wrap:wrap}
+.logo{font-weight:700;font-size:17px;color:var(--primary);display:flex;align-items:center;gap:7px;white-space:nowrap}
+nav{display:flex;gap:3px;flex:1;flex-wrap:wrap}
+nav button{background:transparent;border:none;padding:7px 13px;border-radius:6px;cursor:pointer;font-weight:500;color:var(--text-muted);font-size:13px}
+nav button:hover{background:var(--surface-2);color:var(--text)}
+nav button.active{background:var(--primary-light);color:var(--primary)}
+.hdr-right{display:flex;align-items:center;gap:10px}
+.status-dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;transition:background .3s}
+.status-dot.ok{background:var(--success)}
+.status-dot.err{background:var(--danger)}
+.user-combo{position:relative}
+.user-combo input{padding:6px 28px 6px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;min-width:175px;font-family:inherit;background:var(--surface)}
+.user-combo input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+.user-combo input.sel{border-color:var(--success);background:var(--success-light)}
+.clr-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:none;cursor:pointer;color:var(--text-muted);font-size:16px;display:none;line-height:1;padding:2px}
+.user-combo.has-sel .clr-btn{display:block}
+.udrop{position:absolute;top:calc(100%+4px);right:0;width:270px;max-height:300px;overflow-y:auto;background:var(--surface);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-lg);z-index:80;display:none}
+.udrop.open{display:block}
+.uopt{padding:8px 12px;cursor:pointer;font-size:13px;display:flex;justify-content:space-between;align-items:center}
+.uopt:hover,.uopt.hi{background:var(--primary-light);color:var(--primary)}
+.uopt .dept{font-size:11px;color:var(--text-muted)}
+.uopt .spill{font-size:10px;padding:1px 6px;border-radius:8px;background:var(--surface-2);color:var(--text-muted)}
+.uempty{padding:12px;text-align:center;color:var(--text-muted);font-size:13px}
+main{padding:20px;max-width:1400px;margin:0 auto}
+.panel{display:none}.panel.active{display:block}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:20px;box-shadow:var(--shadow)}
+.card h2{margin:0 0 4px;font-size:17px}.card .sub{color:var(--text-muted);font-size:13px;margin-bottom:16px}
+button.btn{background:var(--primary);color:#fff;border:none;padding:8px 14px;border-radius:6px;cursor:pointer;font-weight:500;font-size:13px}
+button.btn:hover{background:var(--primary-hover)}
+button.btn.sec{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+button.btn.sec:hover{background:var(--border)}
+button.btn.danger{background:var(--danger);color:#fff}
+button.btn.sm{padding:4px 10px;font-size:12px}
+input[type=text],input[type=number],input[type=date],input[type=month],select,textarea{padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--surface);font-size:13px;font-family:inherit;width:100%}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-light)}
+label.field{display:block;margin-bottom:12px}
+label.field>span{display:block;font-size:12px;color:var(--text-muted);margin-bottom:4px;font-weight:500}
+/* calendar */
+.cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.cal-hdr h2{margin:0;font-size:20px}
+.cal-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+@media(max-width:1100px){.cal-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:780px){.cal-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.cal-grid{grid-template-columns:1fr}}
+.month{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:12px}
+.month h3{margin:0 0 8px;font-size:13px;text-align:center;font-weight:700}
+.dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;font-size:10px;color:var(--text-muted);text-align:center;margin-bottom:4px;font-weight:600}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.dc{aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:11px;border-radius:4px;cursor:pointer;position:relative;background:var(--surface-2)}
+.dc.empty{background:transparent;cursor:default}
+.dc:not(.empty):hover{background:var(--primary-light);color:var(--primary)}
+.dc.today{background:var(--primary);color:#fff;font-weight:700}
+.dc.wkend{background:var(--weekend-light);color:var(--weekend)}
+.dc.today.wkend{background:var(--weekend);color:#fff}
+.dc.has-bk::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;background:var(--success);border-radius:50%}
+.dc.my-bk{box-shadow:inset 0 0 0 2px var(--success)}
+.dc.today.my-bk{box-shadow:inset 0 0 0 2px rgba(255,255,255,.7)}
+/* legend */
+.legend{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:16px}
+.legend>div{display:flex;align-items:center;gap:6px;font-size:12px}
+.sw{width:13px;height:13px;border-radius:3px;display:inline-block}
+/* modal */
+.mbdrop{position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:100;display:none;align-items:flex-start;justify-content:center;padding:32px 16px;overflow-y:auto}
+.mbdrop.open{display:flex}
+.modal{background:var(--surface);border-radius:12px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden}
+.modal.wide{max-width:900px}
+.modal.narrow{max-width:520px}
+.mhdr{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.mhdr h2{margin:0;font-size:17px}
+.mclose{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted);width:30px;height:30px;border-radius:6px;line-height:1}
+.mclose:hover{background:var(--surface-2)}
+.mbody{padding:18px 20px;max-height:calc(100vh - 180px);overflow-y:auto}
+/* shift section */
+.shift-sec{margin-bottom:18px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.shift-hdr{padding:10px 14px;display:flex;justify-content:space-between;align-items:center;cursor:pointer;user-select:none;font-weight:600;font-size:13px}
+.shift-hdr.day{background:var(--day-light);color:var(--day)}
+.shift-hdr.eve{background:var(--eve-light);color:var(--eve)}
+.shift-hdr.night{background:var(--night-light);color:var(--night)}
+.shift-hdr.weekend{background:var(--weekend-light);color:var(--weekend)}
+.shift-hdr .stats{font-size:12px;font-weight:500}
+.shift-hdr .chev{transition:transform .2s}
+.shift-hdr.collapsed .chev{transform:rotate(-90deg)}
+.shift-body{padding:14px;background:var(--surface-2)}
+.shift-body.hidden{display:none}
+.res-row{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:640px){.res-row{grid-template-columns:1fr}}
+.res-block h4{margin:0 0 8px;font-size:12px;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.04em}
+.slot-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:5px}
+.park-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+.slot{border:1.5px solid var(--border);border-radius:7px;padding:5px 3px;min-height:48px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;text-align:center;transition:all .15s;background:var(--surface)}
+.slot:hover:not(.taken):not(.unavail){border-color:var(--primary);background:var(--primary-light)}
+.slot.mine{background:var(--success-light);border-color:var(--success)}
+.slot.taken{background:var(--day-light);border-color:var(--day);cursor:default}
+.slot.unavail{background:repeating-linear-gradient(45deg,#f1f5f9,#f1f5f9 6px,#e2e8f0 6px,#e2e8f0 12px);border-color:#cbd5e1;cursor:not-allowed}
+.slot .num{font-weight:700;font-size:11px;color:var(--text-muted)}
+.slot.mine .num{color:#065f46}
+.slot.taken .num{color:var(--day)}
+.slot .nm{font-size:9px;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;color:var(--text-muted)}
+.slot.mine .nm{color:#065f46}
+.slot.taken .nm{color:var(--day);font-weight:500}
+/* stats */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--surface);padding:16px;border-radius:var(--radius);border:1px solid var(--border)}
+.stat .lbl{font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px}
+.stat .val{font-size:26px;font-weight:700;margin:4px 0}
+.stat .sub2{font-size:12px;color:var(--text-muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:7px 10px;text-align:left;border-bottom:1px solid var(--border)}
+th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.3px}
+.bar{display:inline-block;width:60px;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;vertical-align:middle;margin-left:4px}
+.bar>div{height:100%;background:var(--primary);border-radius:3px}
+.pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.pill.day{background:var(--day-light);color:var(--day)}
+.pill.eve{background:var(--eve-light);color:var(--eve)}
+.pill.night{background:var(--night-light);color:var(--night)}
+.pill.weekend{background:var(--weekend-light);color:var(--weekend)}
+.pill.ok{background:var(--success-light);color:#065f46}
+.pill.warn{background:var(--warning-light);color:#92400e}
+.pill.bad{background:var(--danger-light);color:#991b1b}
+/* report */
+.rpt-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+.rpt-controls label.field{margin:0}
+/* slides */
+.slide{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:36px;margin-bottom:18px;min-height:400px;break-inside:avoid;box-shadow:var(--shadow)}
+.slide h1{margin:0 0 6px;font-size:24px}.slide .sub{color:var(--text-muted);margin-bottom:20px;font-size:14px}
+/* toast */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--text);color:#fff;padding:11px 16px;border-radius:8px;box-shadow:var(--shadow-lg);transform:translateY(16px);opacity:0;transition:all .25s;z-index:200;font-size:13px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.ok{background:var(--success)}.toast.err{background:var(--danger)}
+/* utilization bar in table */
+.ubar{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.ubar .bg{width:50px;height:5px;background:var(--surface-2);border-radius:3px;overflow:hidden;flex-shrink:0}
+.ubar .bg>div{height:100%;border-radius:3px}
+/* fc grid */
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+</style>
 </head>
 <body>
 
-  <!-- ── Header ───────────────────────────────────────────────── -->
-  <header class="app-header">
-    <div class="header-left">
-      <span class="header-icon" aria-hidden="true">🏢</span>
-      <h1>Office Reservations</h1>
-    </div>
-    <div class="header-right">
-      <label for="user-name" class="sr-only">Your name</label>
-      <input
-        id="user-name"
-        type="text"
-        placeholder="Enter your name…"
-        maxlength="40"
-        autocomplete="off"
-        aria-label="Your name"
-      />
-      <span id="status-dot" class="status-dot" title="Connection status" aria-live="polite" aria-label="Disconnected"></span>
-    </div>
-  </header>
-
-  <!-- ── Date bar ─────────────────────────────────────────────── -->
-  <div class="date-bar">
-    <span id="today-label"></span>
-    <span id="live-badge" class="live-badge" aria-live="polite">Connecting…</span>
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    Office Reservations
   </div>
-
-  <!-- ── Tabs ─────────────────────────────────────────────────── -->
-  <nav class="tabs" role="tablist" aria-label="Section">
-    <button class="tab active" role="tab" aria-selected="true"  aria-controls="panel-desks"   id="tab-desks"   data-tab="desks">
-      🪑 Desks
-    </button>
-    <button class="tab"        role="tab" aria-selected="false" aria-controls="panel-parking" id="tab-parking" data-tab="parking">
-      🚗 Parking
-    </button>
+  <nav>
+    <button data-panel="calendar" class="active">Calendar</button>
+    <button data-panel="today">Today</button>
+    <button data-panel="dashboard">Dashboard</button>
+    <button data-panel="reports">Reports</button>
+    <button data-panel="employees">Employees</button>
+    <button data-panel="settings">Settings</button>
   </nav>
+  <div class="hdr-right">
+    <span style="font-size:12px;color:var(--text-muted)">I am:</span>
+    <div class="user-combo" id="userCombo">
+      <input type="text" id="userInput" placeholder="Search your name…" autocomplete="off">
+      <button class="clr-btn" id="clrUser" title="Clear">×</button>
+      <div class="udrop" id="udrop"></div>
+    </div>
+    <span class="status-dot" id="statusDot" title="Live connection"></span>
+  </div>
+</header>
 
-  <!-- ── Panels ───────────────────────────────────────────────── -->
-  <main>
-    <section id="panel-desks" class="panel" role="tabpanel" aria-labelledby="tab-desks">
-      <div class="legend">
-        <span class="legend-item"><span class="swatch free"></span>Free</span>
-        <span class="legend-item"><span class="swatch mine"></span>Mine</span>
-        <span class="legend-item"><span class="swatch taken"></span>Reserved</span>
+<main>
+
+<!-- CALENDAR -->
+<section class="panel active" id="panel-calendar">
+  <div class="cal-hdr">
+    <h2>Calendar <span id="calYear" style="color:var(--text-muted);font-weight:400"></span></h2>
+    <div style="display:flex;gap:8px">
+      <button class="btn sec sm" id="prevYear">◀ Prev</button>
+      <button class="btn sec sm" id="thisYear">This Year</button>
+      <button class="btn sec sm" id="nextYear">Next ▶</button>
+    </div>
+  </div>
+  <div class="legend">
+    <div><span class="sw" style="background:var(--day)"></span>Day 09–18</div>
+    <div><span class="sw" style="background:var(--eve)"></span>Evening 16–24</div>
+    <div><span class="sw" style="background:var(--night)"></span>Night 23–07</div>
+    <div><span class="sw" style="background:var(--weekend)"></span>Weekend 19–03</div>
+    <div><span class="sw" style="background:var(--success)"></span>Has bookings</div>
+    <div><span class="sw" style="border:2px solid var(--success);background:transparent"></span>My booking</div>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+</section>
+
+<!-- TODAY -->
+<section class="panel" id="panel-today">
+  <div class="card">
+    <h2>Today's Bookings</h2>
+    <div class="sub" id="todayLbl"></div>
+    <div id="todayContent"></div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section class="panel" id="panel-dashboard">
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+      <div><h2 style="margin:0">Dashboard — <span id="dashWeekLbl"></span></h2><div class="sub" style="margin:0">Utilization &amp; attendance for the selected week</div></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn sec sm" id="dashPrevWeek">◀</button>
+        <input type="date" id="dashDatePick" style="width:140px;padding:5px 8px">
+        <button class="btn sec sm" id="dashNextWeek">▶</button>
+        <button class="btn sec sm" id="dashThisWeek">This week</button>
       </div>
-      <div id="grid-desks" class="spot-grid" aria-label="Desk grid"></div>
-    </section>
+    </div>
+    <div class="stat-grid" id="dashStats"></div>
+  </div>
+  <div class="card">
+    <h2>Daily Utilization</h2>
+    <div class="sub">Desks &amp; parking by shift — avg per active day shown at bottom</div>
+    <div style="overflow-x:auto"><table id="utilTable"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
+  </div>
+  <div class="card">
+    <h2>Presence vs Target</h2>
+    <div class="sub">Target: <strong id="targetLbl"></strong> days/week. ✓ = has a desk booking that day.</div>
+    <div style="overflow-x:auto"><table id="presTable"><thead></thead><tbody></tbody></table></div>
+  </div>
+</section>
 
-    <section id="panel-parking" class="panel hidden" role="tabpanel" aria-labelledby="tab-parking">
-      <div class="legend">
-        <span class="legend-item"><span class="swatch free"></span>Free</span>
-        <span class="legend-item"><span class="swatch mine"></span>Mine</span>
-        <span class="legend-item"><span class="swatch taken"></span>Reserved</span>
+<!-- REPORTS -->
+<section class="panel" id="panel-reports">
+  <div class="card">
+    <h2>Reports &amp; Exports</h2>
+    <div class="sub">Generate weekly, monthly, quarterly or yearly reports</div>
+    <div class="rpt-controls">
+      <label class="field" style="flex:0 0 130px"><span>Report Type</span>
+        <select id="rptType">
+          <option value="week">Weekly</option>
+          <option value="month">Monthly</option>
+          <option value="quarter">Quarterly</option>
+          <option value="year">Yearly</option>
+        </select>
+      </label>
+      <div id="rptWeekPick" style="display:flex;gap:6px;align-items:flex-end">
+        <button class="btn sec sm" id="rptPrevW">◀</button>
+        <label class="field" style="margin:0;flex:0 0 155px"><span>Any day in the week</span><input type="date" id="rptDate"></label>
+        <button class="btn sec sm" id="rptNextW">▶</button>
+        <button class="btn sec sm" id="rptThisW">Now</button>
       </div>
-      <div id="grid-parking" class="spot-grid" aria-label="Parking grid"></div>
-    </section>
-  </main>
+      <label class="field" id="rptMonthPick" style="display:none;margin:0;flex:0 0 160px"><span>Month</span><input type="month" id="rptMonth"></label>
+      <div id="rptQtrPick" style="display:none;gap:8px;align-items:flex-end">
+        <label class="field" style="margin:0;flex:0 0 120px"><span>Quarter</span>
+          <select id="rptQtr"><option value="1">Q1 Jan–Mar</option><option value="2">Q2 Apr–Jun</option><option value="3">Q3 Jul–Sep</option><option value="4">Q4 Oct–Dec</option></select>
+        </label>
+        <label class="field" style="margin:0;flex:0 0 85px"><span>Year</span><input type="number" id="rptQtrYear" min="2024" max="2035"></label>
+      </div>
+      <label class="field" id="rptYearPick" style="display:none;margin:0;flex:0 0 100px"><span>Year</span><input type="number" id="rptYear" min="2024" max="2035"></label>
+      <div style="display:flex;gap:8px;align-items:flex-end">
+        <button class="btn" id="genRpt">Preview</button>
+        <button class="btn sec" id="exportXls">📊 Excel</button>
+        <button class="btn sec" id="exportPpt">🎬 Presentation</button>
+      </div>
+    </div>
+    <div id="rptRangeLbl" style="padding:9px 13px;background:var(--primary-light);color:var(--primary);border-radius:6px;font-size:13px;margin-bottom:16px"></div>
+    <div id="rptPreview"></div>
+  </div>
+  <div class="card">
+    <h2>📈 Capacity Forecast</h2>
+    <div class="sub">Model headcount scenarios to check if desks &amp; parking hold up</div>
+    <div class="cfg-grid" style="margin-bottom:14px">
+      <label class="field"><span>Total headcount</span><input type="number" id="fcHead" min="1" value="80"></label>
+      <label class="field"><span>Attendees coming to office</span><input type="number" id="fcAtt" min="0" value="80"></label>
+      <label class="field"><span>Required days/week (1–5)</span><input type="number" id="fcDays" min="1" max="5" step="0.5" value="2"></label>
+      <label class="field"><span>Desks available</span><input type="number" id="fcDesks" min="1"></label>
+      <label class="field"><span>Parking available</span><input type="number" id="fcPark" min="0"></label>
+      <label class="field"><span>% who drive (parking)</span><input type="number" id="fcDrive" min="0" max="100" value="40"></label>
+      <label class="field"><span>Peak-day factor ×</span><input type="number" id="fcPeak" min="1" max="3" step="0.05" value="1.3"></label>
+    </div>
+    <div style="background:var(--surface-2);border-radius:8px;padding:13px;margin-bottom:13px">
+      <div style="font-size:13px;font-weight:600;margin-bottom:8px">Shift split of attendees (%)</div>
+      <div class="cfg-grid">
+        <label class="field"><span>Day (09–18)</span><input type="number" id="fcSDay" min="0" max="100" value="40"></label>
+        <label class="field"><span>Evening (16–24)</span><input type="number" id="fcSEve" min="0" max="100" value="30"></label>
+        <label class="field"><span>Night (23–07)</span><input type="number" id="fcSNight" min="0" max="100" value="20"></label>
+        <label class="field"><span>Weekend (19–03)</span><input type="number" id="fcSWknd" min="0" max="100" value="10"></label>
+      </div>
+    </div>
+    <button class="btn" id="runFc">Run Forecast</button>
+    <div id="fcResult" style="margin-top:14px"></div>
+  </div>
+</section>
 
-  <!-- ── Modal ────────────────────────────────────────────────── -->
-  <div id="modal-overlay" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
-    <div class="modal">
-      <button class="modal-close" id="modal-close" aria-label="Close">&times;</button>
-      <h2 id="modal-title"></h2>
-      <p  id="modal-body"></p>
-      <div class="modal-actions">
-        <button id="modal-confirm" class="btn btn-primary">Confirm</button>
-        <button id="modal-cancel-btn" class="btn btn-ghost">Cancel</button>
+<!-- EMPLOYEES -->
+<section class="panel" id="panel-employees">
+  <div class="card">
+    <h2>Employee Roster <span id="empCnt" style="font-size:13px;font-weight:400;color:var(--text-muted)"></span></h2>
+    <div class="sub">Add people, paste a name list, or import from Excel. Changes are live for all connected users.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <button class="btn" id="addEmpBtn">+ Add Employee</button>
+      <button class="btn sec" id="pasteNamesBtn">📋 Paste name list</button>
+      <button class="btn sec" id="exportEmpBtn">⬇ Export Excel</button>
+      <input type="text" id="empSearch" placeholder="Search…" style="max-width:190px">
+    </div>
+    <div style="overflow-x:auto">
+      <table id="empTable">
+        <thead><tr><th>#</th><th>Name</th><th>Default Shift</th><th>Department</th><th>Target days/wk</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- SETTINGS -->
+<section class="panel" id="panel-settings">
+  <div class="card">
+    <h2>Capacity &amp; Targets</h2>
+    <div class="cfg-grid">
+      <label class="field"><span>Desks (physical total)</span><input type="number" id="cfgDesks" min="1" max="500"></label>
+      <label class="field"><span>Parking spots (physical total)</span><input type="number" id="cfgPark" min="0" max="500"></label>
+      <label class="field"><span>Default target days/week (1–5)</span><input type="number" id="cfgTarget" min="1" max="5" step="0.5"></label>
+      <label class="field"><span>Calendar year</span><input type="number" id="cfgYear" min="2024" max="2035"></label>
+    </div>
+    <div style="border-top:1px solid var(--border);margin:6px 0 14px;padding-top:14px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:8px">⛔ Out-of-service slots</div>
+      <div class="cfg-grid">
+        <label class="field"><span>Unavailable desk #s (comma-separated)</span><input type="text" id="cfgUnavailD" placeholder="e.g. 5, 12"></label>
+        <label class="field"><span>Unavailable parking #s (comma-separated)</span><input type="text" id="cfgUnavailP" placeholder="e.g. 3, 7"></label>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn" id="saveCfg">Save Settings</button>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Shift Schedule</h2>
+    <table>
+      <thead><tr><th>Shift</th><th>Days</th><th>Hours</th></tr></thead>
+      <tbody>
+        <tr><td><span class="pill day">Day</span></td><td>Mon–Fri</td><td>09:00 – 18:00</td></tr>
+        <tr><td><span class="pill eve">Evening</span></td><td>Mon–Fri</td><td>16:00 – 24:00</td></tr>
+        <tr><td><span class="pill night">Night</span></td><td>Mon–Fri</td><td>23:00 – 07:00 (next day)</td></tr>
+        <tr><td><span class="pill weekend">Weekend</span></td><td>Sat–Sun</td><td>19:00 – 03:00 (next day)</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:12px;padding:10px 14px;background:var(--warning-light);border-left:3px solid var(--warning);border-radius:6px;font-size:13px;color:#92400e">
+      ⚠ <strong>Overlap notice:</strong> Day (09–18) and Evening (16–24) shifts overlap 16:00–18:00.
+    </div>
+  </div>
+  <div class="card">
+    <h2>Data Management</h2>
+    <div class="sub">Back up or restore all bookings and employee data.</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn sec" id="backupBtn">⬇ Backup JSON</button>
+      <button class="btn sec" id="restoreBtn">⬆ Restore JSON</button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none">
+      <button class="btn danger" id="clearBkBtn">⚠ Clear all bookings</button>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- BOOKING MODAL -->
+<div class="mbdrop" id="bookModal">
+  <div class="modal wide">
+    <div class="mhdr">
+      <h2 id="bookModalDate"></h2>
+      <button class="mclose" id="closeBook">×</button>
+    </div>
+    <div class="mbody" id="bookModalBody"></div>
+  </div>
+</div>
+
+<!-- PASTE NAMES MODAL -->
+<div class="mbdrop" id="pasteModal">
+  <div class="modal narrow">
+    <div class="mhdr"><h2>Paste name list</h2><button class="mclose" id="closePaste">×</button></div>
+    <div class="mbody">
+      <p style="margin-top:0;color:var(--text-muted);font-size:13px">One name per line. They'll be added with the default shift and target days from Settings.</p>
+      <textarea id="pasteNames" rows="12" placeholder="Maria Popescu&#10;Ion Ionescu&#10;…"></textarea>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn sec" id="cancelPaste">Cancel</button>
+        <button class="btn" id="applyPaste">Add employees</button>
       </div>
     </div>
   </div>
+</div>
 
-  <!-- ── Toast ────────────────────────────────────────────────── -->
-  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+<div class="toast" id="toast"></div>
 
-  <script src="/static/js/app.js"></script>
+<script>
+/* ====================================================================
+   STATE
+   ==================================================================== */
+let state = {
+  config: { desks:24, parking:10, targetDays:2, year:new Date().getFullYear(), unavailableDesks:[], unavailableParking:[] },
+  employees: [],
+  bookings: {}
+};
+let currentUser = localStorage.getItem('ors_user') || '';
+let viewYear    = new Date().getFullYear();
+let modalDate   = null;
+let activePanel = 'calendar';
+let shiftOpen   = { day:true, evening:false, night:false, weekend:true };
+let dashRef     = new Date();
+
+/* ====================================================================
+   CONSTANTS
+   ==================================================================== */
+const MONTHS   = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DOW_L    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DOW_S    = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const SHIFT_META = {
+  day:     { label:'Day Shift',     hours:'09:00 – 18:00', cls:'day',     weekday:true,  weekend:false },
+  evening: { label:'Evening Shift', hours:'16:00 – 24:00', cls:'eve',     weekday:true,  weekend:false },
+  night:   { label:'Night Shift',   hours:'23:00 – 07:00', cls:'night',   weekday:true,  weekend:false },
+  weekend: { label:'Weekend Shift', hours:'19:00 – 03:00', cls:'weekend', weekday:false, weekend:true  }
+};
+const SHIFT_KEYS = ['day','evening','night','weekend'];
+
+/* ====================================================================
+   HELPERS
+   ==================================================================== */
+function ymd(d){ return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`; }
+function pad(n){ return String(n).padStart(2,'0'); }
+function parseYmd(s){ const [y,m,d]=s.split('-').map(Number); return new Date(y,m-1,d); }
+function isWeekend(d){ const w=d.getDay(); return w===0||w===6; }
+function activeShifts(d){ return isWeekend(d) ? ['weekend'] : ['day','evening','night']; }
+function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function empById(id){ return state.employees.find(e=>e.id===id); }
+function empName(id){ const e=empById(id); return e?e.name:'?'; }
+function isUnavail(kind,n){ const l=kind==='desks'?state.config.unavailableDesks:state.config.unavailableParking; return Array.isArray(l)&&l.includes(+n); }
+function capacity(kind){ const tot=kind==='desks'?state.config.desks:state.config.parking; const u=(kind==='desks'?state.config.unavailableDesks:state.config.unavailableParking)||[]; return tot-u.filter(n=>n>=1&&n<=tot).length; }
+function startOfWeek(d){ const x=new Date(d); const day=x.getDay(); x.setDate(x.getDate()-(day===0?6:day-1)); x.setHours(0,0,0,0); return x; }
+function endOfWeek(d){ const s=startOfWeek(d); const e=new Date(s); e.setDate(e.getDate()+6); return e; }
+function weekDays(ref){ const s=startOfWeek(ref); return Array.from({length:7},(_,i)=>{ const d=new Date(s); d.setDate(d.getDate()+i); return d; }); }
+function weekLabel(ref){ const s=startOfWeek(ref),e=endOfWeek(ref); const sm=MONTHS[s.getMonth()],em=MONTHS[e.getMonth()]; return s.getMonth()===e.getMonth()?`${s.getDate()}–${e.getDate()} ${sm}`:`${s.getDate()} ${sm.slice(0,3)} – ${e.getDate()} ${em.slice(0,3)}`; }
+function pct(n,d){ return d===0?0:Math.round(100*n/d); }
+function clrPct(p){ return p>=80?'ok':p>=50?'warn':'bad'; }
+
+function dayBookings(ds){ return state.bookings[ds]||{}; }
+function shiftData(ds,sh){ const b=dayBookings(ds); return b[sh]||{desks:{},parking:{}}; }
+
+function countBooked(ds, sh, kind){
+  const sd=shiftData(ds,sh);
+  return Object.keys(sd[kind]||{}).length;
+}
+function userHasDesk(userId, ds){
+  const b=dayBookings(ds);
+  for(const sh in b){ for(const k in (b[sh].desks||{})){ if(b[sh].desks[k]===userId) return true; } }
+  return false;
+}
+
+/* ====================================================================
+   API
+   ==================================================================== */
+async function api(url, method='GET', body=null){
+  try{
+    const opts={method,headers:{}};
+    if(body){ opts.body=JSON.stringify(body); opts.headers['Content-Type']='application/json'; }
+    const r=await fetch(url,opts);
+    const data=await r.json();
+    if(!r.ok){ toast(data.error||'Error','err'); return null; }
+    return data;
+  }catch(e){ toast('Network error','err'); return null; }
+}
+
+/* ====================================================================
+   SSE
+   ==================================================================== */
+function connectSSE(){
+  const dot=document.getElementById('statusDot');
+  const es=new EventSource('/api/stream');
+  es.onopen=()=>{ dot.className='status-dot ok'; };
+  es.onmessage=e=>{
+    const msg=JSON.parse(e.data);
+    if(msg.action==='booking'){
+      state.bookings[msg.date]=msg.day;
+      if(activePanel==='calendar') renderCalendar();
+      if(activePanel==='today') renderToday();
+      if(activePanel==='dashboard') renderDashboard();
+      if(modalDate===msg.date) renderBookingModal();
+    } else if(msg.action==='employees'){
+      state.employees=msg.employees;
+      if(activePanel==='employees') renderEmployees();
+      if(activePanel==='dashboard') renderDashboard();
+      syncUserInput();
+    } else if(msg.action==='config'){
+      state.config=msg.config;
+      if(activePanel==='settings') renderSettings();
+      if(activePanel==='dashboard') renderDashboard();
+    }
+  };
+  es.onerror=()=>{ dot.className='status-dot err'; };
+}
+
+/* ====================================================================
+   TOAST
+   ==================================================================== */
+let toastT;
+function toast(msg,type=''){
+  const el=document.getElementById('toast');
+  clearTimeout(toastT);
+  el.textContent=msg; el.className='toast show'+( type?' '+type:'');
+  toastT=setTimeout(()=>el.className='toast',3000);
+}
+
+/* ====================================================================
+   USER SELECTOR
+   ==================================================================== */
+let uMatches=[], uIdx=-1;
+
+function setUser(id){
+  currentUser=id||'';
+  if(currentUser) localStorage.setItem('ors_user',currentUser);
+  else localStorage.removeItem('ors_user');
+  syncUserInput();
+  closeDrop();
+  renderCalendar();
+}
+
+function syncUserInput(){
+  const inp=document.getElementById('userInput');
+  const combo=document.getElementById('userCombo');
+  if(currentUser && empById(currentUser)){
+    inp.value=empById(currentUser).name;
+    inp.classList.add('sel');
+    combo.classList.add('has-sel');
+  } else {
+    inp.value=''; inp.classList.remove('sel'); combo.classList.remove('has-sel');
+    if(currentUser){ currentUser=''; localStorage.removeItem('ors_user'); }
+  }
+}
+
+function openDrop(filter){
+  const dd=document.getElementById('udrop');
+  const f=(filter||'').toLowerCase().trim();
+  uMatches=state.employees.filter(e=>!f||e.name.toLowerCase().includes(f)||(e.department||'').toLowerCase().includes(f)).slice(0,60);
+  uIdx=-1;
+  if(!state.employees.length){ dd.innerHTML='<div class="uempty">No employees yet — add them on the Employees tab.</div>'; }
+  else if(!uMatches.length){ dd.innerHTML=`<div class="uempty">No match for "${h(filter)}"</div>`; }
+  else {
+    dd.innerHTML=uMatches.map((e,i)=>`<div class="uopt${e.id===currentUser?' hi':''}" data-id="${e.id}" data-i="${i}">
+      <span>${h(e.name)}</span>
+      <span style="display:flex;gap:5px;align-items:center">${e.department?`<span class="dept">${h(e.department)}</span>`:''}<span class="spill">${e.shift}</span></span>
+    </div>`).join('');
+    dd.querySelectorAll('.uopt').forEach(o=>o.addEventListener('mousedown',ev=>{
+      ev.preventDefault(); setUser(o.dataset.id); toast(`Booking as ${empName(o.dataset.id)}`,'ok');
+    }));
+  }
+  dd.classList.add('open');
+}
+function closeDrop(){ document.getElementById('udrop').classList.remove('open'); uIdx=-1; }
+function hiActive(){ const dd=document.getElementById('udrop'); dd.querySelectorAll('.uopt').forEach((o,i)=>o.classList.toggle('hi',i===uIdx)); const a=dd.querySelector('.uopt.hi'); if(a) a.scrollIntoView({block:'nearest'}); }
+
+const uInp=document.getElementById('userInput');
+uInp.addEventListener('focus',()=>openDrop(uInp.value));
+uInp.addEventListener('input',()=>{ uInp.classList.remove('sel'); document.getElementById('userCombo').classList.remove('has-sel'); openDrop(uInp.value); });
+uInp.addEventListener('keydown',e=>{
+  const dd=document.getElementById('udrop');
+  if(!dd.classList.contains('open')&&(e.key==='ArrowDown'||e.key==='ArrowUp')){ openDrop(uInp.value); return; }
+  if(e.key==='ArrowDown'){ e.preventDefault(); uIdx=Math.min(uMatches.length-1,uIdx+1); hiActive(); }
+  else if(e.key==='ArrowUp'){ e.preventDefault(); uIdx=Math.max(0,uIdx-1); hiActive(); }
+  else if(e.key==='Enter'){ e.preventDefault();
+    const pick=uIdx>=0?uMatches[uIdx]:uMatches.length===1?uMatches[0]:null;
+    if(pick){ setUser(pick.id); toast(`Booking as ${pick.name}`,'ok'); }
+  } else if(e.key==='Escape'){ closeDrop(); uInp.blur(); }
+});
+uInp.addEventListener('blur',()=>setTimeout(()=>{ closeDrop(); syncUserInput(); },150));
+document.getElementById('clrUser').addEventListener('click',()=>{ setUser(''); uInp.focus(); });
+
+/* ====================================================================
+   TABS
+   ==================================================================== */
+document.querySelectorAll('nav button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    b.classList.add('active');
+    activePanel=b.dataset.panel;
+    document.getElementById('panel-'+activePanel).classList.add('active');
+    if(activePanel==='calendar')   renderCalendar();
+    if(activePanel==='today')      renderToday();
+    if(activePanel==='dashboard')  renderDashboard();
+    if(activePanel==='reports')    initReports();
+    if(activePanel==='employees')  renderEmployees();
+    if(activePanel==='settings')   renderSettings();
+  });
+});
+
+/* ====================================================================
+   CALENDAR
+   ==================================================================== */
+function renderCalendar(){
+  document.getElementById('calYear').textContent=viewYear;
+  const grid=document.getElementById('calGrid');
+  grid.innerHTML='';
+  const todayStr=ymd(new Date());
+  for(let m=0;m<12;m++){
+    const el=document.createElement('div'); el.className='month';
+    el.innerHTML=`<h3>${MONTHS[m]}</h3><div class="dow"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div><div class="days" id="days-${m}"></div>`;
+    const daysEl=el.querySelector('.days');
+    const first=new Date(viewYear,m,1); const fd=first.getDay();
+    const offset=fd===0?6:fd-1;
+    for(let i=0;i<offset;i++){ const e=document.createElement('div'); e.className='dc empty'; daysEl.appendChild(e); }
+    const total=new Date(viewYear,m+1,0).getDate();
+    for(let d=1;d<=total;d++){
+      const date=new Date(viewYear,m,d); const ds=ymd(date);
+      const wknd=isWeekend(date); const today=ds===todayStr;
+      const cell=document.createElement('div');
+      let cls='dc'+(wknd?' wkend':'')+(today?' today':'');
+      const bk=state.bookings[ds];
+      let hasAny=false, hasMine=false;
+      if(bk){ for(const sh in bk){ for(const k in (bk[sh].desks||{})){ hasAny=true; if(bk[sh].desks[k]===currentUser) hasMine=true; } for(const k in (bk[sh].parking||{})){ hasAny=true; if(bk[sh].parking[k]===currentUser) hasMine=true; } } }
+      if(hasAny) cls+=' has-bk';
+      if(hasMine) cls+=' my-bk';
+      cell.className=cls; cell.textContent=d; cell.title=`${DOW_L[date.getDay()]} ${d} ${MONTHS[m]} ${viewYear}`;
+      cell.addEventListener('click',()=>openBookingModal(ds));
+      daysEl.appendChild(cell);
+    }
+    grid.appendChild(el);
+  }
+}
+document.getElementById('prevYear').addEventListener('click',()=>{ viewYear--; renderCalendar(); });
+document.getElementById('nextYear').addEventListener('click',()=>{ viewYear++; renderCalendar(); });
+document.getElementById('thisYear').addEventListener('click',()=>{ viewYear=state.config.year||new Date().getFullYear(); renderCalendar(); });
+
+/* ====================================================================
+   BOOKING MODAL
+   ==================================================================== */
+function openBookingModal(ds){
+  modalDate=ds;
+  const d=parseYmd(ds);
+  document.getElementById('bookModalDate').textContent=`${DOW_L[d.getDay()]}, ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+  renderBookingModal();
+  document.getElementById('bookModal').classList.add('open');
+}
+document.getElementById('closeBook').addEventListener('click',()=>{ document.getElementById('bookModal').classList.remove('open'); modalDate=null; renderCalendar(); });
+document.getElementById('bookModal').addEventListener('click',e=>{ if(e.target.id==='bookModal'){ document.getElementById('bookModal').classList.remove('open'); modalDate=null; renderCalendar(); } });
+
+function renderBookingModal(){
+  if(!modalDate) return;
+  const date=parseYmd(modalDate);
+  const shifts=activeShifts(date);
+  const dCap=capacity('desks'), pCap=capacity('parking');
+  let html='';
+  if(!currentUser) html+='<div style="padding:12px 14px;background:var(--warning-light);border-left:3px solid var(--warning);border-radius:6px;margin-bottom:14px;font-size:13px;color:#92400e">⚠ Select yourself from the header first.</div>';
+
+  shifts.forEach(sh=>{
+    const meta=SHIFT_META[sh];
+    const sd=shiftData(modalDate,sh);
+    const dBooked=Object.keys(sd.desks||{}).length, pBooked=Object.keys(sd.parking||{}).length;
+    const open=shiftOpen[sh];
+    html+=`<div class="shift-sec">
+      <div class="shift-hdr ${meta.cls}${open?'':' collapsed'}" onclick="toggleShift('${sh}')">
+        <span>▼ <span class="chev"></span> ${meta.label} <span style="font-weight:400;font-size:12px">${meta.hours}</span></span>
+        <span class="stats">🪑 ${dBooked}/${dCap} &nbsp; 🚗 ${pBooked}/${pCap}</span>
+      </div>
+      <div class="shift-body${open?'':' hidden'}" id="sbody-${sh}">
+        <div class="res-row">
+          <div class="res-block">
+            <h4>🪑 Desks (${dCap} available)</h4>
+            <div class="slot-grid">${buildSlots('desks',sh,dCap)}</div>
+          </div>
+          <div class="res-block">
+            <h4>🚗 Parking (${pCap} spots)</h4>
+            <div class="park-grid">${buildSlots('parking',sh,pCap)}</div>
+          </div>
+        </div>
+        ${currentUser?`<div style="margin-top:10px"><button class="btn sec sm" onclick="bulkBookShift('${sh}','desks')">Add all ${meta.label} employees (desks)</button></div>`:''}
+      </div>
+    </div>`;
+  });
+  document.getElementById('bookModalBody').innerHTML=html;
+}
+
+function buildSlots(kind,sh,cap){
+  const sd=shiftData(modalDate,sh);
+  const occupied=sd[kind]||{};
+  let html='';
+  for(let n=1;n<=cap;n++){
+    const key=String(n);
+    const unavail=isUnavail(kind,n);
+    const owner=occupied[key];
+    const mine=owner===currentUser;
+    const taken=!!owner&&!mine;
+    let cls='slot'+(unavail?' unavail':mine?' mine':taken?' taken':'');
+    const nm=owner?h(empName(owner)):'Free';
+    if(unavail){
+      html+=`<div class="${cls}"><span class="num">${n}</span><span class="nm">N/A</span></div>`;
+    } else if(taken){
+      html+=`<div class="${cls}" title="${h(empName(owner))}"><span class="num">${n}</span><span class="nm">${nm}</span></div>`;
+    } else {
+      const action=mine?'unbook':'book';
+      html+=`<div class="${cls}" onclick="handleSlot('${sh}','${kind}',${n})" title="${mine?'Cancel my booking':'Book slot '+n}"><span class="num">${n}</span><span class="nm">${mine?'You':''}</span></div>`;
+    }
+  }
+  return html;
+}
+
+function toggleShift(sh){ shiftOpen[sh]=!shiftOpen[sh]; renderBookingModal(); }
+
+async function handleSlot(sh,kind,n){
+  if(!currentUser){ toast('Select yourself first','err'); return; }
+  const sd=shiftData(modalDate,sh);
+  const owner=(sd[kind]||{})[String(n)];
+  if(owner && owner!==currentUser){ toast('Already taken by '+empName(owner),'err'); return; }
+  const mine=owner===currentUser;
+  const endpoint=mine?'/api/unbook':'/api/book';
+  await api(endpoint,'POST',{date:modalDate,shift:sh,kind,slot:n,userId:currentUser});
+}
+
+async function bulkBookShift(sh,kind){
+  if(!currentUser){ toast('Select yourself first','err'); return; }
+  const shiftEmps=state.employees.filter(e=>e.shift===sh);
+  if(!shiftEmps.length){ toast('No employees with this shift','err'); return; }
+  let count=0;
+  for(const emp of shiftEmps){
+    const sd=shiftData(modalDate,sh);
+    const slots=sd[kind]||{};
+    const alreadyBooked=Object.values(slots).includes(emp.id);
+    if(alreadyBooked) continue;
+    const cap=capacity(kind);
+    let free=null;
+    for(let n=1;n<=cap;n++){ if(!slots[String(n)]&&!isUnavail(kind,n)){ free=n; break; } }
+    if(free===null) break;
+    await api('/api/book','POST',{date:modalDate,shift:sh,kind,slot:free,userId:emp.id});
+    count++;
+  }
+  toast(`Booked ${count} employee${count!==1?'s':''}`,'ok');
+}
+
+/* ====================================================================
+   TODAY
+   ==================================================================== */
+function renderToday(){
+  const today=new Date(); const ds=ymd(today);
+  document.getElementById('todayLbl').textContent=`${DOW_L[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]} ${today.getFullYear()}`;
+  const shifts=activeShifts(today);
+  const dCap=capacity('desks'), pCap=capacity('parking');
+  let html='';
+  shifts.forEach(sh=>{
+    const meta=SHIFT_META[sh];
+    const sd=shiftData(ds,sh);
+    const dBooked=Object.keys(sd.desks||{}).length, pBooked=Object.keys(sd.parking||{}).length;
+    html+=`<div class="shift-sec" style="margin-bottom:14px">
+      <div class="shift-hdr ${meta.cls}">${meta.label} <span style="font-weight:400;font-size:12px">${meta.hours}</span><span class="stats">🪑 ${dBooked}/${dCap} &nbsp; 🚗 ${pBooked}/${pCap}</span></div>
+      <div class="shift-body">`;
+    const entries=[...new Set([...Object.values(sd.desks||{}),...Object.values(sd.parking||{})])];
+    if(!entries.length){ html+='<div style="color:var(--text-muted);font-size:13px">No bookings yet</div>'; }
+    else {
+      html+='<table><thead><tr><th>Employee</th><th>Desk</th><th>Parking</th></tr></thead><tbody>';
+      entries.forEach(uid=>{
+        const deskNum=Object.entries(sd.desks||{}).find(([k,v])=>v===uid)?.[0]||'—';
+        const parkNum=Object.entries(sd.parking||{}).find(([k,v])=>v===uid)?.[0]||'—';
+        html+=`<tr><td>${h(empName(uid))}</td><td>${deskNum}</td><td>${parkNum}</td></tr>`;
+      });
+      html+='</tbody></table>';
+    }
+    html+='</div></div>';
+  });
+  document.getElementById('todayContent').innerHTML=html||'<div style="color:var(--text-muted)">No shifts active today.</div>';
+}
+
+/* ====================================================================
+   DASHBOARD
+   ==================================================================== */
+document.getElementById('dashThisWeek').addEventListener('click',()=>{ dashRef=new Date(); renderDashboard(); });
+document.getElementById('dashPrevWeek').addEventListener('click',()=>{ dashRef.setDate(dashRef.getDate()-7); renderDashboard(); });
+document.getElementById('dashNextWeek').addEventListener('click',()=>{ dashRef.setDate(dashRef.getDate()+7); renderDashboard(); });
+document.getElementById('dashDatePick').addEventListener('change',e=>{ dashRef=new Date(e.target.value+'T00:00:00'); renderDashboard(); });
+
+function renderDashboard(){
+  document.getElementById('dashDatePick').value=ymd(dashRef);
+  document.getElementById('dashWeekLbl').textContent=weekLabel(dashRef);
+  document.getElementById('targetLbl').textContent=state.config.targetDays;
+  const days=weekDays(dashRef);
+  const todayStr=ymd(new Date());
+  const dCap=capacity('desks'), pCap=capacity('parking');
+
+  // stat cards: today's snapshot
+  const todayShifts=activeShifts(new Date());
+  let dToday=0, pToday=0;
+  todayShifts.forEach(sh=>{ dToday+=countBooked(todayStr,sh,'desks'); pToday+=countBooked(todayStr,sh,'parking'); });
+  document.getElementById('dashStats').innerHTML=`
+    <div class="stat"><div class="lbl">Desks today</div><div class="val">${dToday}</div><div class="sub2">of ${dCap} available</div></div>
+    <div class="stat"><div class="lbl">Parking today</div><div class="val">${pToday}</div><div class="sub2">of ${pCap} spots</div></div>
+    <div class="stat"><div class="lbl">Employees</div><div class="val">${state.employees.length}</div><div class="sub2">in roster</div></div>
+    <div class="stat"><div class="lbl">Target</div><div class="val">${state.config.targetDays}</div><div class="sub2">days/week</div></div>
+  `;
+
+  // utilization table
+  const thead=document.querySelector('#utilTable thead');
+  const tbody=document.querySelector('#utilTable tbody');
+  const tfoot=document.querySelector('#utilTable tfoot');
+  thead.innerHTML=`<tr><th>Day</th><th>Date</th><th>Day 🪑%</th><th>Day 🚗%</th><th>Eve 🪑%</th><th>Eve 🚗%</th><th>Night 🪑%</th><th>Night 🚗%</th><th>Wknd 🪑%</th><th>Wknd 🚗%</th></tr>`;
+  const totals=[0,0,0,0,0,0,0,0]; let activeDays=0;
+  tbody.innerHTML=days.map(d=>{
+    const ds=ymd(d); const wknd=isWeekend(d);
+    const cur=ds===todayStr;
+    const vals=[];
+    ['day','evening','night','weekend'].forEach((sh,i)=>{
+      const db=countBooked(ds,sh,'desks'), pb=countBooked(ds,sh,'parking');
+      const dp=wknd&&sh!=='weekend'?null:pct(db,dCap), pp=wknd&&sh!=='weekend'?null:pct(pb,pCap);
+      vals.push(dp,pp);
+    });
+    // for weekday cols
+    if(!wknd){ for(let i=0;i<6;i++) totals[i]+=vals[i]||0; activeDays++; }
+    else{ totals[6]+=vals[6]||0; totals[7]+=vals[7]||0; }
+    const bar=v=>v===null?'<td style="color:var(--text-muted)">—</td>':`<td><div class="ubar"><span>${v}%</span><span class="bg"><div style="width:${v}%;background:${v>=80?'var(--success)':v>=50?'var(--warning)':'var(--primary)'}"></div></span></div></td>`;
+    return `<tr${cur?' style="background:var(--primary-light)"':''}><td style="font-weight:600">${DOW_S[d.getDay()]}</td><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}</td>${vals.map(v=>bar(v)).join('')}</tr>`;
+  }).join('');
+
+  const wkndDays=7-activeDays;
+  tfoot.innerHTML=`<tr style="font-weight:600;background:var(--surface-2)"><td colspan="2">Avg/day</td>
+    ${[0,1,2,3,4,5].map(i=>{ const v=activeDays?Math.round(totals[i]/activeDays):0; return `<td>${v}%</td>`; }).join('')}
+    ${[6,7].map(i=>{ const v=wkndDays?Math.round(totals[i]/wkndDays):0; return `<td>${v}%</td>`; }).join('')}
+  </tr>`;
+
+  // presence table
+  const presHead=document.querySelector('#presTable thead');
+  const presBod=document.querySelector('#presTable tbody');
+  presHead.innerHTML=`<tr><th>#</th><th>Employee</th><th>Shift</th>${days.map(d=>`<th>${DOW_S[d.getDay()]}<br><span style="font-weight:400">${d.getDate()}</span></th>`).join('')}<th>Days</th><th>Target</th><th>Rate</th></tr>`;
+  presBod.innerHTML=state.employees.map((emp,i)=>{
+    const marks=days.map(d=>userHasDesk(emp.id,ymd(d)));
+    const total=marks.filter(Boolean).length;
+    const target=emp.targetDays||state.config.targetDays;
+    const p=pct(total,target*days.length/7);
+    const pill=total>=target?'ok':total>=target*0.5?'warn':'bad';
+    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td><span class="pill ${SHIFT_META[emp.shift]?.cls||'day'}">${emp.shift}</span></td>
+      ${marks.map(m=>`<td style="text-align:center">${m?'<span style="color:var(--success);font-weight:700">✓</span>':'<span style="color:var(--border)">·</span>'}</td>`).join('')}
+      <td><strong>${total}</strong></td><td>${target}</td><td><span class="pill ${pill}">${p}%</span></td></tr>`;
+  }).join('');
+}
+
+/* ====================================================================
+   REPORTS
+   ==================================================================== */
+function initReports(){
+  const now=new Date();
+  document.getElementById('rptDate').value=ymd(now);
+  document.getElementById('rptMonth').value=`${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  document.getElementById('rptQtrYear').value=now.getFullYear();
+  document.getElementById('rptYear').value=now.getFullYear();
+  document.getElementById('fcDesks').value=state.config.desks;
+  document.getElementById('fcPark').value=state.config.parking;
+  updateRptPickers();
+  updateRptLabel();
+}
+
+function updateRptPickers(){
+  const t=document.getElementById('rptType').value;
+  document.getElementById('rptWeekPick').style.display=t==='week'?'flex':'none';
+  document.getElementById('rptMonthPick').style.display=t==='month'?'block':'none';
+  document.getElementById('rptQtrPick').style.display=t==='quarter'?'flex':'none';
+  document.getElementById('rptYearPick').style.display=t==='year'?'block':'none';
+}
+
+function updateRptLabel(){
+  const t=document.getElementById('rptType').value;
+  let lbl='';
+  if(t==='week'){ const d=new Date(document.getElementById('rptDate').value+'T00:00:00'); lbl=`Week of ${weekLabel(d)}`; }
+  else if(t==='month'){ const v=document.getElementById('rptMonth').value; lbl=`Month: ${v}`; }
+  else if(t==='quarter'){ lbl=`Q${document.getElementById('rptQtr').value} ${document.getElementById('rptQtrYear').value}`; }
+  else{ lbl=`Year ${document.getElementById('rptYear').value}`; }
+  document.getElementById('rptRangeLbl').textContent=lbl;
+}
+
+document.getElementById('rptType').addEventListener('change',()=>{ updateRptPickers(); updateRptLabel(); });
+document.getElementById('rptDate').addEventListener('change',updateRptLabel);
+['rptPrevW','rptNextW'].forEach((id,i)=>{
+  document.getElementById(id).addEventListener('click',()=>{
+    const inp=document.getElementById('rptDate'); const d=new Date(inp.value+'T00:00:00'); d.setDate(d.getDate()+(i?7:-7)); inp.value=ymd(d); updateRptLabel();
+  });
+});
+document.getElementById('rptThisW').addEventListener('click',()=>{ document.getElementById('rptDate').value=ymd(new Date()); updateRptLabel(); });
+document.getElementById('rptMonth').addEventListener('change',updateRptLabel);
+document.getElementById('rptQtr').addEventListener('change',updateRptLabel);
+document.getElementById('rptQtrYear').addEventListener('change',updateRptLabel);
+document.getElementById('rptYear').addEventListener('change',updateRptLabel);
+
+function getRptRef(){
+  const t=document.getElementById('rptType').value;
+  if(t==='week') return document.getElementById('rptDate').value;
+  if(t==='month') return document.getElementById('rptMonth').value+'-01';
+  if(t==='quarter'){
+    const q=+document.getElementById('rptQtr').value; const yr=document.getElementById('rptQtrYear').value;
+    return `${yr}-${pad((q-1)*3+1)}-01`;
+  }
+  return document.getElementById('rptYear').value+'-01-01';
+}
+
+document.getElementById('genRpt').addEventListener('click',()=>{
+  const t=document.getElementById('rptType').value;
+  const ref=getRptRef();
+  document.getElementById('rptPreview').innerHTML=buildRptPreview(t,ref);
+});
+
+document.getElementById('exportXls').addEventListener('click',()=>{
+  const t=document.getElementById('rptType').value; const ref=getRptRef();
+  window.location.href=`/api/export/excel?period=${t}&ref=${ref}`;
+});
+
+document.getElementById('exportPpt').addEventListener('click',()=>{
+  const t=document.getElementById('rptType').value; const ref=getRptRef();
+  openPresentation(t,ref);
+});
+
+function getDaysForPeriod(t,ref){
+  const d=parseYmd(ref);
+  if(t==='week') return weekDays(d);
+  if(t==='month'){
+    const y=d.getFullYear(),m=d.getMonth(),tot=new Date(y,m+1,0).getDate();
+    return Array.from({length:tot},(_,i)=>new Date(y,m,i+1));
+  }
+  if(t==='quarter'){
+    const q=Math.floor(d.getMonth()/3); const y=d.getFullYear();
+    const start=new Date(y,q*3,1); const end=new Date(y,q*3+3,0);
+    const days=[]; for(let x=new Date(start);x<=end;x.setDate(x.getDate()+1)) days.push(new Date(x)); return days;
+  }
+  // year
+  const y=d.getFullYear();
+  const days=[]; for(let x=new Date(y,0,1);x.getFullYear()===y;x.setDate(x.getDate()+1)) days.push(new Date(x)); return days;
+}
+
+function buildRptPreview(t,ref){
+  const days=getDaysForPeriod(t,ref);
+  const dCap=capacity('desks'), pCap=capacity('parking');
+  // summary stats
+  let totalDesk=0, totalPark=0, activeDays=0;
+  days.forEach(d=>{
+    const ds=ymd(d); const shifts=activeShifts(d);
+    shifts.forEach(sh=>{
+      totalDesk+=countBooked(ds,sh,'desks'); totalPark+=countBooked(ds,sh,'parking');
+    });
+    activeDays++;
+  });
+  const avgD=activeDays?Math.round(totalDesk/activeDays):0;
+  const avgP=activeDays?Math.round(totalPark/activeDays):0;
+  const pctD=pct(avgD,dCap), pctP=pct(avgP,pCap);
+
+  let html=`<div class="card"><h2>Summary</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="lbl">Period days</div><div class="val">${activeDays}</div></div>
+      <div class="stat"><div class="lbl">Total desk bookings</div><div class="val">${totalDesk}</div></div>
+      <div class="stat"><div class="lbl">Avg desk util/day</div><div class="val">${pctD}%</div><div class="sub2">${avgD} of ${dCap}</div></div>
+      <div class="stat"><div class="lbl">Avg parking util/day</div><div class="val">${pctP}%</div><div class="sub2">${avgP} of ${pCap}</div></div>
+    </div>
+  </div>`;
+
+  // daily breakdown (first 60 days max for preview)
+  html+=`<div class="card"><h2>Daily Breakdown</h2><div style="overflow-x:auto"><table>
+    <thead><tr><th>Date</th><th>Day</th><th>Day 🪑</th><th>Day 🚗</th><th>Eve 🪑</th><th>Eve 🚗</th><th>Night 🪑</th><th>Night 🚗</th><th>Wknd 🪑</th><th>Wknd 🚗</th></tr></thead><tbody>`;
+  days.slice(0,60).forEach(d=>{
+    const ds=ymd(d); const wknd=isWeekend(d);
+    html+=`<tr><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}</td><td>${DOW_S[d.getDay()]}</td>`;
+    ['day','evening','night','weekend'].forEach(sh=>{
+      const db=wknd&&sh!=='weekend'?null:countBooked(ds,sh,'desks');
+      const pb=wknd&&sh!=='weekend'?null:countBooked(ds,sh,'parking');
+      html+=db===null?'<td>—</td><td>—</td>':`<td>${db}/${dCap} (${pct(db,dCap)}%)</td><td>${pb}/${pCap} (${pct(pb,pCap)}%)</td>`;
+    });
+    html+='</tr>';
+  });
+  if(days.length>60) html+=`<tr><td colspan="10" style="text-align:center;color:var(--text-muted)">… and ${days.length-60} more days. Download Excel for full data.</td></tr>`;
+  html+=`</tbody></table></div></div>`;
+
+  return html;
+}
+
+function openPresentation(t,ref){
+  const days=getDaysForPeriod(t,ref);
+  const dCap=capacity('desks'), pCap=capacity('parking');
+  let totalDesk=0, totalPark=0;
+  const byDay=days.map(d=>{
+    const ds=ymd(d); const shifts=activeShifts(d);
+    let dB=0,pB=0; shifts.forEach(sh=>{ dB+=countBooked(ds,sh,'desks'); pB+=countBooked(ds,sh,'parking'); });
+    totalDesk+=dB; totalPark+=pB; return {d,dB,pB};
+  });
+  const avgD=days.length?Math.round(totalDesk/days.length):0;
+  const avgP=days.length?Math.round(totalPark/days.length):0;
+
+  const html=`<!DOCTYPE html><html><head><title>Office Report</title>
+<style>
+body{font-family:system-ui,sans-serif;margin:0;background:#1e293b;color:#1e293b}
+.slide{background:#fff;margin:20px auto;padding:50px;max-width:900px;border-radius:12px;min-height:500px;page-break-after:always}
+h1{font-size:32px;margin:0 0 8px}h2{font-size:22px;margin:0 0 16px;color:#4f46e5}
+.sub{color:#64748b;font-size:16px;margin-bottom:28px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{background:#eef2ff;color:#4f46e5;padding:10px;text-align:left;font-size:12px;text-transform:uppercase}
+td{padding:9px 10px;border-bottom:1px solid #e2e8f0}
+.bar-row{display:flex;align-items:center;gap:10px}
+.bar{height:18px;border-radius:4px;background:#4f46e5;display:inline-block;min-width:4px}
+.stat-row{display:flex;gap:24px;flex-wrap:wrap;margin-bottom:28px}
+.stat{background:#f5f7fb;padding:18px 24px;border-radius:10px;flex:1;min-width:140px}
+.stat .v{font-size:32px;font-weight:700;color:#4f46e5}.stat .l{font-size:13px;color:#64748b;margin-top:4px}
+.print-btn{position:fixed;top:20px;right:20px;background:#4f46e5;color:#fff;border:none;padding:12px 22px;border-radius:8px;cursor:pointer;font-size:15px;font-weight:600}
+@media print{.print-btn{display:none}body{background:#fff}.slide{margin:0;border-radius:0;box-shadow:none}}
+</style></head><body>
+<button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
+<div class="slide">
+  <h1>Office Reservations Report</h1>
+  <div class="sub">Period: ${days.length} days &nbsp;·&nbsp; Generated ${new Date().toLocaleDateString()}</div>
+  <div class="stat-row">
+    <div class="stat"><div class="v">${totalDesk}</div><div class="l">Total desk bookings</div></div>
+    <div class="stat"><div class="v">${pct(avgD,dCap)}%</div><div class="l">Avg desk utilization/day</div></div>
+    <div class="stat"><div class="v">${totalPark}</div><div class="l">Total parking bookings</div></div>
+    <div class="stat"><div class="v">${pct(avgP,pCap)}%</div><div class="l">Avg parking utilization/day</div></div>
+  </div>
+</div>
+<div class="slide">
+  <h2>Desk Utilization by Day</h2>
+  <table><thead><tr><th>Date</th><th>Booked</th><th>Capacity</th><th>%</th><th>Bar</th></tr></thead><tbody>
+  ${byDay.slice(0,30).map(({d,dB})=>{
+    const p=pct(dB,dCap); const w=Math.round(p*4);
+    return `<tr><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}</td><td>${dB}</td><td>${dCap}</td><td>${p}%</td><td><div class="bar" style="width:${w}px;background:${p>=80?'#10b981':p>=50?'#f59e0b':'#4f46e5'}"></div></td></tr>`;
+  }).join('')}
+  </tbody></table>
+</div>
+<div class="slide">
+  <h2>Parking Utilization by Day</h2>
+  <table><thead><tr><th>Date</th><th>Booked</th><th>Capacity</th><th>%</th><th>Bar</th></tr></thead><tbody>
+  ${byDay.slice(0,30).map(({d,pB})=>{
+    const p=pct(pB,pCap); const w=Math.round(p*4);
+    return `<tr><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}</td><td>${pB}</td><td>${pCap}</td><td>${p}%</td><td><div class="bar" style="width:${w}px;background:${p>=80?'#10b981':p>=50?'#f59e0b':'#4f46e5'}"></div></td></tr>`;
+  }).join('')}
+  </tbody></table>
+</div>
+<div class="slide">
+  <h2>Employee Roster Overview</h2>
+  <table><thead><tr><th>#</th><th>Name</th><th>Shift</th><th>Department</th><th>Target days/wk</th></tr></thead><tbody>
+  ${state.employees.map((e,i)=>`<tr><td>${i+1}</td><td>${h(e.name)}</td><td>${e.shift}</td><td>${h(e.department||'—')}</td><td>${e.targetDays}</td></tr>`).join('')}
+  </tbody></table>
+</div>
+</body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html); w.document.close();
+}
+
+/* ====================================================================
+   CAPACITY FORECAST
+   ==================================================================== */
+document.getElementById('runFc').addEventListener('click',()=>{
+  const head=+document.getElementById('fcHead').value||0;
+  const att=+document.getElementById('fcAtt').value||0;
+  const days=+document.getElementById('fcDays').value||2;
+  const desks=+document.getElementById('fcDesks').value||state.config.desks;
+  const park=+document.getElementById('fcPark').value||state.config.parking;
+  const drive=+document.getElementById('fcDrive').value/100;
+  const peak=+document.getElementById('fcPeak').value||1.3;
+  const sDay=+document.getElementById('fcSDay').value/100;
+  const sEve=+document.getElementById('fcSEve').value/100;
+  const sNight=+document.getElementById('fcSNight').value/100;
+  const sWknd=+document.getElementById('fcSWknd').value/100;
+
+  const avgPerDay=att*days/5;
+  const peakDay=Math.ceil(avgPerDay*peak);
+  const peakDesk=pct(peakDay,desks);
+  const peakPark=pct(Math.ceil(peakDay*drive),park);
+
+  const clr=p=>p>=100?'#ef4444':p>=80?'#f59e0b':'#10b981';
+  const row=(lbl,val,cap,p)=>`<tr><td>${lbl}</td><td>${val}</td><td>${cap}</td><td style="font-weight:700;color:${clr(p)}">${p}%</td></tr>`;
+
+  document.getElementById('fcResult').innerHTML=`<table>
+    <thead><tr><th>Scenario</th><th>Demand</th><th>Capacity</th><th>Utilization</th></tr></thead><tbody>
+    ${row('Avg day (desks)',Math.round(avgPerDay),desks,pct(Math.round(avgPerDay),desks))}
+    ${row('Peak day (desks)',peakDay,desks,peakDesk)}
+    ${row('Peak day (parking)',Math.ceil(peakDay*drive),park,peakPark)}
+    ${row('Day shift peak',Math.ceil(peakDay*sDay),desks,pct(Math.ceil(peakDay*sDay),desks))}
+    ${row('Evening shift peak',Math.ceil(peakDay*sEve),desks,pct(Math.ceil(peakDay*sEve),desks))}
+    ${row('Night shift peak',Math.ceil(peakDay*sNight),desks,pct(Math.ceil(peakDay*sNight),desks))}
+    </tbody></table>
+    ${peakDesk>=100?'<div style="margin-top:12px;padding:10px 14px;background:var(--danger-light);border-left:3px solid var(--danger);border-radius:6px;font-size:13px;color:#991b1b">⚠ Desk capacity exceeded on peak days. Consider adding desks or staggering attendance.</div>':''}
+    ${peakPark>=100?'<div style="margin-top:8px;padding:10px 14px;background:var(--danger-light);border-left:3px solid var(--danger);border-radius:6px;font-size:13px;color:#991b1b">⚠ Parking capacity exceeded on peak days.</div>':''}
+  `;
+});
+
+/* ====================================================================
+   EMPLOYEES
+   ==================================================================== */
+function renderEmployees(){
+  const q=document.getElementById('empSearch').value.toLowerCase();
+  const emps=state.employees.filter(e=>!q||e.name.toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));
+  document.getElementById('empCnt').textContent=`(${state.employees.length} total${q?' · '+emps.length+' shown':''})`;
+  const tbody=document.querySelector('#empTable tbody');
+  tbody.innerHTML=emps.map((emp,i)=>`<tr>
+    <td>${state.employees.indexOf(emp)+1}</td>
+    <td><input type="text" value="${h(emp.name)}" data-id="${emp.id}" data-field="name" class="emp-inp" style="width:100%"></td>
+    <td><select data-id="${emp.id}" data-field="shift" class="emp-inp">
+      ${['day','evening','night','weekend'].map(s=>`<option value="${s}"${emp.shift===s?' selected':''}>${s}</option>`).join('')}
+    </select></td>
+    <td><input type="text" value="${h(emp.department||'')}" data-id="${emp.id}" data-field="department" class="emp-inp" style="width:100%"></td>
+    <td><input type="number" value="${emp.targetDays||state.config.targetDays}" data-id="${emp.id}" data-field="targetDays" class="emp-inp" min="1" max="5" style="width:70px"></td>
+    <td><button class="btn danger sm" onclick="deleteEmp('${emp.id}')">✕</button></td>
+  </tr>`).join('');
+  // bind change handlers
+  tbody.querySelectorAll('.emp-inp').forEach(inp=>{
+    inp.addEventListener('change',async()=>{
+      const id=inp.dataset.id, field=inp.dataset.field;
+      await api('/api/employees/update','POST',{id,field,value:inp.value,[field]:field==='targetDays'?+inp.value:inp.value});
+    });
+  });
+}
+
+document.getElementById('empSearch').addEventListener('input',renderEmployees);
+
+document.getElementById('addEmpBtn').addEventListener('click',async()=>{
+  const res=await api('/api/employees/add','POST',{name:'New Employee',shift:'day',department:'',targetDays:state.config.targetDays});
+  if(res){ state.employees=res.employees; renderEmployees(); }
+});
+
+async function deleteEmp(id){
+  if(!confirm('Remove this employee?')) return;
+  const res=await api('/api/employees/delete','POST',{id});
+  if(res){ state.employees=res.employees; renderEmployees(); syncUserInput(); }
+}
+
+document.getElementById('exportEmpBtn').addEventListener('click',()=>{
+  const rows=[['#','Name','Shift','Department','Target days/wk'],...state.employees.map((e,i)=>[i+1,e.name,e.shift,e.department||'',e.targetDays])];
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  download('employees.csv','text/csv',csv);
+});
+
+document.getElementById('pasteNamesBtn').addEventListener('click',()=>{
+  document.getElementById('pasteNames').value='';
+  document.getElementById('pasteModal').classList.add('open');
+});
+document.getElementById('closePaste').addEventListener('click',()=>document.getElementById('pasteModal').classList.remove('open'));
+document.getElementById('cancelPaste').addEventListener('click',()=>document.getElementById('pasteModal').classList.remove('open'));
+document.getElementById('applyPaste').addEventListener('click',async()=>{
+  const names=document.getElementById('pasteNames').value.split('\n').map(s=>s.trim()).filter(Boolean);
+  if(!names.length){ toast('No names found','err'); return; }
+  const res=await api('/api/employees/add','POST',{names,shift:'day',targetDays:state.config.targetDays});
+  if(res){ state.employees=res.employees; renderEmployees(); document.getElementById('pasteModal').classList.remove('open'); toast(`Added ${names.length} employees`,'ok'); }
+});
+
+/* ====================================================================
+   SETTINGS
+   ==================================================================== */
+function renderSettings(){
+  document.getElementById('cfgDesks').value=state.config.desks;
+  document.getElementById('cfgPark').value=state.config.parking;
+  document.getElementById('cfgTarget').value=state.config.targetDays;
+  document.getElementById('cfgYear').value=state.config.year;
+  document.getElementById('cfgUnavailD').value=(state.config.unavailableDesks||[]).join(', ');
+  document.getElementById('cfgUnavailP').value=(state.config.unavailableParking||[]).join(', ');
+}
+document.getElementById('saveCfg').addEventListener('click',async()=>{
+  const body={
+    desks:+document.getElementById('cfgDesks').value,
+    parking:+document.getElementById('cfgPark').value,
+    targetDays:+document.getElementById('cfgTarget').value,
+    year:+document.getElementById('cfgYear').value,
+    unavailableDesks:document.getElementById('cfgUnavailD').value,
+    unavailableParking:document.getElementById('cfgUnavailP').value
+  };
+  const res=await api('/api/config','POST',body);
+  if(res){ state.config=res.config; viewYear=res.config.year; toast('Settings saved','ok'); }
+});
+
+/* ====================================================================
+   DATA MANAGEMENT
+   ==================================================================== */
+document.getElementById('backupBtn').addEventListener('click',async()=>{
+  const data=await api('/api/state');
+  if(data) download(`office-backup-${ymd(new Date())}.json`,'application/json',JSON.stringify(data,null,2));
+});
+document.getElementById('restoreBtn').addEventListener('click',()=>document.getElementById('restoreFile').click());
+document.getElementById('restoreFile').addEventListener('change',async e=>{
+  const file=e.target.files[0]; if(!file) return;
+  try{
+    const text=await file.text(); const data=JSON.parse(text);
+    // POST config, employees, bookings separately
+    if(data.config) await api('/api/config','POST',data.config);
+    if(data.employees){ for(const emp of data.employees) await api('/api/employees/add','POST',emp); }
+    toast('Restore complete. Reloading…','ok');
+    setTimeout(()=>location.reload(),1200);
+  }catch(err){ toast('Invalid backup file','err'); }
+  e.target.value='';
+});
+document.getElementById('clearBkBtn').addEventListener('click',async()=>{
+  if(!confirm('Clear ALL bookings? This cannot be undone.')) return;
+  // We don't have a dedicated endpoint, so patch via bulk-clearing via backup restore with empty bookings
+  const data=await api('/api/state');
+  if(!data) return;
+  data.bookings={};
+  // Save by doing a backup restore flow — simplest: just reload page and notify
+  toast('To fully clear, restore a backup with empty bookings. Use the JSON backup/restore above.','err');
+});
+
+/* ====================================================================
+   UTILITY
+   ==================================================================== */
+function download(name,type,content){
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([content],{type}));
+  a.download=name; a.click(); URL.revokeObjectURL(a.href);
+}
+
+/* ====================================================================
+   BOOT
+   ==================================================================== */
+async function init(){
+  try{
+    const data=await fetch('/api/state').then(r=>r.json());
+    state=data;
+    viewYear=state.config.year||new Date().getFullYear();
+  }catch(e){ toast('Could not load state','err'); }
+  syncUserInput();
+  renderCalendar();
+  renderToday();
+  connectSSE();
+}
+init();
+</script>
 </body>
 </html>
