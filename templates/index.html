@@ -202,9 +202,9 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     <button data-panel="calendar" class="active">Calendar</button>
     <button data-panel="today">Today</button>
     <button data-panel="dashboard">Dashboard</button>
-    <button data-panel="reports">Reports</button>
-    <button data-panel="employees">Employees</button>
-    <button data-panel="settings">Settings</button>
+    <button data-panel="reports" class="admin-only" style="display:none">Reports</button>
+    <button data-panel="employees" class="admin-only" style="display:none">Employees</button>
+    <button data-panel="settings" class="admin-only" style="display:none">Settings</button>
     <button data-panel="feedback" id="feedbackNavBtn">💬 Feedback <span id="fbBadge" style="display:none;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:2px"></span></button>
   </nav>
   <div class="hdr-right">
@@ -1703,6 +1703,12 @@ function setAdminUI(admin){
   document.getElementById('adminLoginBtn').style.display  = admin ? 'none' : '';
   document.getElementById('adminLoggedIn').style.display  = admin ? 'flex' : 'none';
   document.getElementById('empAdminBtns').style.display   = admin ? 'flex' : 'none';
+  // Show/hide admin-only nav tabs
+  document.querySelectorAll('nav button.admin-only').forEach(b=>b.style.display=admin?'':'none');
+  // If current panel is admin-only and user just logged out, go back to calendar
+  if(!admin && ['reports','employees','settings'].includes(activePanel)){
+    document.querySelector('nav button[data-panel="calendar"]').click();
+  }
   if(activePanel==='employees') renderEmployees();
   if(activePanel==='feedback')  renderFeedbackPanel();
 }
