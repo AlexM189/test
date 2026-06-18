@@ -248,10 +248,15 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 <section class="panel active" id="panel-calendar">
   <div class="cal-hdr">
     <h2>Calendar <span id="calYear" style="color:var(--text-muted);font-weight:400"></span></h2>
-    <div style="display:flex;gap:8px">
+    <div id="yearNav" style="display:flex;gap:8px">
       <button class="btn sec sm" id="prevYear">◀ Prev</button>
       <button class="btn sec sm" id="thisYear">This Year</button>
       <button class="btn sec sm" id="nextYear">Next ▶</button>
+    </div>
+    <div id="monthNav" style="display:none;gap:8px">
+      <button class="btn sec sm" id="prevMonth">◀ Prev</button>
+      <button class="btn sec sm" id="thisMonth">This Month</button>
+      <button class="btn sec sm" id="nextMonth">Next ▶</button>
     </div>
   </div>
   <div class="legend">
@@ -512,6 +517,7 @@ let activePanel = 'calendar';
 let shiftOpen   = { day:true, evening:false, night:false, weekend:true };
 let dashRef     = new Date();
 let isAdmin     = false;
+let calViewMonth = new Date(); // center month for non-admin 3-month view
 
 /* ====================================================================
    CONSTANTS
@@ -731,39 +737,62 @@ document.querySelectorAll('nav button').forEach(b=>{
 /* ====================================================================
    CALENDAR
    ==================================================================== */
+function renderMonth(grid, year, month){
+  const todayStr=ymd(new Date());
+  const el=document.createElement('div'); el.className='month';
+  el.innerHTML=`<h3>${MONTHS[month]} ${year}</h3><div class="dow"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div><div class="days"></div>`;
+  const daysEl=el.querySelector('.days');
+  const first=new Date(year,month,1); const fd=first.getDay();
+  const offset=fd===0?6:fd-1;
+  for(let i=0;i<offset;i++){ const e=document.createElement('div'); e.className='dc empty'; daysEl.appendChild(e); }
+  const total=new Date(year,month+1,0).getDate();
+  for(let d=1;d<=total;d++){
+    const date=new Date(year,month,d); const ds=ymd(date);
+    const wknd=isWeekend(date); const today=ds===todayStr;
+    const cell=document.createElement('div');
+    let cls='dc'+(wknd?' wkend':'')+(today?' today':'');
+    const bk=state.bookings[ds];
+    let hasAny=false, hasMine=false;
+    if(bk){ for(const sh in bk){ for(const k in (bk[sh].desks||{})){ hasAny=true; if(bk[sh].desks[k]===currentUser) hasMine=true; } for(const k in (bk[sh].parking||{})){ hasAny=true; if(bk[sh].parking[k]===currentUser) hasMine=true; } } }
+    if(hasAny) cls+=' has-bk';
+    if(hasMine) cls+=' my-bk';
+    cell.className=cls; cell.textContent=d; cell.title=`${DOW_L[date.getDay()]} ${d} ${MONTHS[month]} ${year}`;
+    cell.addEventListener('click',()=>openBookingModal(ds));
+    daysEl.appendChild(cell);
+  }
+  grid.appendChild(el);
+}
+
 function renderCalendar(){
-  document.getElementById('calYear').textContent=viewYear;
   const grid=document.getElementById('calGrid');
   grid.innerHTML='';
-  const todayStr=ymd(new Date());
-  for(let m=0;m<12;m++){
-    const el=document.createElement('div'); el.className='month';
-    el.innerHTML=`<h3>${MONTHS[m]}</h3><div class="dow"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div><div class="days" id="days-${m}"></div>`;
-    const daysEl=el.querySelector('.days');
-    const first=new Date(viewYear,m,1); const fd=first.getDay();
-    const offset=fd===0?6:fd-1;
-    for(let i=0;i<offset;i++){ const e=document.createElement('div'); e.className='dc empty'; daysEl.appendChild(e); }
-    const total=new Date(viewYear,m+1,0).getDate();
-    for(let d=1;d<=total;d++){
-      const date=new Date(viewYear,m,d); const ds=ymd(date);
-      const wknd=isWeekend(date); const today=ds===todayStr;
-      const cell=document.createElement('div');
-      let cls='dc'+(wknd?' wkend':'')+(today?' today':'');
-      const bk=state.bookings[ds];
-      let hasAny=false, hasMine=false;
-      if(bk){ for(const sh in bk){ for(const k in (bk[sh].desks||{})){ hasAny=true; if(bk[sh].desks[k]===currentUser) hasMine=true; } for(const k in (bk[sh].parking||{})){ hasAny=true; if(bk[sh].parking[k]===currentUser) hasMine=true; } } }
-      if(hasAny) cls+=' has-bk';
-      if(hasMine) cls+=' my-bk';
-      cell.className=cls; cell.textContent=d; cell.title=`${DOW_L[date.getDay()]} ${d} ${MONTHS[m]} ${viewYear}`;
-      cell.addEventListener('click',()=>openBookingModal(ds));
-      daysEl.appendChild(cell);
-    }
-    grid.appendChild(el);
+  if(isAdmin){
+    // Full-year view
+    document.getElementById('calYear').textContent=viewYear;
+    document.getElementById('yearNav').style.display='flex';
+    document.getElementById('monthNav').style.display='none';
+    grid.style.gridTemplateColumns='';
+    for(let m=0;m<12;m++) renderMonth(grid,viewYear,m);
+  } else {
+    // 3-month view: prev / center / next
+    const cy=calViewMonth.getFullYear(), cm=calViewMonth.getMonth();
+    const prev=new Date(cy,cm-1,1), next=new Date(cy,cm+1,1);
+    document.getElementById('calYear').textContent=`${MONTHS[cm]} ${cy}`;
+    document.getElementById('yearNav').style.display='none';
+    document.getElementById('monthNav').style.display='flex';
+    grid.style.gridTemplateColumns='repeat(3,1fr)';
+    renderMonth(grid, prev.getFullYear(), prev.getMonth());
+    renderMonth(grid, cy, cm);
+    renderMonth(grid, next.getFullYear(), next.getMonth());
   }
 }
+
 document.getElementById('prevYear').addEventListener('click',()=>{ viewYear--; renderCalendar(); });
 document.getElementById('nextYear').addEventListener('click',()=>{ viewYear++; renderCalendar(); });
 document.getElementById('thisYear').addEventListener('click',()=>{ viewYear=state.config.year||new Date().getFullYear(); renderCalendar(); });
+document.getElementById('prevMonth').addEventListener('click',()=>{ calViewMonth=new Date(calViewMonth.getFullYear(),calViewMonth.getMonth()-1,1); renderCalendar(); });
+document.getElementById('nextMonth').addEventListener('click',()=>{ calViewMonth=new Date(calViewMonth.getFullYear(),calViewMonth.getMonth()+1,1); renderCalendar(); });
+document.getElementById('thisMonth').addEventListener('click',()=>{ calViewMonth=new Date(); renderCalendar(); });
 
 /* ====================================================================
    BOOKING MODAL
@@ -1709,6 +1738,7 @@ function setAdminUI(admin){
   if(!admin && ['reports','employees','settings'].includes(activePanel)){
     document.querySelector('nav button[data-panel="calendar"]').click();
   }
+  if(activePanel==='calendar')  renderCalendar();
   if(activePanel==='employees') renderEmployees();
   if(activePanel==='feedback')  renderFeedbackPanel();
 }
