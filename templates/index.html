@@ -205,6 +205,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     <button data-panel="reports">Reports</button>
     <button data-panel="employees">Employees</button>
     <button data-panel="settings">Settings</button>
+    <button data-panel="feedback" id="feedbackNavBtn">💬 Feedback <span id="fbBadge" style="display:none;background:var(--danger);color:#fff;border-radius:10px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:2px"></span></button>
   </nav>
   <div class="hdr-right">
     <span style="font-size:12px;color:var(--text-muted)">I am:</span>
@@ -214,8 +215,32 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
       <div class="udrop" id="udrop"></div>
     </div>
     <span class="status-dot" id="statusDot" title="Live connection"></span>
+    <!-- Admin login area -->
+    <div style="border-left:1px solid var(--border);padding-left:10px;display:flex;align-items:center;gap:6px">
+      <div id="adminLoggedIn" style="display:none;align-items:center;gap:6px">
+        <span style="font-size:11px;font-weight:700;color:var(--primary);background:var(--primary-light);padding:3px 8px;border-radius:10px">👤 Admin</span>
+        <button class="btn sec sm" id="adminLogoutBtn">Sign out</button>
+      </div>
+      <button class="btn sec sm" id="adminLoginBtn" style="white-space:nowrap">🔐 Admin</button>
+    </div>
   </div>
 </header>
+
+<!-- ADMIN LOGIN MODAL -->
+<div class="mbdrop" id="adminLoginModal">
+  <div class="modal narrow">
+    <div class="mhdr"><h2>Admin Sign In</h2><button class="mclose" id="closeAdminLogin">×</button></div>
+    <div class="mbody">
+      <div id="adminLoginErr" style="display:none;padding:9px 13px;background:var(--danger-light);color:#991b1b;border-radius:6px;margin-bottom:12px;font-size:13px"></div>
+      <label class="field"><span>Username</span><input type="text" id="adminUser" autocomplete="username"></label>
+      <label class="field"><span>Password</span><input type="password" id="adminPass" autocomplete="current-password"></label>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:4px">
+        <button class="btn sec" id="cancelAdminLogin">Cancel</button>
+        <button class="btn" id="doAdminLogin">Sign in</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <main>
 
@@ -344,10 +369,12 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     <h2>Employee Roster <span id="empCnt" style="font-size:13px;font-weight:400;color:var(--text-muted)"></span></h2>
     <div class="sub">Add people, paste a name list, or import from Excel. Changes are live for all connected users.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
-      <button class="btn" id="addEmpBtn">+ Add Employee</button>
-      <button class="btn sec" id="pasteNamesBtn">📋 Paste name list</button>
-      <button class="btn sec" id="importXlsBtn">📁 Import Excel</button>
-      <input type="file" id="importXlsFile" accept=".xlsx,.xls,.csv" style="display:none">
+      <div id="empAdminBtns" style="display:none;gap:8px;flex-wrap:wrap">
+        <button class="btn" id="addEmpBtn">+ Add Employee</button>
+        <button class="btn sec" id="pasteNamesBtn">📋 Paste name list</button>
+        <button class="btn sec" id="importXlsBtn">📁 Import Excel</button>
+        <input type="file" id="importXlsFile" accept=".xlsx,.xls,.csv" style="display:none">
+      </div>
       <button class="btn sec" id="exportEmpBtn">⬇ Export Excel</button>
       <input type="text" id="empSearch" placeholder="Search…" style="max-width:190px">
     </div>
@@ -408,6 +435,36 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
   </div>
 </section>
 
+<!-- FEEDBACK -->
+<section class="panel" id="panel-feedback">
+  <!-- Admin view: list of received feedback -->
+  <div class="card" id="fbAdminCard" style="display:none">
+    <h2>📥 Received Feedback</h2>
+    <div class="sub">Messages submitted by employees. Click ✕ to dismiss.</div>
+    <div id="fbList"></div>
+  </div>
+  <!-- Submit feedback (visible to everyone) -->
+  <div class="card">
+    <h2>💬 Send Feedback</h2>
+    <div class="sub">Share suggestions, report issues, or leave a note for the admin.</div>
+    <div class="cfg-grid">
+      <label class="field"><span>Your name (optional)</span><input type="text" id="fbName" placeholder="Your name"></label>
+      <label class="field"><span>Category</span>
+        <select id="fbCat">
+          <option value="general">General</option>
+          <option value="desk">Desk issue</option>
+          <option value="parking">Parking issue</option>
+          <option value="system">System bug</option>
+          <option value="suggestion">Suggestion</option>
+        </select>
+      </label>
+    </div>
+    <label class="field"><span>Message</span><textarea id="fbMsg" rows="5" placeholder="Write your message here…"></textarea></label>
+    <button class="btn" id="sendFbBtn">Send feedback</button>
+    <div id="fbConfirm" style="display:none;margin-top:10px;padding:10px 14px;background:var(--success-light);color:#065f46;border-radius:6px;font-size:13px">✅ Thank you! Your feedback has been sent.</div>
+  </div>
+</section>
+
 </main>
 
 <!-- BOOKING MODAL -->
@@ -445,7 +502,8 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 let state = {
   config: { desks:24, parking:10, targetDays:2, year:new Date().getFullYear(), unavailableDesks:[], unavailableParking:[] },
   employees: [],
-  bookings: {}
+  bookings: {},
+  feedback: []
 };
 let currentUser = localStorage.getItem('ors_user') || '';
 let viewYear    = new Date().getFullYear();
@@ -453,6 +511,7 @@ let modalDate   = null;
 let activePanel = 'calendar';
 let shiftOpen   = { day:true, evening:false, night:false, weekend:true };
 let dashRef     = new Date();
+let isAdmin     = false;
 
 /* ====================================================================
    CONSTANTS
@@ -567,6 +626,9 @@ function connectSSE(){
       state.config=msg.config;
       if(activePanel==='settings') renderSettings();
       if(activePanel==='dashboard') renderDashboard();
+    } else if(msg.action==='feedback_count'){
+      updateFbBadge(msg.count);
+      if(activePanel==='feedback'&&isAdmin) loadFeedback();
     }
   };
   es.onerror=()=>{ dot.className='status-dot err'; };
@@ -831,9 +893,15 @@ function buildParkingLayout(sh){
 function toggleShift(sh){ shiftOpen[sh]=!shiftOpen[sh]; renderBookingModal(); }
 
 async function handleSlot(sh,kind,n){
-  if(!currentUser){ toast('Select yourself first','err'); return; }
   const sd=shiftData(modalDate,sh);
   const owner=(sd[kind]||{})[String(n)];
+  // Admin removing someone else's booking
+  if(isAdmin && owner && owner!==currentUser){
+    if(!confirm(`Remove ${empName(owner)}'s booking?`)) return;
+    await api('/api/unbook','POST',{date:modalDate,shift:sh,kind,slot:n,userId:owner});
+    return;
+  }
+  if(!currentUser){ toast('Select yourself first','err'); return; }
   if(owner && owner!==currentUser){ toast('Already taken by '+empName(owner),'err'); return; }
   const mine=owner===currentUser;
   if(!mine){
@@ -1468,7 +1536,7 @@ function renderEmployees(){
       <td><div class="shift-tog" data-id="${emp.id}">${togBtns}</div></td>
       <td><input type="text" value="${h(emp.department||'')}" data-id="${emp.id}" data-field="department" class="emp-inp" style="width:100%"></td>
       <td><input type="number" value="${emp.targetDays??state.config.targetDays}" data-id="${emp.id}" data-field="targetDays" class="emp-inp" min="0" max="5" style="width:70px" title="0 = remote employee"></td>
-      <td><button class="btn danger sm" onclick="deleteEmp('${emp.id}')">✕</button></td>
+      <td>${isAdmin?`<button class="btn danger sm" onclick="deleteEmp('${emp.id}')">✕</button>`:''}</td>
     </tr>`;
   }).join('');
 
@@ -1628,6 +1696,116 @@ function download(name,type,content){
 }
 
 /* ====================================================================
+   ADMIN AUTH
+   ==================================================================== */
+function setAdminUI(admin){
+  isAdmin = admin;
+  document.getElementById('adminLoginBtn').style.display  = admin ? 'none' : '';
+  document.getElementById('adminLoggedIn').style.display  = admin ? 'flex' : 'none';
+  document.getElementById('empAdminBtns').style.display   = admin ? 'flex' : 'none';
+  if(activePanel==='employees') renderEmployees();
+  if(activePanel==='feedback')  renderFeedbackPanel();
+}
+
+document.getElementById('adminLoginBtn').addEventListener('click',()=>{
+  document.getElementById('adminLoginErr').style.display='none';
+  document.getElementById('adminUser').value='';
+  document.getElementById('adminPass').value='';
+  document.getElementById('adminLoginModal').classList.add('open');
+  setTimeout(()=>document.getElementById('adminUser').focus(),50);
+});
+document.getElementById('closeAdminLogin').addEventListener('click',()=>document.getElementById('adminLoginModal').classList.remove('open'));
+document.getElementById('cancelAdminLogin').addEventListener('click',()=>document.getElementById('adminLoginModal').classList.remove('open'));
+document.getElementById('adminLoginModal').addEventListener('click',e=>{if(e.target.id==='adminLoginModal') document.getElementById('adminLoginModal').classList.remove('open');});
+
+async function doAdminLogin(){
+  const username=document.getElementById('adminUser').value.trim();
+  const password=document.getElementById('adminPass').value;
+  const errEl=document.getElementById('adminLoginErr');
+  const res=await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})});
+  const data=await res.json();
+  if(!res.ok){ errEl.textContent=data.error||'Login failed'; errEl.style.display='block'; return; }
+  document.getElementById('adminLoginModal').classList.remove('open');
+  setAdminUI(true);
+  toast('Signed in as Admin','ok');
+  if(activePanel==='feedback') loadFeedback();
+}
+document.getElementById('doAdminLogin').addEventListener('click',doAdminLogin);
+document.getElementById('adminPass').addEventListener('keydown',e=>{ if(e.key==='Enter') doAdminLogin(); });
+
+document.getElementById('adminLogoutBtn').addEventListener('click',async()=>{
+  await fetch('/api/logout',{method:'POST'});
+  setAdminUI(false);
+  toast('Signed out');
+});
+
+/* ====================================================================
+   FEEDBACK
+   ==================================================================== */
+function updateFbBadge(count){
+  const badge=document.getElementById('fbBadge');
+  if(count>0&&isAdmin){ badge.textContent=count; badge.style.display='inline'; }
+  else { badge.style.display='none'; }
+}
+
+async function loadFeedback(){
+  const data=await api('/api/feedback');
+  if(!data) return;
+  state.feedback=data.feedback||[];
+  renderFeedbackPanel();
+  updateFbBadge(state.feedback.filter(f=>!f.read).length);
+}
+
+const FB_CAT_LABEL={general:'General',desk:'Desk issue',parking:'Parking issue',system:'System bug',suggestion:'Suggestion'};
+
+function renderFeedbackPanel(){
+  const adminCard=document.getElementById('fbAdminCard');
+  const listEl=document.getElementById('fbList');
+  if(!isAdmin){ adminCard.style.display='none'; return; }
+  adminCard.style.display='block';
+  if(!state.feedback.length){
+    listEl.innerHTML='<p style="color:var(--text-muted);font-size:13px">No feedback yet.</p>';
+    return;
+  }
+  listEl.innerHTML=`<table><thead><tr><th>Date</th><th>Name</th><th>Category</th><th>Message</th><th></th></tr></thead><tbody>`+
+    [...state.feedback].reverse().map(f=>`<tr style="${f.read?'':'background:var(--primary-light)'}">
+      <td style="white-space:nowrap;font-size:12px">${f.ts.replace('T',' ').replace('Z','')}</td>
+      <td>${h(f.name)}</td>
+      <td><span class="pill day" style="font-size:10px">${h(FB_CAT_LABEL[f.category]||f.category)}</span></td>
+      <td style="max-width:340px;white-space:pre-wrap;word-break:break-word">${h(f.message)}</td>
+      <td><button class="btn sec sm" onclick="deleteFb('${f.id}')">✕</button></td>
+    </tr>`).join('')+
+    `</tbody></table>`;
+  // Mark all as read
+  state.feedback.filter(f=>!f.read).forEach(f=>api('/api/feedback/read','POST',{id:f.id}));
+  state.feedback.forEach(f=>f.read=true);
+  updateFbBadge(0);
+}
+
+async function deleteFb(id){
+  const res=await api('/api/feedback/delete','POST',{id});
+  if(res){ state.feedback=state.feedback.filter(f=>f.id!==id); renderFeedbackPanel(); toast('Feedback removed'); }
+}
+
+document.getElementById('sendFbBtn').addEventListener('click',async()=>{
+  const msg=document.getElementById('fbMsg').value.trim();
+  if(!msg){ toast('Enter a message','err'); return; }
+  const res=await api('/api/feedback','POST',{
+    name:document.getElementById('fbName').value.trim()||'Anonymous',
+    message:msg,
+    category:document.getElementById('fbCat').value
+  });
+  if(res){
+    document.getElementById('fbMsg').value='';
+    document.getElementById('fbName').value='';
+    const conf=document.getElementById('fbConfirm');
+    conf.style.display='block';
+    setTimeout(()=>conf.style.display='none',4000);
+    toast('Feedback sent','ok');
+  }
+});
+
+/* ====================================================================
    BOOT
    ==================================================================== */
 function normalizeEmployees(emps){
@@ -1645,11 +1823,25 @@ async function init(){
     state=data;
     viewYear=state.config.year||new Date().getFullYear();
   }catch(e){ toast('Could not load state','err'); }
+  // Restore admin session if cookie still valid
+  try{
+    const me=await fetch('/api/me').then(r=>r.json());
+    if(me.isAdmin) setAdminUI(true);
+  }catch(e){}
   syncUserInput();
   renderCalendar();
   renderToday();
   connectSSE();
 }
+
+// Wire feedback tab
+document.querySelectorAll('nav button').forEach(b=>{
+  if(b.dataset.panel==='feedback') b.addEventListener('click',()=>{
+    renderFeedbackPanel();
+    if(isAdmin) loadFeedback();
+  });
+});
+
 init();
 </script>
 </body>

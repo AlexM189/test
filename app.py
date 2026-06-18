@@ -5,6 +5,7 @@ import time
 import uuid
 import io
 from datetime import date, datetime, timedelta
+from functools import wraps
 
 from flask import (
     Flask,
@@ -12,11 +13,18 @@ from flask import (
     jsonify,
     render_template,
     request,
+    session,
     stream_with_context,
     send_file,
 )
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", "ors-secret-change-me")
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
+
+ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
+ADMIN_PASS = os.environ.get("ADMIN_PASS", "IIS12354")
 
 # ---------------------------------------------------------------------------
 # Storage configuration
@@ -38,6 +46,15 @@ SHIFT_HOURS = {
 }
 
 
+def admin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("is_admin"):
+            return jsonify({"error": "Admin access required"}), 403
+        return f(*args, **kwargs)
+    return decorated
+
+
 def _default_state():
     return {
         "config": {
@@ -50,6 +67,7 @@ def _default_state():
         },
         "employees": [],
         "bookings": {},
+        "feedback": [],
     }
 
 
@@ -90,6 +108,7 @@ def load_data():
     data["config"] = cfg
     data.setdefault("employees", [])
     data.setdefault("bookings", {})
+    data.setdefault("feedback", [])
     return data
 
 
@@ -130,6 +149,100 @@ def api_state():
     with file_lock:
         return jsonify(load_data())
 
+
+# ---------------------------------------------------------------------------
+# Admin auth
+# ---------------------------------------------------------------------------
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    body = request.get_json(silent=True) or {}
+    if body.get("username") == ADMIN_USER and body.get("password") == ADMIN_PASS:
+        session.permanent = True
+        session["is_admin"] = True
+        return jsonify({"ok": True, "isAdmin": True})
+    return jsonify({"error": "Invalid credentials"}), 401
+
+
+@app.route("/api/logout", methods=["POST"])
+def api_logout():
+    session.clear()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/me")
+def api_me():
+    return jsonify({"isAdmin": bool(session.get("is_admin"))})
+
+
+# ---------------------------------------------------------------------------
+# Feedback
+# ---------------------------------------------------------------------------
+
+@app.route("/api/feedback", methods=["GET"])
+@admin_required
+def api_feedback_list():
+    with file_lock:
+        data = load_data()
+    return jsonify({"feedback": data.get("feedback", [])})
+
+
+@app.route("/api/feedback", methods=["POST"])
+def api_feedback_submit():
+    body = request.get_json(silent=True) or {}
+    name = (body.get("name") or "Anonymous").strip()[:80]
+    message = (body.get("message") or "").strip()[:1000]
+    category = body.get("category", "general")
+    if not message:
+        return jsonify({"error": "Message required"}), 400
+    entry = {
+        "id": "fb_" + uuid.uuid4().hex[:8],
+        "name": name,
+        "message": message,
+        "category": category,
+        "ts": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+        "read": False,
+    }
+    with file_lock:
+        data = load_data()
+        data["feedback"].append(entry)
+        _save_data(data)
+    _broadcast({"action": "feedback_count", "count": len(data["feedback"])})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/feedback/delete", methods=["POST"])
+@admin_required
+def api_feedback_delete():
+    fb_id = (request.get_json(silent=True) or {}).get("id")
+    with file_lock:
+        data = load_data()
+        before = len(data["feedback"])
+        data["feedback"] = [f for f in data["feedback"] if f["id"] != fb_id]
+        if len(data["feedback"]) == before:
+            return jsonify({"error": "Not found"}), 404
+        _save_data(data)
+        count = len(data["feedback"])
+    _broadcast({"action": "feedback_count", "count": count})
+    return jsonify({"ok": True, "count": count})
+
+
+@app.route("/api/feedback/read", methods=["POST"])
+@admin_required
+def api_feedback_read():
+    fb_id = (request.get_json(silent=True) or {}).get("id")
+    with file_lock:
+        data = load_data()
+        for f in data["feedback"]:
+            if f["id"] == fb_id:
+                f["read"] = True
+        _save_data(data)
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Config / employees
+# ---------------------------------------------------------------------------
 
 @app.route("/api/config", methods=["POST"])
 def api_config():
@@ -172,6 +285,7 @@ def _normalize_shifts(raw, fallback="day"):
 
 
 @app.route("/api/employees/add", methods=["POST"])
+@admin_required
 def api_emp_add():
     body = request.get_json(silent=True) or {}
     with file_lock:
@@ -250,6 +364,7 @@ def api_emp_update():
 
 
 @app.route("/api/employees/delete", methods=["POST"])
+@admin_required
 def api_emp_delete():
     body = request.get_json(silent=True) or {}
     emp_id = body.get("id")
@@ -315,7 +430,7 @@ def api_unbook():
         current = day[shift][kind].get(slot)
         if current is None:
             return jsonify({"ok": True, "day": data["bookings"][dt]})
-        if user_id and current != user_id:
+        if user_id and current != user_id and not session.get("is_admin"):
             return jsonify({"error": "Not your booking", "by": current}), 403
         del day[shift][kind][slot]
         _save_data(data)
