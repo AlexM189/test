@@ -298,10 +298,16 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     <div class="sub">Desks &amp; parking by shift — avg per active day shown at bottom</div>
     <div style="overflow-x:auto"><table id="utilTable"><thead></thead><tbody></tbody><tfoot></tfoot></table></div>
   </div>
-  <div class="card">
+  <div class="card" id="presAdminCard">
     <h2>Presence vs Target</h2>
     <div class="sub">Target: <strong id="targetLbl"></strong> days/week. Cells show actual booked shift: <span style="background:var(--day);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">D</span> Day &nbsp;<span style="background:var(--eve);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">E</span> Eve &nbsp;<span style="background:var(--night);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">N</span> Night &nbsp;<span style="background:var(--weekend);color:#fff;border-radius:3px;padding:0 4px;font-size:11px;font-weight:700">W</span> Weekend</div>
     <div style="overflow-x:auto"><table id="presTable"><thead></thead><tbody></tbody></table></div>
+  </div>
+  <div class="card" id="presPublicCard">
+    <h2>Iași Office — Presence vs Target</h2>
+    <div class="sub" id="presPublicSub"></div>
+    <div id="presPublicChart" style="overflow-x:auto"></div>
+    <div id="presPublicStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px"></div>
   </div>
 </section>
 
@@ -1001,6 +1007,87 @@ document.getElementById('dashPrevWeek').addEventListener('click',()=>{ dashRef.s
 document.getElementById('dashNextWeek').addEventListener('click',()=>{ dashRef.setDate(dashRef.getDate()+7); renderDashboard(); });
 document.getElementById('dashDatePick').addEventListener('change',e=>{ dashRef=new Date(e.target.value+'T00:00:00'); renderDashboard(); });
 
+function renderPresencePublic(days){
+  const officeTarget = state.config.targetDays;
+  const inOfficeEmps = state.employees.filter(e=>(e.targetDays??officeTarget)>0);
+  const total = inOfficeEmps.length;
+  // Expected per weekday = total * targetDays / 5 workdays
+  const expectedWeekday = total>0 ? Math.round(total * officeTarget / 5) : 0;
+  // Expected per weekend day = employees who have weekend shift
+  const weekendEmps = state.employees.filter(e=>(e.shifts||[e.shift||'day']).includes('weekend')).length;
+
+  const dayStrs = days.map(d=>ymd(d));
+  const actual = days.map(d=>{
+    const ds=ymd(d);
+    const ids=new Set();
+    const b=dayBookings(ds);
+    for(const sh in b) Object.values(b[sh]?.desks||{}).forEach(id=>ids.add(id));
+    return ids.size;
+  });
+  const expected = days.map(d=>isWeekend(d)?weekendEmps:expectedWeekday);
+  const weekTotal = actual.reduce((a,b)=>a+b,0);
+  const weekExpected = days.filter(d=>!isWeekend(d)).length * expectedWeekday +
+                       days.filter(d=>isWeekend(d)).length * weekendEmps;
+  const weekPct = weekExpected>0?Math.round(100*weekTotal/weekExpected):0;
+  const maxVal = Math.max(...actual, ...expected, 1);
+
+  document.getElementById('presPublicSub').innerHTML=
+    `Office target: <strong>${officeTarget} day${officeTarget!==1?'s':''}/week</strong> per employee &nbsp;·&nbsp; `+
+    `<strong>${total}</strong> in-office employees &nbsp;·&nbsp; Expected per weekday: <strong>${expectedWeekday}</strong>`;
+
+  // SVG bar chart: grouped bars (Actual blue, Target orange) per day
+  const chartW=640, chartH=240, padL=44, padR=14, padT=20, padB=48;
+  const gW=chartW-padL-padR, gH=chartH-padT-padB;
+  const n=days.length, grpW=gW/n, barW=Math.min(22,(grpW-10)/2);
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" style="font-family:system-ui,sans-serif;display:block;margin:0 auto">`;
+  svg+=`<rect width="${chartW}" height="${chartH}" fill="#f8fafc" rx="8"/>`;
+  // grid lines
+  const step = maxVal<=10?2:maxVal<=20?5:10;
+  for(let v=0;v<=maxVal;v+=step){
+    const y=padT+gH*(1-v/maxVal);
+    svg+=`<line x1="${padL}" y1="${y}" x2="${padL+gW}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
+    svg+=`<text x="${padL-5}" y="${y+4}" text-anchor="end" font-size="10" fill="#94a3b8">${v}</text>`;
+  }
+  days.forEach((d,i)=>{
+    const x0=padL+i*grpW+(grpW-barW*2-4)/2;
+    const aVal=actual[i], eVal=expected[i];
+    // Actual bar
+    const ah=Math.max(aVal>0?2:0,(aVal/maxVal)*gH);
+    const aColor=aVal>=eVal?'#10b981':aVal>=eVal*0.7?'#f59e0b':'#ef4444';
+    svg+=`<rect x="${x0.toFixed(1)}" y="${(padT+gH-ah).toFixed(1)}" width="${barW-1}" height="${ah.toFixed(1)}" fill="${aColor}" rx="2" opacity=".85"/>`;
+    if(aVal>0) svg+=`<text x="${(x0+barW/2-0.5).toFixed(1)}" y="${(padT+gH-ah-3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${aColor}" font-weight="700">${aVal}</text>`;
+    // Target bar
+    const th=Math.max(eVal>0?2:0,(eVal/maxVal)*gH);
+    const tx=x0+barW+3;
+    svg+=`<rect x="${tx.toFixed(1)}" y="${(padT+gH-th).toFixed(1)}" width="${barW-1}" height="${th.toFixed(1)}" fill="#94a3b8" rx="2" opacity=".55"/>`;
+    if(eVal>0) svg+=`<text x="${(tx+barW/2-0.5).toFixed(1)}" y="${(padT+gH-th-3).toFixed(1)}" text-anchor="middle" font-size="9" fill="#64748b">${eVal}</text>`;
+    // x label
+    const lx=padL+i*grpW+grpW/2;
+    const ds=ymd(d); const isToday=ds===ymd(new Date());
+    svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+14).toFixed(1)}" text-anchor="middle" font-size="10" fill="${isToday?'#4f46e5':'#475569'}" font-weight="${isToday?'700':'400'}">${DOW_S[d.getDay()]}</text>`;
+    svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+26).toFixed(1)}" text-anchor="middle" font-size="9" fill="#94a3b8">${d.getDate()}/${d.getMonth()+1}</text>`;
+  });
+  svg+=`<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  svg+=`<line x1="${padL}" y1="${padT+gH}" x2="${padL+gW}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  svg+=`</svg>`;
+
+  const legend=`<div style="display:flex;gap:20px;justify-content:center;margin-bottom:12px;flex-wrap:wrap">
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><span style="width:13px;height:13px;border-radius:3px;background:#10b981;display:inline-block"></span>Present (on/above target)</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><span style="width:13px;height:13px;border-radius:3px;background:#f59e0b;display:inline-block"></span>Present (near target)</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><span style="width:13px;height:13px;border-radius:3px;background:#ef4444;display:inline-block"></span>Present (below target)</span>
+    <span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569"><span style="width:13px;height:13px;border-radius:3px;background:#94a3b8;opacity:.6;display:inline-block"></span>Expected</span>
+  </div>`;
+  document.getElementById('presPublicChart').innerHTML=legend+svg;
+
+  const pill=weekPct>=80?'ok':weekPct>=50?'warn':'bad';
+  document.getElementById('presPublicStats').innerHTML=`
+    <div class="stat"><div class="lbl">Week total present</div><div class="val">${weekTotal}</div><div class="sub2">person-days</div></div>
+    <div class="stat"><div class="lbl">Week expected</div><div class="val">${weekExpected}</div><div class="sub2">person-days</div></div>
+    <div class="stat"><div class="lbl">Week attendance rate</div><div class="val"><span class="pill ${pill}">${weekPct}%</span></div><div class="sub2">vs office target</div></div>
+    <div class="stat"><div class="lbl">Office target</div><div class="val">${officeTarget}</div><div class="sub2">days/week per person</div></div>
+  `;
+}
+
 function renderDashboard(){
   document.getElementById('dashDatePick').value=ymd(dashRef);
   document.getElementById('dashWeekLbl').textContent=weekLabel(dashRef);
@@ -1048,25 +1135,32 @@ function renderDashboard(){
     ${[6,7].map(i=>{ const v=wkndDays?Math.round(totals[i]/wkndDays):0; return `<td>${v}%</td>`; }).join('')}
   </tr>`;
 
-  // presence table
-  const presHead=document.querySelector('#presTable thead');
-  const presBod=document.querySelector('#presTable tbody');
-  presHead.innerHTML=`<tr><th>#</th><th>Employee</th>${days.map(d=>`<th style="text-align:center">${DOW_S[d.getDay()]}<br><span style="font-weight:400">${d.getDate()}</span></th>`).join('')}<th>Days</th><th>Target</th><th>Rate</th></tr>`;
-  presBod.innerHTML=state.employees.map((emp,i)=>{
-    const dayStrs=days.map(d=>ymd(d));
-    const total=dayStrs.filter(ds=>userHasDesk(emp.id,ds)).length;
-    const target=emp.targetDays??state.config.targetDays;
-    const isRemote=target===0;
-    const cells=dayStrs.map(ds=>`<td style="text-align:center">${presenceDayCell(emp.id,ds)}</td>`).join('');
-    if(isRemote){
+  // presence section — admin gets individual table, others get aggregate chart
+  document.getElementById('presAdminCard').style.display = isAdmin ? '' : 'none';
+  document.getElementById('presPublicCard').style.display = isAdmin ? 'none' : '';
+
+  if(isAdmin){
+    const presHead=document.querySelector('#presTable thead');
+    const presBod=document.querySelector('#presTable tbody');
+    presHead.innerHTML=`<tr><th>#</th><th>Employee</th>${days.map(d=>`<th style="text-align:center">${DOW_S[d.getDay()]}<br><span style="font-weight:400">${d.getDate()}</span></th>`).join('')}<th>Days</th><th>Target</th><th>Rate</th></tr>`;
+    presBod.innerHTML=state.employees.map((emp,i)=>{
+      const dayStrs=days.map(d=>ymd(d));
+      const total=dayStrs.filter(ds=>userHasDesk(emp.id,ds)).length;
+      const target=emp.targetDays??state.config.targetDays;
+      const isRemote=target===0;
+      const cells=dayStrs.map(ds=>`<td style="text-align:center">${presenceDayCell(emp.id,ds)}</td>`).join('');
+      if(isRemote){
+        return `<tr><td>${i+1}</td><td>${h(emp.name)}</td>${cells}
+          <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center"><span class="pill" style="background:#f1f5f9;color:#64748b">Remote</span></td><td>—</td></tr>`;
+      }
+      const p=pct(total,target*days.length/7);
+      const pill=total>=target?'ok':total>=target*0.5?'warn':'bad';
       return `<tr><td>${i+1}</td><td>${h(emp.name)}</td>${cells}
-        <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center"><span class="pill" style="background:#f1f5f9;color:#64748b">Remote</span></td><td>—</td></tr>`;
-    }
-    const p=pct(total,target*days.length/7);
-    const pill=total>=target?'ok':total>=target*0.5?'warn':'bad';
-    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td>${cells}
-      <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center">${target}</td><td><span class="pill ${pill}">${p}%</span></td></tr>`;
-  }).join('');
+        <td style="text-align:center"><strong>${total}</strong></td><td style="text-align:center">${target}</td><td><span class="pill ${pill}">${p}%</span></td></tr>`;
+    }).join('');
+  } else {
+    renderPresencePublic(days);
+  }
 }
 
 /* ====================================================================
