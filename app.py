@@ -352,6 +352,8 @@ def api_emp_update():
             # if no multi-shift record yet, create one from the single value
             if not found.get("shifts"):
                 found["shifts"] = [body["shift"]]
+        if "remote" in body:
+            found["remote"] = bool(body["remote"])
         if "targetDays" in body:
             try:
                 found["targetDays"] = int(body["targetDays"])

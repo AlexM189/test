@@ -14,9 +14,29 @@
   --warning:#f59e0b;--warning-light:#fef3c7;--danger:#ef4444;--danger-light:#fee2e2;
   --day:#3b82f6;--day-light:#dbeafe;--eve:#8b5cf6;--eve-light:#ede9fe;
   --night:#334155;--night-light:#e2e8f0;--weekend:#ec4899;--weekend-light:#fce7f3;
+  --remote:#0891b2;--remote-light:#cffafe;
   --shadow:0 1px 3px rgba(0,0,0,.08);--shadow-lg:0 10px 25px rgba(0,0,0,.12);--radius:8px;
+  --transition:background .2s,color .2s,border-color .2s;
 }
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5}
+[data-theme="dark"]{
+  --bg:#0f172a;--surface:#1e293b;--surface-2:#243347;--border:#334155;
+  --text:#f1f5f9;--text-muted:#94a3b8;--primary:#818cf8;--primary-hover:#6366f1;
+  --primary-light:#1e1b4b;--success:#34d399;--success-light:#064e3b;
+  --warning:#fbbf24;--warning-light:#431407;--danger:#f87171;--danger-light:#450a0a;
+  --day:#60a5fa;--day-light:#172554;--eve:#a78bfa;--eve-light:#2e1065;
+  --night:#94a3b8;--night-light:#1e293b;--weekend:#f472b6;--weekend-light:#500724;
+  --remote:#22d3ee;--remote-light:#0c4a6e;
+  --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 10px 25px rgba(0,0,0,.5);
+  color-scheme:dark;
+}
+[data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:var(--surface-2);color:var(--text);border-color:var(--border)}
+[data-theme="dark"] input::placeholder,[data-theme="dark"] textarea::placeholder{color:var(--text-muted)}
+[data-theme="dark"] .modal{background:var(--surface)}
+[data-theme="dark"] .udrop{background:var(--surface)}
+[data-theme="dark"] .dc{background:var(--surface-2)}
+[data-theme="dark"] .dc.empty{background:transparent}
+[data-theme="dark"] .slot{background:var(--surface-2)}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;transition:var(--transition)}
 header{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:50;box-shadow:var(--shadow);flex-wrap:wrap}
 .logo{font-weight:700;font-size:17px;color:var(--primary);display:flex;align-items:center;gap:7px;white-space:nowrap}
 nav{display:flex;gap:3px;flex:1;flex-wrap:wrap}
@@ -160,22 +180,30 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 .stog.on-eve{background:var(--eve-light);border-color:var(--eve);color:var(--eve);font-weight:600}
 .stog.on-night{background:var(--night-light);border-color:var(--night);color:var(--night);font-weight:600}
 .stog.on-weekend{background:var(--weekend-light);border-color:var(--weekend);color:var(--weekend);font-weight:600}
+.stog.on-remote{background:var(--remote-light);border-color:var(--remote);color:var(--remote);font-weight:600}
+/* theme button */
+.theme-btn{background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:5px 8px;font-size:15px;line-height:1;color:var(--text-muted);transition:var(--transition)}
+.theme-btn:hover{background:var(--surface-2)}
+/* empty-state helper */
+.empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
+.empty-state .es-icon{font-size:40px;margin-bottom:10px}
+.empty-state p{margin:4px 0;font-size:14px}
 /* accessibility parking slot */
 .slot.access{border-color:#1d4ed8;border-width:2px}
 .slot.access .num{color:#1d4ed8}
 /* ── Floor-plan layout (booking modal) ──────────────────────────── */
-.fp-wrap{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:2px}
+.fp-wrap{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:2px}
 .fp-section-hdr{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:8px}
 .fp-offices{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:0}
-.fp-office-room{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.fp-office-room{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
 .fp-office-label{font-size:10px;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px}
 .fp-office-desks{display:flex;gap:6px}
 .fp-openspace{display:flex;flex-direction:column;gap:6px}
-.fp-bench-pair{background:#fff;border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.fp-bench-pair{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
 .fp-bench-row{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
 .fp-park-row{grid-template-columns:repeat(5,1fr)!important}
 .fp-table-line{height:5px;background:linear-gradient(#cbd5e1,#e2e8f0);border-radius:3px;margin:4px 8px}
-.fp-cell{border:1.5px solid var(--border);background:#fff;border-radius:6px;padding:4px 3px;min-height:46px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .15s;text-align:center;font-family:inherit}
+.fp-cell{border:1.5px solid var(--border);background:var(--surface);border-radius:6px;padding:4px 3px;min-height:46px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;transition:all .15s;text-align:center;font-family:inherit}
 .fp-cell:hover:not(.na):not(.taken){border-color:var(--primary);background:var(--primary-light)}
 .fp-cell.mine{background:var(--success-light);border-color:var(--success)}
 .fp-cell.taken{background:var(--day-light);border-color:var(--day);cursor:default}
@@ -188,7 +216,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 .fp-cell.taken .fp-num,.fp-cell.taken .fp-nm{color:var(--day);font-weight:600}
 .fp-cell.access .fp-num{color:#1d4ed8}
 .fp-cell.access.mine .fp-num{color:#065f46}
-.fp-parking-wrap{background:#f8fafc;border:1px solid var(--border);border-radius:10px;padding:12px}
+.fp-parking-wrap{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px}
 </style>
 </head>
 <body>
@@ -215,6 +243,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
       <div class="udrop" id="udrop"></div>
     </div>
     <span class="status-dot" id="statusDot" title="Live connection"></span>
+    <button class="theme-btn" id="themeBtn" title="Switch theme">💻</button>
     <!-- Admin login area -->
     <div style="border-left:1px solid var(--border);padding-left:10px;display:flex;align-items:center;gap:6px">
       <div id="adminLoggedIn" style="display:none;align-items:center;gap:6px">
@@ -391,7 +420,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
     </div>
     <div style="overflow-x:auto">
       <table id="empTable">
-        <thead><tr><th>#</th><th>Name</th><th>Default Shift</th><th>Department</th><th>Target days/wk</th><th></th></tr></thead>
+        <thead><tr><th>#</th><th>Name</th><th>Shifts / Status</th><th>Department</th><th>Target days/wk</th><th></th></tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -524,6 +553,31 @@ let shiftOpen   = { day:true, evening:false, night:false, weekend:true };
 let dashRef     = new Date();
 let isAdmin     = false;
 let calViewMonth = new Date(); // center month for non-admin 3-month view
+
+/* ====================================================================
+   THEME
+   ==================================================================== */
+const THEME_CYCLE=['system','light','dark'];
+const THEME_ICON={system:'💻',light:'☀️',dark:'🌙'};
+const THEME_TITLE={system:'System default',light:'Light mode',dark:'Dark mode'};
+let currentTheme=localStorage.getItem('ors_theme')||'system';
+
+function applyTheme(t){
+  currentTheme=t;
+  localStorage.setItem('ors_theme',t);
+  const prefersDark=window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const useDark = t==='dark' || (t==='system'&&prefersDark);
+  document.documentElement.setAttribute('data-theme', useDark?'dark':'light');
+  const btn=document.getElementById('themeBtn');
+  if(btn){ btn.textContent=THEME_ICON[t]; btn.title=THEME_TITLE[t]+' (click to switch)'; }
+}
+
+document.getElementById('themeBtn').addEventListener('click',()=>{
+  const idx=THEME_CYCLE.indexOf(currentTheme);
+  applyTheme(THEME_CYCLE[(idx+1)%THEME_CYCLE.length]);
+});
+window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(currentTheme==='system') applyTheme('system'); });
+applyTheme(currentTheme);
 
 /* ====================================================================
    CONSTANTS
@@ -973,6 +1027,10 @@ async function bulkBookShift(sh,kind){
 function renderToday(){
   const today=new Date(); const ds=ymd(today);
   document.getElementById('todayLbl').textContent=`${DOW_L[today.getDay()]}, ${today.getDate()} ${MONTHS[today.getMonth()]} ${today.getFullYear()}`;
+  if(!state.employees.length){
+    document.getElementById('todayContent').innerHTML=`<div class="empty-state"><div class="es-icon">🏢</div><p><strong>No employees in roster yet</strong></p><p>Ask your admin to add employees so you can start booking.</p></div>`;
+    return;
+  }
   const shifts=activeShifts(today);
   const dCap=capacity('desks'), pCap=capacity('parking');
   let html='';
@@ -990,7 +1048,9 @@ function renderToday(){
       entries.forEach(uid=>{
         const deskNum=Object.entries(sd.desks||{}).find(([k,v])=>v===uid)?.[0]||'—';
         const parkNum=Object.entries(sd.parking||{}).find(([k,v])=>v===uid)?.[0]||'—';
-        html+=`<tr><td>${h(empName(uid))}</td><td>${deskNum}</td><td>${parkNum}</td></tr>`;
+        const emp=empById(uid);
+        const remoteBadge=emp?.remote?'<span style="font-size:10px;background:var(--remote-light);color:var(--remote);border-radius:8px;padding:1px 6px;margin-left:4px">Remote</span>':'';
+        html+=`<tr><td>${h(empName(uid))}${remoteBadge}</td><td>${deskNum}</td><td>${parkNum}</td></tr>`;
       });
       html+='</tbody></table>';
     }
@@ -1029,11 +1089,14 @@ function renderPresencePublic(days){
   const weekExpected = days.filter(d=>!isWeekend(d)).length * expectedWeekday +
                        days.filter(d=>isWeekend(d)).length * weekendEmps;
   const weekPct = weekExpected>0?Math.round(100*weekTotal/weekExpected):0;
-  const maxVal = Math.max(...actual, ...expected, 1);
+  const maxVal = Math.max(...actual, ...expected, expectedWeekday, 1);
 
+  const remoteCount=state.employees.filter(e=>e.remote).length;
   document.getElementById('presPublicSub').innerHTML=
     `Office target: <strong>${officeTarget} day${officeTarget!==1?'s':''}/week</strong> per employee &nbsp;·&nbsp; `+
-    `<strong>${total}</strong> in-office employees &nbsp;·&nbsp; Expected per weekday: <strong>${expectedWeekday}</strong>`;
+    `<strong>${total}</strong> in-office employees`+
+    (remoteCount?` &nbsp;·&nbsp; <strong>${remoteCount}</strong> remote`:'') +
+    ` &nbsp;·&nbsp; Expected per weekday: <strong>${expectedWeekday}</strong>`;
 
   // SVG bar chart: grouped bars (Actual blue, Target orange) per day
   const chartW=640, chartH=240, padL=44, padR=14, padT=20, padB=48;
@@ -1643,20 +1706,26 @@ const SHIFT_TOG_CFG=[
   {key:'night',  label:'Night',  cls:'night'},
   {key:'weekend',label:'Wknd',   cls:'weekend'},
 ];
+const REMOTE_LABEL='🏠 Remote';
 
 function renderEmployees(){
   const q=document.getElementById('empSearch').value.toLowerCase();
   const emps=state.employees.filter(e=>!q||e.name.toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));
   document.getElementById('empCnt').textContent=`(${state.employees.length} total${q?' · '+emps.length+' shown':''})`;
   const tbody=document.querySelector('#empTable tbody');
+  if(!state.employees.length){
+    tbody.innerHTML=`<tr><td colspan="6"><div class="empty-state"><div class="es-icon">👥</div><p><strong>No employees yet</strong></p><p>Use "+ Add Employee", paste a list, or import from Excel above.</p></div></td></tr>`;
+    return;
+  }
   tbody.innerHTML=emps.map((emp)=>{
     const idx=state.employees.indexOf(emp)+1;
     const shifts=emp.shifts||[emp.shift||'day'];
     const togBtns=SHIFT_TOG_CFG.map(sc=>`<button class="stog${shifts.includes(sc.key)?' on-'+sc.cls:''}" data-id="${emp.id}" data-sh="${sc.key}" title="Toggle ${sc.key} shift">${sc.label}</button>`).join('');
+    const remoteBtn=`<button class="stog${emp.remote?' on-remote':''}" data-id="${emp.id}" data-remote="1" title="${emp.remote?'Mark as office worker':'Mark as remote'}">${REMOTE_LABEL}</button>`;
     return `<tr>
       <td>${idx}</td>
       <td><input type="text" value="${h(emp.name)}" data-id="${emp.id}" data-field="name" class="emp-inp" style="width:100%"></td>
-      <td><div class="shift-tog" data-id="${emp.id}">${togBtns}</div></td>
+      <td><div class="shift-tog" data-id="${emp.id}">${togBtns}${remoteBtn}</div></td>
       <td><input type="text" value="${h(emp.department||'')}" data-id="${emp.id}" data-field="department" class="emp-inp" style="width:100%"></td>
       <td><input type="number" value="${emp.targetDays??state.config.targetDays}" data-id="${emp.id}" data-field="targetDays" class="emp-inp" min="0" max="5" style="width:70px" title="0 = remote employee"></td>
       <td>${isAdmin?`<button class="btn danger sm" onclick="deleteEmp('${emp.id}')">✕</button>`:''}</td>
@@ -1672,7 +1741,7 @@ function renderEmployees(){
   });
 
   // shift toggle buttons
-  tbody.querySelectorAll('.stog').forEach(btn=>{
+  tbody.querySelectorAll('.stog:not([data-remote])').forEach(btn=>{
     btn.addEventListener('click',async()=>{
       const id=btn.dataset.id, sh=btn.dataset.sh;
       const emp=empById(id); if(!emp) return;
@@ -1684,6 +1753,19 @@ function renderEmployees(){
         shifts.push(sh);
       }
       const res=await api('/api/employees/update','POST',{id,shifts});
+      if(res){ state.employees=normalizeEmployees(res.employees); renderEmployees(); }
+    });
+  });
+
+  // remote toggle
+  tbody.querySelectorAll('.stog[data-remote]').forEach(btn=>{
+    btn.addEventListener('click',async()=>{
+      const id=btn.dataset.id;
+      const emp=empById(id); if(!emp) return;
+      const newRemote=!emp.remote;
+      const update={id, remote:newRemote};
+      if(newRemote) update.targetDays=0;
+      const res=await api('/api/employees/update','POST',update);
       if(res){ state.employees=normalizeEmployees(res.employees); renderEmployees(); }
     });
   });
@@ -1939,9 +2021,9 @@ document.getElementById('sendFbBtn').addEventListener('click',async()=>{
    BOOT
    ==================================================================== */
 function normalizeEmployees(emps){
-  // Ensure every employee has a `shifts` array (backward compat with old data)
   return emps.map(e=>({
     ...e,
+    remote: e.remote||false,
     shifts: Array.isArray(e.shifts) && e.shifts.length ? e.shifts : [e.shift||'day']
   }));
 }
@@ -1963,6 +2045,15 @@ async function init(){
   renderToday();
   connectSSE();
 }
+
+// Escape key closes any open modal
+document.addEventListener('keydown',e=>{
+  if(e.key!=='Escape') return;
+  ['bookModal','pasteModal','adminLoginModal'].forEach(id=>{
+    document.getElementById(id)?.classList.remove('open');
+  });
+  if(document.getElementById('bookModal').classList.contains('open')===false && modalDate){ modalDate=null; renderCalendar(); }
+});
 
 // Wire feedback tab
 document.querySelectorAll('nav button').forEach(b=>{
