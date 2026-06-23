@@ -916,7 +916,11 @@ function _fpDeskCell(n, sh){
   let cls='fp-cell'+(unavail?' na':mine?' mine':taken?' taken':'');
   const numHtml=`<span class="fp-num">${n}</span>`;
   const nmHtml=unavail?`<span class="fp-nm">N/A</span>`:owner?`<span class="fp-nm">${h(empName(owner))}</span>`:'';
-  if(unavail||taken) return `<div class="${cls}" title="${taken?h(empName(owner)):'Out of service'}">${numHtml}${nmHtml}</div>`;
+  if(unavail) return `<div class="${cls}" title="Out of service">${numHtml}${nmHtml}</div>`;
+  if(taken){
+    const clickAttr=isAdmin?` onclick="handleSlot('${sh}','desks',${n})" style="cursor:pointer" title="Remove ${h(empName(owner))}'s booking"`:` title="${h(empName(owner))}"`;
+    return `<div class="${cls}"${clickAttr}>${numHtml}${nmHtml}</div>`;
+  }
   return `<div class="${cls}" onclick="handleSlot('${sh}','desks',${n})" title="${mine?'Cancel booking':'Book desk '+n}">${numHtml}${nmHtml}</div>`;
 }
 
@@ -966,8 +970,11 @@ function buildParkingLayout(sh){
     const numHtml=`<span class="fp-num">${isAccess?ACCESS_ICON:''}<span style="font-size:9px">${label}</span></span>`;
     const nmHtml=owner?`<span class="fp-nm">${h(empName(owner))}</span>`:'';
     let cell;
-    if(unavail||taken){
-      cell=`<div class="${cls}" title="${taken?h(empName(owner)):'Out of service'}">${numHtml}${nmHtml}</div>`;
+    if(unavail){
+      cell=`<div class="${cls}" title="Out of service">${numHtml}${nmHtml}</div>`;
+    } else if(taken){
+      const clickAttr=isAdmin?` onclick="handleSlot('${sh}','parking',${n})" style="cursor:pointer" title="Remove ${h(empName(owner))}'s parking"`:` title="${h(empName(owner))}"`;
+      cell=`<div class="${cls}"${clickAttr}>${numHtml}${nmHtml}</div>`;
     } else {
       cell=`<div class="${cls}" onclick="handleSlot('${sh}','parking',${n})" title="${mine?'Cancel booking':pk.code+(pk.pos?' ('+pk.pos+')':'')+(isAccess?' · Accessible':'')}">${numHtml}${nmHtml}</div>`;
     }
