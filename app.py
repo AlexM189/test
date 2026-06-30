@@ -738,6 +738,39 @@ def api_export_excel():
         style_sheet(ws_m, ["Month", "Avg Desk Util", "Avg Parking Util"],
                     rows, pct_cols={1, 2})
 
+    # ----- Occupancy sheet -----
+    ws_occ = wb.create_sheet("Occupancy")
+    occ_rows = []
+    for d in _iter_dates(start, end):
+        dt = d.isoformat()
+        day = bookings.get(dt, {})
+        all_people: set = set()
+        shift_heads = {}
+        for s in _shifts_for(d):
+            sd = day.get(s, {})
+            people = set((sd.get("desks") or {}).values())
+            shift_heads[s] = len(people)
+            all_people |= people
+        unique = len(all_people)
+        occ_pct = (unique / n_desks) if n_desks else 0
+        row = [
+            dt,
+            d.strftime("%a"),
+            unique,
+            occ_pct,
+            shift_heads.get("day", 0) if d.weekday() < 5 else "",
+            shift_heads.get("evening", 0) if d.weekday() < 5 else "",
+            shift_heads.get("night", 0) if d.weekday() < 5 else "",
+            shift_heads.get("weekend", 0) if d.weekday() >= 5 else "",
+        ]
+        occ_rows.append(row)
+    style_sheet(
+        ws_occ,
+        ["Date", "Day", "Unique People", "Occupancy %", "Day shift", "Evening shift", "Night shift", "Weekend shift"],
+        occ_rows,
+        pct_cols={3},
+    )
+
     bio = io.BytesIO()
     wb.save(bio)
     bio.seek(0)
@@ -748,6 +781,61 @@ def api_export_excel():
         as_attachment=True,
         download_name=fname,
     )
+
+
+# ---------------------------------------------------------------------------
+# Occupancy report API
+# ---------------------------------------------------------------------------
+
+@app.route("/api/report/occupancy")
+def api_report_occupancy():
+    period = request.args.get("period", "week")
+    ref    = request.args.get("ref", date.today().isoformat())
+    start, end = _period_range(period, ref)
+
+    with file_lock:
+        data = load_data()
+
+    bookings = data["bookings"]
+    emp_by_id = {e["id"]: e for e in data["employees"]}
+
+    days_out = []
+    for d in _iter_dates(start, end):
+        dt = d.isoformat()
+        day = bookings.get(dt, {})
+        all_people: set = set()
+        shifts_data = {}
+        for s in _shifts_for(d):
+            sd = day.get(s, {})
+            people = set((sd.get("desks") or {}).values())
+            shifts_data[s] = {
+                "headcount": len(people),
+                "names": [emp_by_id[uid]["name"] for uid in people if uid in emp_by_id],
+            }
+            all_people |= people
+        days_out.append({
+            "date":         dt,
+            "weekday":      d.weekday(),
+            "shifts":       shifts_data,
+            "unique_people": len(all_people),
+        })
+
+    total    = sum(r["unique_people"] for r in days_out)
+    peak     = max((r["unique_people"] for r in days_out), default=0)
+    avg      = round(total / len(days_out), 1) if days_out else 0
+
+    return jsonify({
+        "period": period,
+        "start":  start.isoformat(),
+        "end":    end.isoformat(),
+        "days":   days_out,
+        "summary": {
+            "total_person_days": total,
+            "peak_headcount":    peak,
+            "avg_headcount":     avg,
+            "total_days":        len(days_out),
+        },
+    })
 
 
 if __name__ == "__main__":

@@ -1390,6 +1390,9 @@ function buildRptPreview(t,ref){
   if(days.length>60) html+=`<tr><td colspan="10" style="text-align:center;color:var(--text-muted)">… and ${days.length-60} more days. Download Excel for full data.</td></tr>`;
   html+=`</tbody></table></div></div>`;
 
+  // Occupancy section
+  html += buildOccupancySection(days);
+
   return html;
 }
 
@@ -1637,7 +1640,38 @@ tr:nth-child(even) td{background:#f8fafc}
   <span class="slide-num">3</span>
 </div>
 
-<!-- SLIDE 4: Employee Presence -->
+<!-- SLIDE 4: Occupancy -->
+<div class="slide" style="position:relative">
+  <h2>Office Occupancy — Unique People per Day</h2>
+  <div class="sub">${periodLabel} &nbsp;·&nbsp; Capacity: ${dCap} desks &nbsp;·&nbsp; Distinct from desk utilization: counts individual headcount</div>
+  ${(()=>{
+    const occByDay2=buildOccupancyData(days);
+    const totalPD=occByDay2.reduce((s,d)=>s+d.uniquePeople,0);
+    const peakC=Math.max(...occByDay2.map(d=>d.uniquePeople),0);
+    const avgC=occByDay2.length?(totalPD/occByDay2.length):0;
+    const avgPct2=dCap?Math.round(100*avgC/dCap):0;
+    return `<div class="stat-row">
+      <div class="stat"><div class="v">${totalPD}</div><div class="l">Total person-days</div></div>
+      <div class="stat"><div class="v">${peakC}</div><div class="l">Peak headcount</div></div>
+      <div class="stat"><div class="v">${avgC.toFixed(1)}</div><div class="l">Avg daily headcount</div></div>
+      <div class="stat"><div class="v">${avgPct2}%</div><div class="l">Avg occupancy rate</div></div>
+    </div>
+    <div class="chart-wrap">
+      <div class="chart-title">Daily occupancy — unique people in office (desk-booked)</div>
+      ${buildOccupancyHeatmapSvg(occByDay2,dCap)}
+    </div>
+    <table>
+      <thead><tr><th>Date</th><th>Day</th><th>People</th><th>Occ %</th><th>Day shift</th><th>Eve shift</th><th>Night shift</th><th>Wknd shift</th></tr></thead>
+      <tbody>${occByDay2.slice(0,20).map(od=>{
+        const pv=dCap?Math.round(100*od.uniquePeople/dCap):0;
+        return `<tr><td>${od.date.getDate()} ${MONTHS[od.date.getMonth()].slice(0,3)}</td><td>${DOW_S[od.date.getDay()]}</td><td>${od.uniquePeople}</td><td>${pv}%</td><td>${od.shiftHeads.day??'—'}</td><td>${od.shiftHeads.evening??'—'}</td><td>${od.shiftHeads.night??'—'}</td><td>${od.shiftHeads.weekend??'—'}</td></tr>`;
+      }).join('')}${occByDay2.length>20?`<tr><td colspan="8" style="text-align:center;color:#94a3b8">… ${occByDay2.length-20} more days</td></tr>`:''}</tbody>
+    </table>`;
+  })()}
+  <span class="slide-num">4</span>
+</div>
+
+<!-- SLIDE 5: Employee Presence -->
 <div class="slide" style="position:relative">
   <h2>Employee Presence vs Target</h2>
   <div class="sub">${periodLabel} &nbsp;·&nbsp; Target: ${state.config.targetDays} days/week &nbsp;·&nbsp; Showing ${Math.min(40,state.employees.length)} of ${state.employees.length} employees<br><span style="font-size:12px;color:#64748b">Shifts shown = shifts actually used in reservations during this period</span></div>
@@ -1645,10 +1679,10 @@ tr:nth-child(even) td{background:#f8fafc}
     <thead><tr><th>#</th><th>Employee</th><th>Shifts worked</th><th>Days present</th><th>Target</th><th>Rate</th></tr></thead>
     <tbody>${presRows}</tbody>
   </table>
-  <span class="slide-num">4</span>
+  <span class="slide-num">5</span>
 </div>
 
-<!-- SLIDE 5: Roster -->
+<!-- SLIDE 6: Roster -->
 <div class="slide" style="position:relative">
   <h2>Employee Roster</h2>
   <div class="sub">${state.employees.length} employees &nbsp;·&nbsp; Default target: ${state.config.targetDays} days/week</div>
@@ -1656,7 +1690,7 @@ tr:nth-child(even) td{background:#f8fafc}
     <thead><tr><th>#</th><th>Name</th><th>Default Shift</th><th>Department</th><th>Target days/wk</th></tr></thead>
     <tbody>${state.employees.map((e,i)=>`<tr><td>${i+1}</td><td>${h(e.name)}</td><td>${e.shift}</td><td>${h(e.department||'—')}</td><td>${e.targetDays}</td></tr>`).join('')}</tbody>
   </table>
-  <span class="slide-num">5</span>
+  <span class="slide-num">6</span>
 </div>
 
 </body></html>`;
@@ -1664,6 +1698,137 @@ tr:nth-child(even) td{background:#f8fafc}
   const w=window.open('','_blank');
   if(!w){ toast('Pop-up blocked — allow pop-ups for this page','err'); return; }
   w.document.write(html); w.document.close();
+}
+
+/* ====================================================================
+   OCCUPANCY REPORT
+   ==================================================================== */
+function buildOccupancyData(days){
+  const dCap = capacity('desks');
+  return days.map(d => {
+    const ds = ymd(d);
+    const shifts = activeShifts(d);
+    const allPeople = new Set();
+    const shiftHeads = {};
+    shifts.forEach(sh => {
+      const sd = shiftData(ds, sh);
+      const people = new Set(Object.values(sd.desks || {}));
+      shiftHeads[sh] = people.size;
+      people.forEach(id => allPeople.add(id));
+    });
+    return { date: d, ds, uniquePeople: allPeople.size, shiftHeads, dCap };
+  });
+}
+
+function buildOccupancyHeatmapSvg(occByDay, cap){
+  if(!occByDay.length) return '<p style="color:var(--text-muted)">No data.</p>';
+  const chartW=760, chartH=200, padL=40, padR=14, padT=18, padB=44;
+  const gW=chartW-padL-padR, gH=chartH-padT-padB;
+  const n=occByDay.length;
+  const maxVal=Math.max(...occByDay.map(d=>d.uniquePeople), cap, 1);
+  const barW=Math.max(4, Math.min(30, gW/n - 2));
+
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" style="font-family:system-ui,sans-serif;display:block">`;
+  svg+=`<rect width="${chartW}" height="${chartH}" fill="#f8fafc" rx="8"/>`;
+
+  // Y grid
+  [0, Math.round(cap/2), cap].filter((v,i,a)=>a.indexOf(v)===i).forEach(v=>{
+    const y=padT+gH*(1-v/maxVal);
+    svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+gW}" y2="${y.toFixed(1)}" stroke="#e2e8f0" stroke-width="1"/>`;
+    svg+=`<text x="${padL-4}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="#94a3b8">${v}</text>`;
+  });
+
+  // Capacity line
+  const capY=padT+gH*(1-cap/maxVal);
+  svg+=`<line x1="${padL}" y1="${capY.toFixed(1)}" x2="${padL+gW}" y2="${capY.toFixed(1)}" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="4,3" opacity="0.55"/>`;
+  svg+=`<text x="${padL+gW-2}" y="${(capY-4).toFixed(1)}" text-anchor="end" font-size="9" fill="#ef4444" opacity="0.7">Desk capacity (${cap})</text>`;
+
+  const step=Math.ceil(n/31);
+  occByDay.forEach((od, i)=>{
+    const v=od.uniquePeople;
+    const ratio=cap?v/cap:0;
+    const color=v===0?'#e2e8f0':ratio>=0.8?'#10b981':ratio>=0.5?'#f59e0b':'#3b82f6';
+    const bh=Math.max(v>0?2:0,(v/maxVal)*gH);
+    const bx=padL+i*(gW/n)+(gW/n-barW)/2;
+    const by=padT+gH-bh;
+    svg+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW}" height="${bh.toFixed(1)}" fill="${color}" rx="2" opacity="0.88"/>`;
+    if(v>0&&barW>14) svg+=`<text x="${(bx+barW/2).toFixed(1)}" y="${(by-3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${color}" font-weight="600">${v}</text>`;
+    if(i%step===0||n<=14){
+      const lx=padL+i*(gW/n)+(gW/n)/2;
+      svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+14).toFixed(1)}" text-anchor="middle" font-size="9" fill="#475569">${DOW_S[od.date.getDay()]}</text>`;
+      svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+25).toFixed(1)}" text-anchor="middle" font-size="8" fill="#94a3b8">${od.date.getDate()}/${od.date.getMonth()+1}</text>`;
+    }
+  });
+
+  svg+=`<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  svg+=`<line x1="${padL}" y1="${padT+gH}" x2="${padL+gW}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  svg+=`</svg>`;
+  return svg;
+}
+
+function buildOccupancySection(days){
+  const dCap=capacity('desks');
+  const occByDay=buildOccupancyData(days);
+  const totalPersonDays=occByDay.reduce((s,d)=>s+d.uniquePeople,0);
+  const peakCount=Math.max(...occByDay.map(d=>d.uniquePeople),0);
+  const avgCount=occByDay.length?(totalPersonDays/occByDay.length):0;
+  const peakDayObj=occByDay.find(d=>d.uniquePeople===peakCount);
+  const avgPct=dCap?Math.round(100*avgCount/dCap):0;
+
+  // Per-shift totals
+  const shiftTotals={day:0,evening:0,night:0,weekend:0};
+  const shiftDays={day:0,evening:0,night:0,weekend:0};
+  occByDay.forEach(od=>{
+    Object.entries(od.shiftHeads).forEach(([sh,cnt])=>{ shiftTotals[sh]+=cnt; shiftDays[sh]++; });
+  });
+  const busiestShift=Object.keys(shiftTotals).reduce((a,b)=>
+    (shiftDays[a]?shiftTotals[a]/shiftDays[a]:0) >= (shiftDays[b]?shiftTotals[b]/shiftDays[b]:0) ? a : b
+  );
+
+  const legend=`<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px;font-size:12px;color:var(--text-muted)">
+    <span><span style="display:inline-block;width:12px;height:12px;background:#10b981;border-radius:2px;vertical-align:middle;margin-right:4px"></span>High ≥80%</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#f59e0b;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Medium 50–79%</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#3b82f6;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Low &lt;50%</span>
+    <span><span style="display:inline-block;width:12px;height:12px;background:#e2e8f0;border-radius:2px;vertical-align:middle;margin-right:4px"></span>Empty</span>
+  </div>`;
+
+  let tableHtml='';
+  if(days.length<=62){
+    tableHtml=`<div style="overflow-x:auto;margin-top:16px"><table>
+      <thead><tr><th>Date</th><th>Day</th><th>People in office</th><th>Occupancy %</th><th>By shift</th></tr></thead><tbody>`;
+    occByDay.forEach(od=>{
+      const pctVal=dCap?Math.round(100*od.uniquePeople/dCap):0;
+      const col=pctVal>=80?'var(--success)':pctVal>=50?'var(--warning)':'var(--primary)';
+      const shiftStr=Object.entries(od.shiftHeads)
+        .filter(([,cnt])=>cnt>0)
+        .map(([sh,cnt])=>`<span class="pill ${sh==='evening'?'eve':sh}" style="font-size:10px">${sh.slice(0,1).toUpperCase()}:${cnt}</span>`)
+        .join(' ');
+      tableHtml+=`<tr>
+        <td>${od.date.getDate()} ${MONTHS[od.date.getMonth()].slice(0,3)} ${od.date.getFullYear()}</td>
+        <td>${DOW_S[od.date.getDay()]}</td>
+        <td><strong>${od.uniquePeople}</strong><span style="color:var(--text-muted)"> / ${dCap}</span></td>
+        <td><div class="ubar"><span style="color:${col};font-weight:600">${pctVal}%</span><span class="bg"><div style="width:${pctVal}%;background:${col}"></div></span></div></td>
+        <td>${shiftStr||'<span style="color:var(--text-muted)">—</span>'}</td>
+      </tr>`;
+    });
+    tableHtml+=`</tbody></table></div>`;
+  } else {
+    tableHtml=`<p style="color:var(--text-muted);font-size:13px;margin-top:12px">Table limited to 62 days — download Excel for full data.</p>`;
+  }
+
+  return `<div class="card">
+    <h2>👥 Occupancy Report</h2>
+    <div class="sub">Unique people physically in the office (desk-booked) per day — distinct from desk utilization %</div>
+    <div class="stat-grid">
+      <div class="stat"><div class="lbl">Total person-days</div><div class="val">${totalPersonDays}</div><div class="sub2">across ${occByDay.length} days</div></div>
+      <div class="stat"><div class="lbl">Peak occupancy</div><div class="val">${peakCount}</div><div class="sub2">${peakDayObj?peakDayObj.date.getDate()+' '+MONTHS[peakDayObj.date.getMonth()].slice(0,3):'—'}</div></div>
+      <div class="stat"><div class="lbl">Avg daily occupancy</div><div class="val">${avgCount.toFixed(1)}</div><div class="sub2">of ${dCap} desks (${avgPct}%)</div></div>
+      <div class="stat"><div class="lbl">Busiest shift</div><div class="val" style="font-size:18px"><span class="pill ${busiestShift==='evening'?'eve':busiestShift}">${busiestShift}</span></div><div class="sub2">by avg headcount</div></div>
+    </div>
+    ${legend}
+    <div style="overflow-x:auto">${buildOccupancyHeatmapSvg(occByDay,dCap)}</div>
+    ${tableHtml}
+  </div>`;
 }
 
 /* ====================================================================
