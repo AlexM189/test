@@ -144,6 +144,11 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/occupancy-report")
+def occupancy_report():
+    return render_template("occupancy_report.html")
+
+
 @app.route("/api/state")
 def api_state():
     with file_lock:

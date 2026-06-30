@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Occupancy Report</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f8;--surface:#fff;--surface-2:#f8fafc;--border:#e2e8f0;
+  --text:#1e293b;--muted:#64748b;--primary:#4f46e5;--primary-l:#eef2ff;
+  --success:#10b981;--success-l:#d1fae5;--warning:#f59e0b;--warning-l:#fef3c7;
+  --danger:#ef4444;--danger-l:#fee2e2;--info:#3b82f6;--info-l:#dbeafe;
+  --radius:10px;--shadow:0 1px 4px rgba(0,0,0,.08);--shadow-lg:0 8px 24px rgba(0,0,0,.12);
+}
+[data-theme=dark]{
+  --bg:#0f172a;--surface:#1e293b;--surface-2:#243347;--border:#334155;
+  --text:#f1f5f9;--muted:#94a3b8;--primary:#818cf8;--primary-l:#1e1b4b;
+  --success:#34d399;--success-l:#064e3b;--warning:#fbbf24;--warning-l:#431407;
+  --danger:#f87171;--danger-l:#450a0a;--info:#60a5fa;--info-l:#172554;
+  color-scheme:dark;
+}
+[data-theme=dark] input,[data-theme=dark] select{background:var(--surface-2);color:var(--text);border-color:var(--border)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+
+/* ── Header ── */
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:14px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;position:sticky;top:0;z-index:50;box-shadow:var(--shadow)}
+.logo{font-size:17px;font-weight:800;color:var(--primary);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.logo svg{opacity:.85}
+.hdr-mid{flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.seg{display:flex;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:3px;gap:2px}
+.seg button{background:none;border:none;padding:5px 14px;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);white-space:nowrap}
+.seg button.on{background:var(--primary);color:#fff}
+.yr-nav{display:flex;align-items:center;gap:6px}
+.yr-nav button{background:var(--surface-2);border:1px solid var(--border);border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;color:var(--muted)}
+.yr-nav button:hover{border-color:var(--primary);color:var(--primary)}
+#yearLbl{font-weight:700;font-size:15px;min-width:42px;text-align:center}
+.hdr-right{display:flex;align-items:center;gap:8px}
+.btn{border:none;padding:7px 14px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:5px;transition:opacity .15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-secondary{background:var(--surface-2);color:var(--text);border:1px solid var(--border)}
+.btn:hover{opacity:.85}
+.theme-btn{background:none;border:1px solid var(--border);border-radius:7px;padding:5px 9px;font-size:16px;cursor:pointer;color:var(--muted)}
+
+/* ── Main ── */
+main{padding:20px 24px;max-width:1600px;margin:0 auto}
+
+/* ── Sliders panel ── */
+.params-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:18px;box-shadow:var(--shadow)}
+.params-card h3{font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:14px}
+.sliders{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:18px}
+.slider-row{display:flex;flex-direction:column;gap:6px}
+.slider-label{display:flex;justify-content:space-between;align-items:center;font-size:13px;font-weight:600}
+.slider-label span:last-child{background:var(--primary-l);color:var(--primary);padding:2px 10px;border-radius:20px;font-weight:700;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--primary);height:6px;cursor:pointer}
+.target-row{display:flex;align-items:center;gap:12px;margin-top:4px;flex-wrap:wrap}
+.target-row label{font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px}
+.target-row input[type=number]{width:72px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)}
+.target-row input[type=number]:focus{outline:none;border-color:var(--primary)}
+.occ-legend{display:flex;gap:12px;flex-wrap:wrap;font-size:11px}
+.occ-legend span{display:flex;align-items:center;gap:5px}
+.swatch{width:12px;height:12px;border-radius:3px;display:inline-block;flex-shrink:0}
+
+/* ── Stats ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:14px;margin-bottom:18px}
+.stat{background:var(--surface);padding:18px;border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow)}
+.stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.stat .val{font-size:28px;font-weight:800;margin:4px 0 2px}
+.stat .sub{font-size:12px;color:var(--muted)}
+
+/* ── Chart ── */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:18px;box-shadow:var(--shadow)}
+.chart-card h3{font-size:14px;font-weight:700;margin-bottom:14px}
+.chart-wrap{overflow-x:auto}
+
+/* ── Table ── */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+.table-toolbar{padding:14px 18px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;border-bottom:1px solid var(--border)}
+.table-toolbar h3{font-size:14px;font-weight:700}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+th{padding:9px 10px;text-align:right;background:var(--surface-2);border-bottom:2px solid var(--border);font-weight:700;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0}
+th:first-child{text-align:left}
+td{padding:7px 10px;text-align:right;border-bottom:1px solid var(--border)}
+td:first-child{text-align:left;font-weight:600}
+tr:hover td{background:var(--surface-2)}
+tr:last-child td{border-bottom:none}
+.calc{color:var(--muted);font-style:italic}
+td input{width:90px;padding:3px 6px;border:1px solid transparent;border-radius:5px;font-size:12px;text-align:right;background:transparent;color:var(--text);font-family:inherit}
+td input:focus{border-color:var(--primary);background:var(--primary-l);outline:none}
+td input:hover:not(:focus){border-color:var(--border)}
+.month-cell{font-weight:700;font-size:13px;min-width:95px}
+
+/* ── Occupancy badge ── */
+.occ-chip{display:inline-block;padding:3px 10px;border-radius:20px;font-weight:800;font-size:13px}
+.occ-low{background:var(--info-l);color:var(--info)}
+.occ-ok{background:var(--success-l);color:#065f46}
+.occ-warn{background:var(--warning-l);color:#92400e}
+.occ-over{background:var(--danger-l);color:#991b1b}
+
+.warn-chip{font-size:11px;padding:2px 8px;border-radius:12px;font-weight:700}
+.warn-pos{background:var(--success-l);color:#065f46}
+.warn-neg{background:var(--danger-l);color:#991b1b}
+
+.del-btn{background:none;border:none;color:var(--danger);cursor:pointer;font-size:16px;padding:0 4px;opacity:.5}
+.del-btn:hover{opacity:1}
+
+/* ── Add row ── */
+.add-row{padding:10px 18px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+/* ── Empty ── */
+.empty{padding:40px;text-align:center;color:var(--muted)}
+.empty div{font-size:36px;margin-bottom:10px}
+
+/* ── Toast ── */
+.toast{position:fixed;bottom:22px;right:22px;background:var(--text);color:#fff;padding:11px 18px;border-radius:8px;box-shadow:var(--shadow-lg);font-size:13px;opacity:0;transform:translateY(10px);transition:.25s;z-index:200;pointer-events:none}
+.toast.show{opacity:1;transform:none}
+.toast.ok{background:var(--success)}.toast.err{background:var(--danger)}
+
+/* ── Quarter / Year aggregation rows ── */
+.agg-hdr td{background:var(--primary-l);color:var(--primary);font-weight:800;border-top:2px solid var(--primary)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    Occupancy Report
+  </div>
+  <div class="hdr-mid">
+    <div class="seg">
+      <button id="viewMonth" class="on" onclick="setView('month')">Month</button>
+      <button id="viewQuarter"           onclick="setView('quarter')">Quarter</button>
+      <button id="viewYear"              onclick="setView('year')">Year</button>
+    </div>
+    <div class="yr-nav" id="yrNav">
+      <button onclick="changeYear(-1)">◀</button>
+      <span id="yearLbl"></span>
+      <button onclick="changeYear(1)">▶</button>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <button class="btn btn-secondary" onclick="exportCSV()">⬇ CSV</button>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  </div>
+</header>
+
+<main>
+
+<!-- Parameters -->
+<div class="params-card">
+  <h3>⚙ Parameters — drag to recalculate occupancy live</h3>
+  <div class="sliders">
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>📧 Email AVG Time</span>
+        <span id="emailVal">10 min</span>
+      </div>
+      <input type="range" id="slEmail" min="1" max="60" value="10" step="1" oninput="onSlider()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>📞 Outbound DS Time</span>
+        <span id="dsVal">4 min</span>
+      </div>
+      <input type="range" id="slDS" min="1" max="30" value="4" step="1" oninput="onSlider()">
+    </div>
+    <div class="slider-row">
+      <div class="slider-label">
+        <span>🗂 Case Handling Time</span>
+        <span id="caseVal">10 min</span>
+      </div>
+      <input type="range" id="slCase" min="1" max="60" value="10" step="1" oninput="onSlider()">
+    </div>
+  </div>
+  <div class="target-row" style="margin-top:16px">
+    <label>
+      🎯 Occupancy Target:
+      <input type="number" id="targetInput" value="85" min="50" max="100" step="1" oninput="render()">
+      <span style="color:var(--muted)">%</span>
+    </label>
+    <div class="occ-legend">
+      <span><span class="swatch" style="background:var(--info)"></span>&lt; 70% Low</span>
+      <span><span class="swatch" style="background:var(--success)"></span>70–84% Healthy</span>
+      <span><span class="swatch" style="background:var(--warning)"></span>85–89% Watch</span>
+      <span><span class="swatch" style="background:var(--danger)"></span>≥ 90% Over</span>
+    </div>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="stat-grid" id="statGrid"></div>
+
+<!-- Chart -->
+<div class="chart-card">
+  <h3>📈 Occupancy Trend</h3>
+  <div class="chart-wrap" id="chartWrap"></div>
+</div>
+
+<!-- Table -->
+<div class="table-card">
+  <div class="table-toolbar">
+    <h3 id="tableTitle">Monthly Data</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="addRow()">+ Add Month</button>
+    </div>
+  </div>
+  <div class="table-wrap">
+    <table id="dataTable">
+      <thead id="tableHead"></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+  <div class="add-row" id="addRowHint" style="display:none">
+    <span style="font-size:13px;color:var(--muted)">New month:</span>
+    <input type="month" id="newMonthInput" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:13px;background:var(--surface);color:var(--text)">
+    <button class="btn btn-primary" onclick="confirmAddRow()">Add</button>
+    <button class="btn btn-secondary" onclick="cancelAddRow()">Cancel</button>
+  </div>
+</div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===================================================================
+   HISTORICAL DATA  [month, inTime, inCalls, outTime, emails, disp, fte, workMin]
+=================================================================== */
+const HIST = [
+  ['2019-09',19371,2587, 9075,4069, 8906,18,166320],
+  ['2019-10',22294,3010,11292,3354,10204,18,166320],
+  ['2019-11',23452,3334,10093,3787, 9252,18,166320],
+  ['2019-12',26780,3714,12010,3685,12281,18,166320],
+  ['2020-01',27034,3597,11099,3898,11210,22,203280],
+  ['2020-02',18569,2667,10725,3672,11631,22,184800],
+  ['2020-03',27162,3384,11929,5741,12730,22,203280],
+  ['2020-04',25539,3610,14467,5685,12072,22,203280],
+  ['2020-05',21203,2582,12378,4549, 9740,22,194040],
+  ['2020-06',22876,2707,14124,4327,11293,22,203280],
+  ['2020-07',22601,2920,13313,4847,10000,22,212520],
+  ['2020-08',23653,3200,13937,4769,11809,22,194040],
+  ['2020-09',22427,3342,10346,5135, 9095,22,203280],
+  ['2020-10',21323,3422,10082,3835, 8753,20,184800],
+  ['2020-11',19652,2955, 8435,4218, 6768,20,168000],
+  ['2020-12',17289,2792,10101,4134, 8145,21,185220],
+  ['2021-01',14190,2474,12105,3320,13343,21,176400],
+  ['2021-02',14697,2082,10544,3774, 8658,23,193200],
+  ['2021-03',20890,2820,12112,4894, 9970,20,193200],
+  ['2021-04',18133,2477,12817,4190,10559,19,175560],
+  ['2021-05',17885,2313,13630,3686,16172,22,194040],
+  ['2021-06',19477,2710,13319,3922,15268,20,184800],
+  ['2021-07',18819,2997,10010,4529,10871,19,175560],
+  ['2021-08',19290,3159,10874,5354, 8852,20,184800],
+  ['2021-09',17369,3220,10763,4825,11816,20,176400],
+  ['2021-10',20424,3483,10406,5474, 8492,20,176400],
+  ['2021-11',21336,3864, 2767,6990,  723,17,149940],
+  ['2021-12',14510,3145, 6326,6628, 3307,17,157080],
+  ['2022-01',14593,2826, 6478,5051, 4084,17,149940],
+  ['2022-02',16785,3351, 4534,6063, 3173,21,201600],
+  ['2022-03',16925,3636, 8798,5902, 7093,17,187680],
+  ['2022-04',15234,2880,11652,5301, 9080,20,182400],
+  ['2022-05',14116,2613,11092,5181,10783,18,190080],
+  ['2022-06',14483,2822, 9662,5401, 7807,21,201600],
+  ['2022-07',13260,2363, 8014,3948, 6740,18,181440],
+  ['2022-08',12427,2549, 9191,4559, 7494,18,158760],
+  ['2022-09',11394,3229,10843,3780,11393,17,149940],
+  ['2022-10',14803,3175,11794,5024,10796,20,176400],
+  ['2022-11',29207,4385, 6781,7104, 3722,21,185220],
+  ['2022-12',16343,2241, 7945,5679, 5710,19,167580],
+];
+
+/* ===================================================================
+   STATE
+=================================================================== */
+let userData   = {};   // YYYY-MM -> {inTime,inCalls,outTime,emails,disp,fte,workMin}
+let currentView = 'month';
+let currentYear = new Date().getFullYear();
+let params = { email:10, ds:4, case_h:10 };
+
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTH_NAMES  = ['January','February','March','April','May','June',
+                      'July','August','September','October','November','December'];
+
+/* ===================================================================
+   THEME
+=================================================================== */
+let dark = localStorage.getItem('occ_theme') === 'dark';
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+  document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
+  localStorage.setItem('occ_theme', dark ? 'dark' : 'light');
+}
+document.getElementById('themeBtn').addEventListener('click', () => { dark=!dark; applyTheme(); render(); });
+applyTheme();
+
+/* ===================================================================
+   DATA HELPERS
+=================================================================== */
+function loadStorage(){
+  try { userData = JSON.parse(localStorage.getItem('occ_data') || '{}'); } catch(e){ userData={}; }
+}
+function saveStorage(){
+  localStorage.setItem('occ_data', JSON.stringify(userData));
+}
+
+function allData(){
+  // Merge HIST + user overrides
+  const map = {};
+  HIST.forEach(([m,inT,inC,outT,em,dp,fte,wh]) => {
+    map[m] = {inTime:inT,inCalls:inC,outTime:outT,emails:em,disp:dp,fte,workMin:wh};
+  });
+  Object.entries(userData).forEach(([m,v]) => { map[m] = {...(map[m]||{}), ...v}; });
+  return map;
+}
+
+function calc(row){
+  const e  = params.email;
+  const d  = params.ds;
+  const c  = params.case_h;
+  const caseTime  = (row.inCalls  || 0) * c;
+  const emailTime = (row.emails   || 0) * e;
+  const dispTime  = (row.disp     || 0) * d;
+  const active    = (row.inTime||0) + caseTime + (row.outTime||0) + emailTime + dispTime;
+  const wh        = row.workMin || 0;
+  const occ       = wh > 0 ? active / wh : null;
+  const target    = (+(document.getElementById('targetInput')?.value || 85)) / 100;
+  const warn      = occ !== null ? target - occ : null;
+  const free      = wh > 0 ? wh - active : null;
+  return {caseTime, emailTime, dispTime, active, occ, warn, free};
+}
+
+function occClass(occ){
+  if(occ === null) return '';
+  const p = occ * 100;
+  if(p < 70)  return 'occ-low';
+  if(p < 85)  return 'occ-ok';
+  if(p < 90)  return 'occ-warn';
+  return 'occ-over';
+}
+function occColor(occ){
+  if(occ === null) return '#94a3b8';
+  const p = occ * 100;
+  if(p < 70)  return '#3b82f6';
+  if(p < 85)  return '#10b981';
+  if(p < 90)  return '#f59e0b';
+  return '#ef4444';
+}
+
+function fmtPct(v){ return v !== null ? (v*100).toFixed(1)+'%' : '—'; }
+function fmtN(v)  { return v !== null && v !== undefined ? Math.round(v).toLocaleString() : '—'; }
+function fmtMon(m){
+  const [y,mo] = m.split('-');
+  return MONTHS_SHORT[+mo-1] + ' ' + y;
+}
+
+/* ===================================================================
+   SLIDER / INPUT HANDLERS
+=================================================================== */
+function onSlider(){
+  params.email  = +document.getElementById('slEmail').value;
+  params.ds     = +document.getElementById('slDS').value;
+  params.case_h = +document.getElementById('slCase').value;
+  document.getElementById('emailVal').textContent = params.email + ' min';
+  document.getElementById('dsVal').textContent    = params.ds    + ' min';
+  document.getElementById('caseVal').textContent  = params.case_h+ ' min';
+  render();
+}
+
+/* ===================================================================
+   VIEW
+=================================================================== */
+function setView(v){
+  currentView = v;
+  ['month','quarter','year'].forEach(x => {
+    document.getElementById('view'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('on', x===v);
+  });
+  document.getElementById('yrNav').style.display = v === 'year' ? 'none' : '';
+  render();
+}
+function changeYear(d){
+  currentYear += d;
+  document.getElementById('yearLbl').textContent = currentYear;
+  render();
+}
+
+/* ===================================================================
+   AGGREGATED DATA FOR QUARTER / YEAR
+=================================================================== */
+function aggregateRows(rows){
+  // rows: array of {month, ...raw data fields}
+  const sum = {inTime:0,inCalls:0,outTime:0,emails:0,disp:0,workMin:0};
+  let fteSum=0, fteCount=0;
+  rows.forEach(r => {
+    ['inTime','inCalls','outTime','emails','disp','workMin'].forEach(k => sum[k] += (r[k]||0));
+    if(r.fte){ fteSum += r.fte; fteCount++; }
+  });
+  const avgFte = fteCount ? +(fteSum/fteCount).toFixed(1) : null;
+  return {...sum, fte: avgFte};
+}
+
+function quarterRows(){
+  const data = allData();
+  const out = [];
+  [1,2,3,4].forEach(q => {
+    const months = [(q-1)*3+1, (q-1)*3+2, (q-1)*3+3].map(m => `${currentYear}-${String(m).padStart(2,'0')}`);
+    const rows = months.map(m => ({month:m, ...(data[m]||{})})).filter(r => data[r.month]);
+    if(!rows.length) { out.push({label:`Q${q} ${currentYear}`, months, hasData:false, agg:{}}); return; }
+    const agg = aggregateRows(rows);
+    out.push({label:`Q${q} ${currentYear}`, months, hasData:true, agg, ...agg});
+  });
+  return out;
+}
+
+function yearRows(){
+  const data = allData();
+  const years = [...new Set(Object.keys(data).map(m=>m.slice(0,4)))].sort();
+  return years.map(y => {
+    const months = Object.keys(data).filter(m => m.startsWith(y));
+    const rows = months.map(m => ({month:m, ...(data[m]||{})}));
+    const agg = aggregateRows(rows);
+    return {label:y, months, hasData:true, agg, ...agg};
+  });
+}
+
+/* ===================================================================
+   STATS
+=================================================================== */
+function renderStats(rows){
+  // rows: [{month, ...raw, occ, warn}] or aggregated
+  const valid = rows.filter(r => r.occ !== null && r.occ !== undefined);
+  if(!valid.length){ document.getElementById('statGrid').innerHTML=''; return; }
+  const occs = valid.map(r => r.occ);
+  const avg  = occs.reduce((a,b)=>a+b,0) / occs.length;
+  const peak = Math.max(...occs);
+  const low  = Math.min(...occs);
+  const target = (+(document.getElementById('targetInput').value||85))/100;
+  const over = valid.filter(r => r.occ >= target).length;
+  const peakRow = valid.find(r=>r.occ===peak);
+  const lowRow  = valid.find(r=>r.occ===low);
+  const peakLbl = peakRow ? (peakRow.label||fmtMon(peakRow.month)) : '—';
+  const lowLbl  = lowRow  ? (lowRow.label ||fmtMon(lowRow.month))  : '—';
+
+  document.getElementById('statGrid').innerHTML=`
+    <div class="stat"><div class="lbl">Avg Occupancy</div>
+      <div class="val" style="color:${occColor(avg)}">${fmtPct(avg)}</div>
+      <div class="sub">across ${valid.length} period${valid.length!==1?'s':''}</div></div>
+    <div class="stat"><div class="lbl">Peak Occupancy</div>
+      <div class="val" style="color:${occColor(peak)}">${fmtPct(peak)}</div>
+      <div class="sub">${peakLbl}</div></div>
+    <div class="stat"><div class="lbl">Lowest Occupancy</div>
+      <div class="val" style="color:${occColor(low)}">${fmtPct(low)}</div>
+      <div class="sub">${lowLbl}</div></div>
+    <div class="stat"><div class="lbl">Periods ≥ ${Math.round(target*100)}% Target</div>
+      <div class="val" style="color:${over>0?'var(--danger)':'var(--success)'}">${over}</div>
+      <div class="sub">of ${valid.length} total</div></div>
+    <div class="stat"><div class="lbl">Total Person-Activity</div>
+      <div class="val" style="font-size:22px">${Math.round(valid.reduce((s,r)=>s+(r.active||0),0)/60).toLocaleString()}h</div>
+      <div class="sub">total active minutes / 60</div></div>
+  `;
+}
+
+/* ===================================================================
+   CHART
+=================================================================== */
+function renderChart(rows){
+  const valid = rows.filter(r => r.occ !== null && r.occ !== undefined);
+  if(!valid.length){ document.getElementById('chartWrap').innerHTML='<div class="empty"><div>📊</div>No data to chart</div>'; return; }
+  const target = (+(document.getElementById('targetInput').value||85))/100;
+
+  const W=Math.max(640, valid.length*28+80), H=240;
+  const padL=48, padR=20, padT=16, padB=48;
+  const gW=W-padL-padR, gH=H-padT-padB;
+  const n=valid.length;
+  const xs = valid.map((_,i) => padL + (i/(Math.max(n-1,1)))*gW);
+  const oy = occ => padT + gH*(1 - Math.min(occ,1.1)/1.1);
+
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:system-ui,sans-serif;display:block">`;
+  svg+=`<rect width="${W}" height="${H}" fill="${dark?'#1e293b':'#f8fafc'}" rx="10"/>`;
+
+  // Grid lines 0,25,50,75,100
+  [0,25,50,75,100,110].forEach(v=>{
+    const y=padT+gH*(1-v/110);
+    const col = v===0||v===25||v===50||v===75||v===100 ? (dark?'#334155':'#e2e8f0') : 'transparent';
+    svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+gW}" y2="${y.toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
+    if(v<=100) svg+=`<text x="${padL-6}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="10" fill="${dark?'#64748b':'#94a3b8'}">${v}%</text>`;
+  });
+
+  // Target line
+  const ty=oy(target);
+  svg+=`<line x1="${padL}" y1="${ty.toFixed(1)}" x2="${padL+gW}" y2="${ty.toFixed(1)}" stroke="#ef4444" stroke-width="1.8" stroke-dasharray="6,4" opacity="0.7"/>`;
+  svg+=`<text x="${padL+gW-2}" y="${(ty-5).toFixed(1)}" text-anchor="end" font-size="9" fill="#ef4444" opacity="0.9">Target ${Math.round(target*100)}%</text>`;
+
+  // Area fill under line
+  let areaPath = `M${xs[0].toFixed(1)},${padT+gH}`;
+  valid.forEach((r,i) => areaPath += ` L${xs[i].toFixed(1)},${oy(r.occ).toFixed(1)}`);
+  areaPath += ` L${xs[n-1].toFixed(1)},${padT+gH} Z`;
+  svg+=`<path d="${areaPath}" fill="${dark?'rgba(99,102,241,.15)':'rgba(79,70,229,.08)'}"/>`;
+
+  // Line
+  let linePath = `M${xs[0].toFixed(1)},${oy(valid[0].occ).toFixed(1)}`;
+  valid.forEach((r,i) => { if(i>0) linePath += ` L${xs[i].toFixed(1)},${oy(r.occ).toFixed(1)}`; });
+  svg+=`<path d="${linePath}" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linejoin="round"/>`;
+
+  // Dots + labels
+  valid.forEach((r,i) => {
+    const x=xs[i], y=oy(r.occ);
+    const col=occColor(r.occ);
+    svg+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${col}" stroke="${dark?'#1e293b':'#fff'}" stroke-width="2"/>`;
+    // x labels (skip if too many)
+    if(n<=24 || i%Math.ceil(n/24)===0){
+      const lbl = r.label || fmtMon(r.month);
+      svg+=`<text x="${x.toFixed(1)}" y="${padT+gH+16}" text-anchor="middle" font-size="9" fill="${dark?'#64748b':'#64748b'}">${lbl.length>7?lbl.slice(0,7):lbl}</text>`;
+    }
+    // Tooltip-style value for selected dots (show % for non-dense)
+    if(n<=12){
+      const abv = y - 14 > padT;
+      svg+=`<text x="${x.toFixed(1)}" y="${abv?y-9:y+14}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${(r.occ*100).toFixed(1)}%</text>`;
+    }
+  });
+
+  // Axes
+  svg+=`<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+gH}" stroke="${dark?'#475569':'#cbd5e1'}" stroke-width="1.5"/>`;
+  svg+=`<line x1="${padL}" y1="${padT+gH}" x2="${padL+gW}" y2="${padT+gH}" stroke="${dark?'#475569':'#cbd5e1'}" stroke-width="1.5"/>`;
+  svg+=`</svg>`;
+
+  document.getElementById('chartWrap').innerHTML = svg;
+}
+
+/* ===================================================================
+   TABLE — MONTHLY VIEW (editable)
+=================================================================== */
+function renderMonthTable(){
+  const data = allData();
+  document.getElementById('tableTitle').textContent = `Monthly Data — ${currentYear}`;
+
+  const head = document.getElementById('tableHead');
+  head.innerHTML=`<tr>
+    <th style="text-align:left">Month</th>
+    <th>IN Time<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th>IN Calls</th>
+    <th title="= IN Calls × Case Handling Time">Case Time*<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th>OUT Time<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th>Emails</th>
+    <th title="= Emails × Email AVG Time">Email Time*<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th>Dispositions</th>
+    <th title="= Dispositions × Outbound DS Time">Disp. Time*<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th>FTE</th>
+    <th>Working Hours<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th title="= All activity time summed">Active Time*<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th title="= Working Hours − Active Time">Free Time*<br><span style="font-weight:400;font-style:italic">(min)</span></th>
+    <th>Occupancy*</th>
+    <th title="= Target − Occupancy (negative = over target)">Warning*</th>
+    <th></th>
+  </tr>`;
+
+  const tbody = document.getElementById('tableBody');
+  const rows = [];
+  for(let m=1; m<=12; m++){
+    const key = `${currentYear}-${String(m).padStart(2,'0')}`;
+    const raw = data[key];
+    if(!raw && !userData[key]) continue; // skip months with no data
+    rows.push({month:key, ...(raw||{})});
+  }
+
+  if(!rows.length){
+    tbody.innerHTML=`<tr><td colspan="16"><div class="empty"><div>📋</div>No data for ${currentYear}. Click "+ Add Month" to get started.</div></td></tr>`;
+    renderStats([]);
+    renderChart([]);
+    return;
+  }
+
+  const computed = rows.map(r => ({...r, ...calc(r)}));
+  renderStats(computed);
+  renderChart(computed);
+
+  tbody.innerHTML = computed.map(r => {
+    const wc = occClass(r.occ);
+    const warnSign = r.warn !== null ? (r.warn >= 0 ? '+' : '') : '';
+    const warnCls  = r.warn !== null ? (r.warn >= 0 ? 'warn-pos' : 'warn-neg') : '';
+    const isUser   = !!userData[r.month];
+    return `<tr data-month="${r.month}">
+      <td class="month-cell">${fmtMon(r.month)}${isUser?'<span title="Custom entry" style="margin-left:4px;font-size:10px;color:var(--primary)">●</span>':''}</td>
+      <td><input type="number" value="${r.inTime||''}" placeholder="—" data-field="inTime" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td><input type="number" value="${r.inCalls||''}" placeholder="—" data-field="inCalls" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td class="calc">${fmtN(r.caseTime)}</td>
+      <td><input type="number" value="${r.outTime||''}" placeholder="—" data-field="outTime" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td><input type="number" value="${r.emails||''}" placeholder="—" data-field="emails" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td class="calc">${fmtN(r.emailTime)}</td>
+      <td><input type="number" value="${r.disp||''}" placeholder="—" data-field="disp" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td class="calc">${fmtN(r.dispTime)}</td>
+      <td><input type="number" value="${r.fte||''}" placeholder="—" data-field="fte" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td><input type="number" value="${r.workMin||''}" placeholder="—" data-field="workMin" data-month="${r.month}" onchange="updateField(this)"></td>
+      <td class="calc">${fmtN(r.active)}</td>
+      <td class="calc">${fmtN(r.free)}</td>
+      <td><span class="occ-chip ${wc}">${fmtPct(r.occ)}</span></td>
+      <td>${r.warn!==null?`<span class="warn-chip ${warnCls}">${warnSign}${(r.warn*100).toFixed(1)}%</span>`:'—'}</td>
+      <td>${isUser?`<button class="del-btn" title="Remove custom entry" onclick="deleteRow('${r.month}')">✕</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===================================================================
+   TABLE — QUARTER VIEW
+=================================================================== */
+function renderQuarterTable(){
+  document.getElementById('tableTitle').textContent = `Quarterly Summary — ${currentYear}`;
+  const qRows = quarterRows();
+
+  const head = document.getElementById('tableHead');
+  head.innerHTML=`<tr>
+    <th style="text-align:left">Quarter</th>
+    <th>IN Time (min)</th><th>IN Calls</th><th>Case Time*</th>
+    <th>OUT Time (min)</th><th>Emails</th><th>Email Time*</th>
+    <th>Dispositions</th><th>Disp. Time*</th>
+    <th>Avg FTE</th><th>Working Hours (min)</th>
+    <th>Active Time*</th><th>Free Time*</th>
+    <th>Occupancy*</th><th>Warning*</th>
+  </tr>`;
+
+  const computed = qRows.map(q => {
+    if(!q.hasData) return {...q, occ:null, warn:null};
+    return {...q, ...calc(q.agg), label:q.label, fte:q.agg.fte};
+  });
+
+  renderStats(computed);
+  renderChart(computed);
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = computed.map(r => {
+    if(!r.hasData) return `<tr style="opacity:.4"><td class="month-cell">${r.label}</td><td colspan="14" style="text-align:center;color:var(--muted)">No data</td></tr>`;
+    const wc=occClass(r.occ);
+    const warnSign = r.warn >= 0 ? '+' : '';
+    const warnCls  = r.warn >= 0 ? 'warn-pos' : 'warn-neg';
+    return `<tr>
+      <td class="month-cell">${r.label}</td>
+      <td>${fmtN(r.agg.inTime)}</td><td>${fmtN(r.agg.inCalls)}</td><td class="calc">${fmtN(r.caseTime)}</td>
+      <td>${fmtN(r.agg.outTime)}</td><td>${fmtN(r.agg.emails)}</td><td class="calc">${fmtN(r.emailTime)}</td>
+      <td>${fmtN(r.agg.disp)}</td><td class="calc">${fmtN(r.dispTime)}</td>
+      <td>${r.fte||'—'}</td><td>${fmtN(r.agg.workMin)}</td>
+      <td class="calc">${fmtN(r.active)}</td><td class="calc">${fmtN(r.free)}</td>
+      <td><span class="occ-chip ${wc}">${fmtPct(r.occ)}</span></td>
+      <td>${r.warn!==null?`<span class="warn-chip ${warnCls}">${warnSign}${(r.warn*100).toFixed(1)}%</span>`:'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===================================================================
+   TABLE — YEAR VIEW
+=================================================================== */
+function renderYearTable(){
+  document.getElementById('tableTitle').textContent = 'Yearly Summary — All Years';
+  const yRows = yearRows();
+
+  const head = document.getElementById('tableHead');
+  head.innerHTML=`<tr>
+    <th style="text-align:left">Year</th>
+    <th>IN Time (min)</th><th>IN Calls</th><th>Case Time*</th>
+    <th>OUT Time (min)</th><th>Emails</th><th>Email Time*</th>
+    <th>Dispositions</th><th>Disp. Time*</th>
+    <th>Avg FTE</th><th>Working Hours (min)</th>
+    <th>Active Time*</th><th>Free Time*</th>
+    <th>Occupancy*</th><th>Warning*</th>
+  </tr>`;
+
+  const computed = yRows.map(y => ({...y, ...calc(y.agg), label:y.label, fte:y.agg.fte}));
+  renderStats(computed);
+  renderChart(computed);
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = computed.map(r => {
+    const wc=occClass(r.occ);
+    const warnSign = r.warn !== null ? (r.warn >= 0 ? '+' : '') : '';
+    const warnCls  = r.warn !== null ? (r.warn >= 0 ? 'warn-pos' : 'warn-neg') : '';
+    return `<tr>
+      <td class="month-cell">${r.label}</td>
+      <td>${fmtN(r.agg.inTime)}</td><td>${fmtN(r.agg.inCalls)}</td><td class="calc">${fmtN(r.caseTime)}</td>
+      <td>${fmtN(r.agg.outTime)}</td><td>${fmtN(r.agg.emails)}</td><td class="calc">${fmtN(r.emailTime)}</td>
+      <td>${fmtN(r.agg.disp)}</td><td class="calc">${fmtN(r.dispTime)}</td>
+      <td>${r.fte||'—'}</td><td>${fmtN(r.agg.workMin)}</td>
+      <td class="calc">${fmtN(r.active)}</td><td class="calc">${fmtN(r.free)}</td>
+      <td><span class="occ-chip ${wc}">${fmtPct(r.occ)}</span></td>
+      <td>${r.warn!==null?`<span class="warn-chip ${warnCls}">${warnSign}${(r.warn*100).toFixed(1)}%</span>`:'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ===================================================================
+   FIELD EDIT
+=================================================================== */
+function updateField(inp){
+  const month = inp.dataset.month;
+  const field = inp.dataset.field;
+  const val   = inp.value.trim() === '' ? null : +inp.value;
+  if(!userData[month]) userData[month] = {};
+  if(val === null) delete userData[month][field];
+  else userData[month][field] = val;
+  // Clean up empty objects
+  if(!Object.keys(userData[month]).length) delete userData[month];
+  saveStorage();
+  render();
+}
+
+/* ===================================================================
+   ADD / DELETE ROWS
+=================================================================== */
+function addRow(){
+  document.getElementById('addRowHint').style.display = 'flex';
+  // Default to first missing month in current year
+  const data = allData();
+  for(let m=1; m<=12; m++){
+    const k = `${currentYear}-${String(m).padStart(2,'0')}`;
+    if(!data[k]){ document.getElementById('newMonthInput').value = k; break; }
+  }
+}
+function cancelAddRow(){ document.getElementById('addRowHint').style.display = 'none'; }
+function confirmAddRow(){
+  const val = document.getElementById('newMonthInput').value;
+  if(!val){ toast('Pick a month', 'err'); return; }
+  if(!userData[val]) userData[val] = {};
+  saveStorage();
+  // Switch year to match new month
+  currentYear = +val.slice(0,4);
+  document.getElementById('yearLbl').textContent = currentYear;
+  document.getElementById('addRowHint').style.display = 'none';
+  render();
+  toast('Month added — fill in the values', 'ok');
+}
+function deleteRow(month){
+  if(!confirm(`Remove custom data for ${fmtMon(month)}?`)) return;
+  delete userData[month];
+  saveStorage();
+  render();
+  toast('Removed');
+}
+
+/* ===================================================================
+   CSV EXPORT
+=================================================================== */
+function exportCSV(){
+  const data = allData();
+  const t = (+(document.getElementById('targetInput').value||85))/100;
+  const lines = [['Month','IN Time (min)','IN Calls','Case Time (min)','OUT Time (min)',
+    'Emails','Email Time (min)','Dispositions','Disp. Time (min)','FTE',
+    'Working Hours (min)','Active Time (min)','Free Time (min)','Occupancy %','Warning %'].join(',')];
+  Object.keys(data).sort().forEach(m => {
+    const r = data[m]; const c = calc(r);
+    lines.push([m,r.inTime||'',r.inCalls||'',c.caseTime,r.outTime||'',r.emails||'',
+      c.emailTime,r.disp||'',c.dispTime,r.fte||'',r.workMin||'',c.active,
+      c.free!==null?Math.round(c.free):'',
+      c.occ!==null?(c.occ*100).toFixed(2):'',
+      c.warn!==null?(c.warn*100).toFixed(2):''].join(','));
+  });
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `occupancy-report-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  toast('CSV downloaded', 'ok');
+}
+
+/* ===================================================================
+   RENDER
+=================================================================== */
+function render(){
+  document.getElementById('yearLbl').textContent = currentYear;
+  if(currentView === 'month')   renderMonthTable();
+  else if(currentView === 'quarter') renderQuarterTable();
+  else renderYearTable();
+}
+
+/* ===================================================================
+   TOAST
+=================================================================== */
+let toastT;
+function toast(msg, type=''){
+  const el = document.getElementById('toast');
+  clearTimeout(toastT);
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' '+type : '');
+  toastT = setTimeout(() => el.className = 'toast', 3000);
+}
+
+/* ===================================================================
+   TARGET INPUT WATCHER
+=================================================================== */
+document.getElementById('targetInput').addEventListener('input', () => render());
+
+/* ===================================================================
+   BOOT
+=================================================================== */
+loadStorage();
+// Default year: last year with data
+const allYears = [...new Set(HIST.map(h=>h[0].slice(0,4)))];
+currentYear = +allYears[allYears.length-1];
+document.getElementById('yearLbl').textContent = currentYear;
+render();
+</script>
+</body>
+</html>
