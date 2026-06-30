@@ -248,93 +248,193 @@ tbody tr:hover td:first-child{background:var(--card2)}
 .import-grid .gi:focus{outline:none;border-color:var(--primary);background:var(--primary-l)}
 .import-note{font-size:11px;color:var(--muted);margin-top:10px}
 
-/* ── Presentation overlay ── */
-.pres-overlay{
-  position:fixed;inset:0;background:#0a0a12;z-index:600;
-  display:flex;flex-direction:column;
-}
+/* ── Presentation overlay (v2) ── */
+.pres-overlay{position:fixed;inset:0;background:#0f1117;z-index:600;display:flex;flex-direction:column}
 .pres-overlay.hidden{display:none}
+
+/* topbar */
 .pres-topbar{
-  display:flex;align-items:center;justify-content:space-between;padding:0 16px;
-  height:50px;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.1);
-  flex-shrink:0;
+  height:54px;flex-shrink:0;display:flex;align-items:center;padding:0 18px;gap:14px;
+  background:#161b27;border-bottom:1px solid rgba(255,255,255,.07);
 }
-.pres-topbar-left{font-size:13px;font-weight:700;color:rgba(255,255,255,.7)}
-.pres-topbar-right{display:flex;gap:8px;align-items:center}
+.pres-brand{display:flex;align-items:center;gap:9px;flex-shrink:0}
+.pres-brand-icon{
+  width:30px;height:30px;background:linear-gradient(135deg,#2563eb,#60a5fa);
+  border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.pres-brand-icon svg{stroke:#fff}
+.pres-brand-name{font-size:13px;font-weight:700;color:#fff;white-space:nowrap}
+.pres-divider{width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0}
+.pres-meta{flex:1;display:flex;align-items:center;justify-content:center;gap:10px}
+.pres-slide-name{font-size:13px;color:rgba(255,255,255,.55);font-weight:500}
+.pres-counter{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.1);
+  border-radius:20px;padding:2px 11px;font-size:11px;color:rgba(255,255,255,.5);font-weight:700;
+}
+.pres-actions{display:flex;gap:6px;align-items:center;flex-shrink:0}
 .pres-btn{
-  padding:6px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.08);color:#fff;font-size:12px;font-weight:600;
-  cursor:pointer;display:flex;align-items:center;gap:5px;transition:.15s;
+  padding:6px 13px;border-radius:7px;border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.06);color:rgba(255,255,255,.85);font-size:12px;font-weight:600;
+  cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:.15s;white-space:nowrap;
+  font-family:inherit;
 }
-.pres-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4)}
-.pres-btn.accent{background:#2563eb;border-color:#2563eb}
-.pres-btn.accent:hover{background:#1d4ed8}
-.pres-stage-wrap{
-  flex:1;display:flex;align-items:center;justify-content:center;gap:16px;overflow:hidden;padding:12px;
+.pres-btn:hover{background:rgba(255,255,255,.13);border-color:rgba(255,255,255,.25);color:#fff}
+.pres-btn.pres-btn-green{background:rgba(34,197,94,.15);border-color:rgba(34,197,94,.3);color:#4ade80}
+.pres-btn.pres-btn-green:hover{background:rgba(34,197,94,.25)}
+.pres-btn.pres-btn-close{width:32px;height:32px;padding:0;justify-content:center;border-radius:8px}
+.pres-btn svg{width:14px;height:14px;flex-shrink:0}
+
+/* body layout */
+.pres-body{flex:1;display:flex;overflow:hidden}
+
+/* thumbnail strip */
+.pres-thumbs{
+  width:148px;flex-shrink:0;background:#111827;border-right:1px solid rgba(255,255,255,.06);
+  overflow-y:auto;padding:10px 8px;display:flex;flex-direction:column;gap:8px;
 }
-.pres-arrow{
-  width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.2);
-  background:rgba(255,255,255,.07);color:#fff;font-size:18px;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;
+.pres-thumbs::-webkit-scrollbar{width:4px}
+.pres-thumbs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:2px}
+.pres-thumb{
+  border-radius:6px;border:2px solid transparent;cursor:pointer;overflow:hidden;
+  transition:.15s;background:#fff;aspect-ratio:16/9;position:relative;flex-shrink:0;
 }
-.pres-arrow:hover{background:rgba(255,255,255,.18)}
-.pres-arrow:disabled{opacity:.25;cursor:default}
-.pres-slide-wrap{
-  flex:1;max-width:960px;aspect-ratio:16/9;background:#fff;border-radius:10px;
-  box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden;position:relative;
-}
-.pres-slide{
-  width:100%;height:100%;display:flex;flex-direction:column;
+.pres-thumb:hover{border-color:rgba(99,102,241,.5)}
+.pres-thumb.active{border-color:#6366f1;box-shadow:0 0 0 2px rgba(99,102,241,.3)}
+.thumb-inner{
+  width:960px;height:540px;transform-origin:top left;pointer-events:none;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
 }
-/* slide 1 cover */
+.thumb-num{
+  position:absolute;bottom:4px;right:6px;font-size:9px;font-weight:700;
+  color:rgba(0,0,0,.35);z-index:2;
+}
+
+/* main stage */
+.pres-main{flex:1;display:flex;align-items:center;justify-content:center;gap:14px;padding:16px}
+.pres-arrow{
+  width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.14);
+  background:rgba(255,255,255,.05);color:rgba(255,255,255,.7);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;
+}
+.pres-arrow:hover:not(:disabled){background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.3)}
+.pres-arrow:disabled{opacity:.2;cursor:default}
+.pres-stage{flex:1;display:flex;align-items:center;justify-content:center;max-width:960px}
+.pres-slide-frame{
+  width:100%;border-radius:10px;overflow:hidden;
+  box-shadow:0 25px 80px rgba(0,0,0,.7);aspect-ratio:16/9;position:relative;background:#fff;
+}
+.pres-slide-inner{
+  width:960px;height:540px;transform-origin:top left;position:absolute;top:0;left:0;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+
+/* progress */
+.pres-progress{height:3px;background:rgba(255,255,255,.08);flex-shrink:0}
+.pres-progress-bar{height:100%;background:linear-gradient(90deg,#6366f1,#60a5fa);transition:width .3s}
+
+/* ──────────────────────────────────────────────────────────────
+   SLIDE CONTENT STYLES (fixed 960×540 canvas)
+────────────────────────────────────────────────────────────── */
+/* Cover slide */
 .sl-cover{
-  background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#3b82f6 100%);
-  color:#fff;align-items:center;justify-content:center;text-align:center;padding:40px;gap:12px;
+  width:960px;height:540px;background:#0f172a;color:#fff;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:64px 72px;
 }
-.sl-cover .sl-logo{font-size:52px;margin-bottom:8px}
-.sl-cover h1{font-size:clamp(18px,3vw,32px);font-weight:900;letter-spacing:-.5px;margin:0}
-.sl-cover .sl-period{font-size:clamp(12px,1.8vw,18px);opacity:.85;margin-top:4px}
-.sl-cover .sl-date{font-size:clamp(10px,1.3vw,13px);opacity:.6;margin-top:8px}
-.sl-cover .sl-params{
-  display:flex;gap:24px;margin-top:20px;background:rgba(255,255,255,.12);
-  border-radius:10px;padding:12px 24px;font-size:clamp(9px,1.2vw,12px);
+.sl-cover-deco1{
+  position:absolute;top:-80px;right:-80px;width:380px;height:380px;border-radius:50%;
+  background:linear-gradient(135deg,rgba(37,99,235,.4),rgba(99,102,241,.2));
 }
-.sl-cover .sl-params span{display:flex;flex-direction:column;align-items:center;gap:2px}
-.sl-cover .sl-params strong{font-size:clamp(13px,1.8vw,20px);font-weight:800}
-/* slide headers */
-.sl-header{
-  background:#1e3a8a;color:#fff;padding:14px 28px;
-  font-size:clamp(10px,1.5vw,15px);font-weight:800;letter-spacing:.04em;
-  display:flex;align-items:center;gap:8px;flex-shrink:0;
+.sl-cover-deco2{
+  position:absolute;bottom:-60px;right:120px;width:220px;height:220px;border-radius:50%;
+  background:rgba(59,130,246,.15);
 }
-.sl-content{flex:1;padding:16px 28px;overflow:hidden}
+.sl-cover-deco3{
+  position:absolute;top:60px;right:160px;width:100px;height:100px;border-radius:50%;
+  background:rgba(99,102,241,.2);
+}
+.sl-cover-line{position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#2563eb,#6366f1,#60a5fa)}
+.sl-cover-chip{
+  display:inline-flex;align-items:center;gap:6px;background:rgba(37,99,235,.25);border:1px solid rgba(99,162,255,.3);
+  border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;color:#93c5fd;
+  letter-spacing:.06em;text-transform:uppercase;margin-bottom:20px;
+}
+.sl-cover h1{font-size:42px;font-weight:900;line-height:1.1;letter-spacing:-.5px;margin:0 0 10px;max-width:600px}
+.sl-cover .sl-period{font-size:20px;color:#93c5fd;font-weight:600;margin-bottom:6px}
+.sl-cover .sl-date{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:40px}
+.sl-cover-params{display:flex;gap:0;border:1px solid rgba(255,255,255,.1);border-radius:10px;overflow:hidden}
+.sl-cover-param{
+  padding:10px 22px;display:flex;flex-direction:column;gap:2px;
+  border-right:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+}
+.sl-cover-param:last-child{border-right:none}
+.sl-cover-param strong{font-size:20px;font-weight:800;color:#fff}
+.sl-cover-param span{font-size:11px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em}
+.sl-cover-icon{
+  position:absolute;right:72px;top:50%;transform:translateY(-50%);
+  width:160px;height:160px;background:rgba(37,99,235,.2);border:1px solid rgba(99,162,255,.2);
+  border-radius:28px;display:flex;align-items:center;justify-content:center;
+}
+.sl-cover-icon svg{width:80px;height:80px;stroke:rgba(147,197,253,.8)}
+
+/* Slide header bar */
+.sl-hbar{
+  height:52px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 32px;
+  background:#fff;border-bottom:3px solid #e2e8f0;
+}
+.sl-hbar-accent{width:4px;height:26px;border-radius:2px;background:linear-gradient(180deg,#2563eb,#6366f1);flex-shrink:0}
+.sl-hbar h2{font-size:16px;font-weight:800;color:#1e293b;margin:0;flex:1}
+.sl-hbar-period{font-size:12px;color:#64748b;font-weight:600}
+
 /* stats slide */
-.sl-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:100%}
-.sl-stat{
-  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;
+.sl-stats{width:960px;height:540px;background:#f8fafc;display:flex;flex-direction:column}
+.sl-stats-grid{
+  display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);
+  gap:12px;padding:14px 22px 18px;flex:1;
 }
-.sl-stat .s-lbl{font-size:clamp(8px,1.1vw,11px);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}
-.sl-stat .s-val{font-size:clamp(18px,3vw,36px);font-weight:900;line-height:1}
-.sl-stat .s-sub{font-size:clamp(8px,1vw,11px);color:#64748b;margin-top:3px}
+.sl-scard{
+  background:#fff;border-radius:12px;padding:18px 20px;display:flex;align-items:flex-start;
+  gap:14px;border:1px solid #e2e8f0;box-shadow:0 1px 3px rgba(0,0,0,.06);
+}
+.sl-scard-icon{
+  width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.sl-scard-icon svg{width:20px;height:20px}
+.sl-scard-body{flex:1;min-width:0}
+.sl-scard-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}
+.sl-scard-val{font-size:30px;font-weight:900;line-height:1;margin-bottom:3px}
+.sl-scard-sub{font-size:11px;color:#64748b}
+
 /* chart slide */
-.sl-chart-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.sl-chart-inner svg{width:100%;height:100%;display:block}
+.sl-chart{width:960px;height:540px;background:#fff;display:flex;flex-direction:column}
+.sl-chart-body{flex:1;padding:12px 20px 16px;overflow:hidden;display:flex;align-items:center}
+.sl-chart-body svg{width:100%;height:100%;display:block}
+
 /* table slide */
-.sl-table{width:100%;border-collapse:collapse;font-size:clamp(7px,1vw,11px)}
-.sl-table th{background:#1e3a8a;color:#fff;padding:5px 8px;text-align:right;font-size:clamp(6px,.9vw,10px);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
-.sl-table th:first-child{text-align:left}
-.sl-table td{padding:4px 8px;text-align:right;border-bottom:1px solid #e2e8f0}
-.sl-table td:first-child{text-align:left;font-weight:700}
-.sl-table tr:nth-child(even) td{background:#f8fafc}
-.sl-occ-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-weight:800;font-size:clamp(7px,1vw,11px)}
-/* dots */
-.pres-dots{display:flex;justify-content:center;gap:7px;padding:10px;flex-shrink:0}
-.pres-dot{
-  width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.25);
-  cursor:pointer;transition:.15s;border:none;padding:0;
+.sl-tbl{width:960px;height:540px;background:#fff;display:flex;flex-direction:column}
+.sl-tbl-body{flex:1;padding:10px 20px 14px;overflow:hidden}
+.sl-table{width:100%;border-collapse:collapse;font-size:11px}
+.sl-table thead th{
+  background:#1e293b;color:#fff;padding:8px 10px;text-align:right;
+  font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;
 }
-.pres-dot.on{background:#fff;transform:scale(1.2)}
+.sl-table thead th:first-child{text-align:left;border-radius:6px 0 0 0}
+.sl-table thead th:last-child{border-radius:0 6px 0 0}
+.sl-table tbody td{padding:6px 10px;text-align:right;border-bottom:1px solid #f1f5f9;font-size:11px}
+.sl-table tbody td:first-child{text-align:left;font-weight:700;color:#1e293b}
+.sl-table tbody tr:nth-child(even) td{background:#f8fafc}
+.sl-table tbody tr:last-child td{border-bottom:none}
+.sl-occ-pill{display:inline-block;padding:2px 9px;border-radius:20px;font-weight:800;font-size:10px}
+.sl-warn{font-weight:700;font-size:10px}
+
+/* slide footer */
+.sl-footer{
+  height:28px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;background:#f8fafc;border-top:1px solid #e2e8f0;
+}
+.sl-footer-left{font-size:9px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.06em}
+.sl-footer-right{font-size:9px;color:#94a3b8;font-weight:600}
+.sl-footer-logo{display:flex;align-items:center;gap:4px}
+.sl-footer-logo-dot{width:6px;height:6px;border-radius:50%;background:#2563eb}
 </style>
 </head>
 <body>
@@ -457,26 +557,64 @@ tbody tr:hover td:first-child{background:var(--card2)}
 
 </div><!-- /page -->
 
-<!-- ── Presentation Overlay ── -->
+<!-- ── Presentation Overlay v2 ── -->
 <div class="pres-overlay hidden" id="presOverlay">
+  <!-- Top bar -->
   <div class="pres-topbar">
-    <div class="pres-topbar-left">
-      <span id="presSlideLbl">Slide 1 of 4</span>
-      &nbsp;·&nbsp; <span id="presPeriodLbl" style="opacity:.6"></span>
+    <div class="pres-brand">
+      <div class="pres-brand-icon">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-16.73-16.73A2 2 0 0 1 5 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L9.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+        </svg>
+      </div>
+      <span class="pres-brand-name">Call Centre Occupancy</span>
     </div>
-    <div class="pres-topbar-right">
-      <button class="pres-btn" onclick="exportExcel()">📊 Excel</button>
-      <button class="pres-btn" onclick="exportPptx()">⬇ .pptx</button>
-      <button class="pres-btn" onclick="printPresentation()">🖨 PDF</button>
-      <button class="pres-btn" style="border-color:rgba(255,255,255,.4)" onclick="closePresentation()">✕ Close</button>
+    <div class="pres-divider"></div>
+    <div class="pres-meta">
+      <span class="pres-slide-name" id="presSlideName"></span>
+      <span class="pres-counter" id="presSlideLbl">1 / 4</span>
+    </div>
+    <div class="pres-divider"></div>
+    <div class="pres-actions">
+      <button class="pres-btn" onclick="exportExcel()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M3 9h18M3 15h18"/></svg>
+        Excel
+      </button>
+      <button class="pres-btn pres-btn-green" onclick="exportPptx()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Download .pptx
+      </button>
+      <button class="pres-btn" onclick="printPresentation()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print / PDF
+      </button>
+      <div class="pres-divider"></div>
+      <button class="pres-btn pres-btn-close" onclick="closePresentation()" title="Close (Esc)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
     </div>
   </div>
-  <div class="pres-stage-wrap">
-    <button class="pres-arrow" id="presBack" onclick="goSlide(-1)">&#9664;</button>
-    <div class="pres-slide-wrap" id="presStage"></div>
-    <button class="pres-arrow" id="presNext" onclick="goSlide(1)">&#9654;</button>
+
+  <!-- Body: thumbnails + stage -->
+  <div class="pres-body">
+    <div class="pres-thumbs" id="presThumbStrip"></div>
+    <div class="pres-main">
+      <button class="pres-arrow" id="presBack" onclick="goSlide(-1)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="pres-stage">
+        <div class="pres-slide-frame" id="presSlideFrame">
+          <div class="pres-slide-inner" id="presSlideInner"></div>
+        </div>
+      </div>
+      <button class="pres-arrow" id="presNext" onclick="goSlide(1)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
   </div>
-  <div class="pres-dots" id="presDots"></div>
+
+  <!-- Progress bar -->
+  <div class="pres-progress"><div class="pres-progress-bar" id="presProgressBar"></div></div>
 </div>
 
 <!-- ── Import Modal ── -->
@@ -487,11 +625,11 @@ tbody tr:hover td:first-child{background:var(--card2)}
       <button class="modal-close-x" onclick="closeImport()">✕</button>
     </div>
     <div class="modal-tabs">
-      <button class="modal-tab on" id="tabCSV"  onclick="switchImportTab('csv')">📄 CSV / Paste</button>
+      <button class="modal-tab on" id="tabCSV"  onclick="switchImportTab('csv')">📄 File / Paste</button>
       <button class="modal-tab"    id="tabGrid" onclick="switchImportTab('grid')">🗓 Year Grid</button>
     </div>
 
-    <!-- CSV tab -->
+    <!-- CSV/XLSX tab -->
     <div class="modal-body" id="paneCSV">
       <div class="drop-zone" id="dropZone"
            onclick="document.getElementById('fileIn').click()"
@@ -499,10 +637,10 @@ tbody tr:hover td:first-child{background:var(--card2)}
            ondragleave="this.classList.remove('over')"
            ondrop="onFileDrop(event)">
         <div style="font-size:32px">📂</div>
-        <strong>Click to browse or drag & drop a CSV file</strong>
-        <p>Supports CSV exported from this tool, or any CSV with columns:<br>
+        <strong>Click to browse or drag & drop a CSV or Excel (.xlsx) file</strong>
+        <p>Supports <strong>.xlsx</strong> exported from this tool or Excel, or any <strong>.csv</strong> with columns:<br>
            <em>Month, IN Time, IN Calls, OUT Time, Emails, Dispositions, FTE, Working Hours</em></p>
-        <input type="file" id="fileIn" accept=".csv,.txt" style="display:none" onchange="onFileSelect(this)">
+        <input type="file" id="fileIn" accept=".csv,.txt,.xlsx,.xls" style="display:none" onchange="onFileSelect(this)">
       </div>
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-size:12px">
         <hr style="flex:1;border-color:var(--border)"> or paste CSV below <hr style="flex:1;border-color:var(--border)">
@@ -1201,20 +1339,25 @@ function loadSheetJS(cb){
 }
 
 /* ══════════════════════════════════════════════════════════════
-   PRESENTATION
+   PRESENTATION v2
 ══════════════════════════════════════════════════════════════ */
-let presSlides=[], presIdx=0;
+let presSlides=[], presIdx=0, slideNames=[];
 
 function openPresentation(){
-  presSlides = buildSlides();
+  const built = buildSlides();
+  presSlides  = built.html;
+  slideNames  = built.names;
   presIdx = 0;
-  document.getElementById('presPeriodLbl').textContent = getPeriodLabel();
   document.getElementById('presOverlay').classList.remove('hidden');
+  scaleSlide();
   renderPresSlide();
+  buildThumbStrip();
+  window.addEventListener('resize', scaleSlide);
   document.addEventListener('keydown', presKeyNav);
 }
 function closePresentation(){
   document.getElementById('presOverlay').classList.add('hidden');
+  window.removeEventListener('resize', scaleSlide);
   document.removeEventListener('keydown', presKeyNav);
 }
 function presKeyNav(e){
@@ -1225,183 +1368,229 @@ function presKeyNav(e){
 function goSlide(d){
   presIdx = Math.max(0,Math.min(presSlides.length-1, presIdx+d));
   renderPresSlide();
+  // sync thumbnail active state
+  document.querySelectorAll('.pres-thumb').forEach((t,i)=>t.classList.toggle('active',i===presIdx));
+  document.querySelectorAll('.pres-thumb')[presIdx]?.scrollIntoView({block:'nearest'});
+}
+function scaleSlide(){
+  const frame = document.getElementById('presSlideFrame');
+  if(!frame) return;
+  const s = frame.clientWidth / 960;
+  const inner = document.getElementById('presSlideInner');
+  if(inner){ inner.style.transform = `scale(${s})`; }
+  frame.style.height = (540 * s) + 'px';
+  // scale thumbnails
+  document.querySelectorAll('.thumb-inner').forEach(ti=>{
+    const tw = ti.parentElement?.clientWidth || 128;
+    ti.style.transform = `scale(${tw/960})`;
+  });
 }
 function renderPresSlide(){
   const n = presSlides.length;
-  document.getElementById('presSlideLbl').textContent = `Slide ${presIdx+1} of ${n}`;
-  document.getElementById('presStage').innerHTML = presSlides[presIdx];
+  document.getElementById('presSlideLbl').textContent  = `${presIdx+1} / ${n}`;
+  document.getElementById('presSlideName').textContent = slideNames[presIdx] || '';
+  document.getElementById('presSlideInner').innerHTML  = presSlides[presIdx];
   document.getElementById('presBack').disabled = presIdx===0;
   document.getElementById('presNext').disabled = presIdx===n-1;
-  document.getElementById('presDots').innerHTML =
-    presSlides.map((_,i)=>`<button class="pres-dot${i===presIdx?' on':''}" onclick="presIdx=${i};renderPresSlide()"></button>`).join('');
+  document.getElementById('presProgressBar').style.width = ((presIdx+1)/n*100)+'%';
+}
+function buildThumbStrip(){
+  const strip = document.getElementById('presThumbStrip');
+  strip.innerHTML = presSlides.map((html,i)=>`
+    <div class="pres-thumb${i===0?' active':''}" onclick="goSlide(${i}-presIdx)">
+      <div class="thumb-inner">${html}</div>
+      <span class="thumb-num">${i+1}</span>
+    </div>`).join('');
+  // Scale all thumbnails after DOM is ready
+  requestAnimationFrame(scaleSlide);
 }
 
-/* ── Build slides ── */
+/* ── Build slides (returns {html, names}) ── */
+function occBg(occ){
+  if(occ===null) return '#f1f5f9';
+  const p=occ*100;
+  if(p<70) return '#dbeafe'; if(p<85) return '#dcfce7'; if(p<90) return '#fef3c7';
+  return '#fee2e2';
+}
+
+function slideFooter(period,idx,total){
+  return `<div class="sl-footer">
+    <div class="sl-footer-logo"><div class="sl-footer-logo-dot"></div> Call Centre Occupancy</div>
+    <div class="sl-footer-left">${period}</div>
+    <div class="sl-footer-right">${idx} / ${total}</div>
+  </div>`;
+}
+
 function buildSlides(){
   const rows   = getCurrentRows();
   const period = getPeriodLabel();
   const tgt    = targetPct();
   const valid  = rows.filter(r=>r.occ!=null);
-  const slides = [];
+  const html=[], names=[];
+  const genDate = new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'});
 
-  /* Slide 1 — Cover */
-  const avgOcc = valid.length ? valid.reduce((s,r)=>s+r.occ,0)/valid.length : null;
-  slides.push(`
-    <div class="pres-slide sl-cover">
-      <div class="sl-logo">📞</div>
-      <h1>Call Centre Occupancy Report</h1>
-      <div class="sl-period">${period}</div>
-      <div class="sl-date">Generated ${new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})}</div>
-      <div class="sl-params">
-        <span><strong>${params.email} min</strong>Email AVG</span>
-        <span><strong>${params.ds} min</strong>Outbound DS</span>
-        <span><strong>${params.caseH} min</strong>Case Handling</span>
-        <span><strong>${tgt}%</strong>Target</span>
-      </div>
-    </div>`);
+  /* ── Slide 1: Cover ── */
+  names.push('Cover');
+  html.push(`<div class="sl-cover">
+    <div class="sl-cover-line"></div>
+    <div class="sl-cover-deco1"></div>
+    <div class="sl-cover-deco2"></div>
+    <div class="sl-cover-deco3"></div>
+    <div class="sl-cover-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-16.73-16.73A2 2 0 0 1 5 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L9.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </svg>
+    </div>
+    <div class="sl-cover-chip">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Occupancy Analytics
+    </div>
+    <h1>Call Centre<br>Occupancy Report</h1>
+    <div class="sl-period">${period}</div>
+    <div class="sl-date">Generated ${genDate}</div>
+    <div class="sl-cover-params">
+      <div class="sl-cover-param"><strong>${params.email} min</strong><span>Email AVG Time</span></div>
+      <div class="sl-cover-param"><strong>${params.ds} min</strong><span>Outbound DS Time</span></div>
+      <div class="sl-cover-param"><strong>${params.caseH} min</strong><span>Case Handling</span></div>
+      <div class="sl-cover-param"><strong>${tgt}%</strong><span>Occ. Target</span></div>
+    </div>
+  </div>`);
 
-  /* Slide 2 — Key Metrics */
+  const total = 2 + (valid.length?2:0) + Math.ceil(rows.length/13);
+
+  /* ── Slide 2: Key Metrics ── */
   if(valid.length){
+    const avgOcc = valid.reduce((s,r)=>s+r.occ,0)/valid.length;
     const peak   = Math.max(...valid.map(r=>r.occ));
     const lowest = Math.min(...valid.map(r=>r.occ));
     const atTgt  = valid.filter(r=>r.occ>=tgt/100).length;
-    const peakLbl  = rowLabel(valid.find(r=>r.occ===peak)||{});
-    const loLbl    = rowLabel(valid.find(r=>r.occ===lowest)||{});
-    const totalAct = Math.round(valid.reduce((s,r)=>s+(r.active||0),0)/60);
-    const card=(lbl,val,sub,bg,col)=>
-      `<div class="sl-stat" style="background:${bg}">
-        <div class="s-lbl">${lbl}</div>
-        <div class="s-val" style="color:${col}">${val}</div>
-        <div class="s-sub">${sub}</div>
+    const peakLbl= rowLabel(valid.find(r=>r.occ===peak)||{});
+    const loLbl  = rowLabel(valid.find(r=>r.occ===lowest)||{});
+    const totalH = Math.round(valid.reduce((s,r)=>s+(r.active||0),0)/60);
+    const fteCnt = valid.filter(r=>r.fte).length;
+    const avgFte = fteCnt ? (valid.filter(r=>r.fte).reduce((s,r)=>s+(r.fte||0),0)/fteCnt).toFixed(1) : '—';
+
+    const svgIcon = {
+      avg:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,
+      up: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>`,
+      dn: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 18 13.5 8.5 8.5 13.5 1 6"/><polyline points="17 18 23 18 23 12"/></svg>`,
+      tgt:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>`,
+      clk:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`,
+      ppl:`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>`,
+    };
+    const scard=(icon,iconBg,iconFg,lbl,val,vCol,sub)=>
+      `<div class="sl-scard">
+        <div class="sl-scard-icon" style="background:${iconBg}">${icon.replace(/stroke="currentColor"/,`stroke="${iconFg}"`)}</div>
+        <div class="sl-scard-body">
+          <div class="sl-scard-lbl">${lbl}</div>
+          <div class="sl-scard-val" style="color:${vCol}">${val}</div>
+          <div class="sl-scard-sub">${sub}</div>
+        </div>
       </div>`;
-    slides.push(`
-      <div class="pres-slide">
-        <div class="sl-header">📊 Key Metrics — ${period}</div>
-        <div class="sl-content" style="display:flex;align-items:center">
-          <div class="sl-stats-grid" style="width:100%">
-            ${card('Average Occupancy', pct(avgOcc), `${valid.length} periods`, occBg(avgOcc), occColor(avgOcc))}
-            ${card('Peak Occupancy', pct(peak), peakLbl, occBg(peak), occColor(peak))}
-            ${card('Lowest Occupancy', pct(lowest), loLbl, occBg(lowest), occColor(lowest))}
-            ${card(`Periods ≥ ${tgt}%`, atTgt+' / '+valid.length, 'at or above target',
-              atTgt?'#fee2e2':'#dcfce7', atTgt?'#dc2626':'#16a34a')}
-            ${card('Total Active Time', totalAct.toLocaleString()+' h', 'across all periods', '#eff6ff', '#2563eb')}
-            ${card('Avg FTE', (valid.reduce((s,r)=>s+(r.fte||0),0)/valid.filter(r=>r.fte).length||0).toFixed(1),
-              'agents', '#f8fafc', '#1e293b')}
-          </div>
-        </div>
-      </div>`);
+    names.push('Key Metrics');
+    html.push(`<div class="sl-stats">
+      <div class="sl-hbar"><div class="sl-hbar-accent"></div><h2>Key Metrics</h2><span class="sl-hbar-period">${period}</span></div>
+      <div class="sl-stats-grid">
+        ${scard(svgIcon.avg,'#eff6ff','#2563eb','Average Occupancy',pct(avgOcc),occColor(avgOcc),`${valid.length} periods`)}
+        ${scard(svgIcon.up, occBg(peak).replace('#','')==='fee2e2'?'#fee2e2':'#dcfce7', occColor(peak),'Peak Occupancy',pct(peak),occColor(peak),peakLbl)}
+        ${scard(svgIcon.dn, occBg(lowest).replace('#','')==='fee2e2'?'#fee2e2':'#dbeafe',occColor(lowest),'Lowest Occupancy',pct(lowest),occColor(lowest),loLbl)}
+        ${scard(svgIcon.tgt,atTgt?'#fee2e2':'#dcfce7',atTgt?'#dc2626':'#16a34a',`Periods ≥ ${tgt}%`,`${atTgt} / ${valid.length}`,atTgt?'#dc2626':'#16a34a','at or above target')}
+        ${scard(svgIcon.clk,'#eff6ff','#2563eb','Total Active Time',totalH.toLocaleString()+' h','#1e293b','across all periods')}
+        ${scard(svgIcon.ppl,'#f0fdf4','#16a34a','Average FTE',String(avgFte),'#1e293b','agents per period')}
+      </div>
+      ${slideFooter(period,2,total)}
+    </div>`);
   }
 
-  /* Slide 3 — Chart */
+  /* ── Slide 3: Trend Chart ── */
   if(valid.length){
-    // Temporarily render chart in light mode for embedding
-    const savedDark = dark;
-    dark = false;
-    const chartDiv = document.createElement('div');
-    document.body.appendChild(chartDiv);
-    const chartRows = valid.map(r=>({...r}));
-    // Build SVG inline (reuse renderChart logic but capture output)
-    const svgHtml = buildChartSVG(valid, tgt/100, false);
-    document.body.removeChild(chartDiv);
-    dark = savedDark;
-    slides.push(`
-      <div class="pres-slide">
-        <div class="sl-header">📈 Occupancy Trend — ${period}</div>
-        <div class="sl-content">
-          <div class="sl-chart-inner">${svgHtml}</div>
-        </div>
-      </div>`);
+    const svgHtml = buildChartSVG(valid, tgt/100);
+    names.push('Occupancy Trend');
+    html.push(`<div class="sl-chart">
+      <div class="sl-hbar"><div class="sl-hbar-accent"></div><h2>Occupancy Trend</h2><span class="sl-hbar-period">${period}</span></div>
+      <div class="sl-chart-body">${svgHtml}</div>
+      ${slideFooter(period,3,total)}
+    </div>`);
   }
 
-  /* Slide 4+ — Data table (paginated, max 12 rows per slide) */
-  const PAGE = 12;
-  for(let p=0; p<rows.length; p+=PAGE){
-    const chunk = rows.slice(p, p+PAGE);
-    const pageNum = Math.floor(p/PAGE)+1;
-    const totalPages = Math.ceil(rows.length/PAGE);
-    const pg = totalPages>1 ? ` (${pageNum}/${totalPages})` : '';
-    slides.push(`
-      <div class="pres-slide">
-        <div class="sl-header">📋 Detail Data — ${period}${pg}</div>
-        <div class="sl-content" style="overflow:hidden">
-          <table class="sl-table">
-            <thead><tr>
-              <th style="text-align:left">Period</th>
-              <th>IN Time</th><th>IN Calls</th><th>OUT Time</th>
-              <th>Emails</th><th>Disp.</th><th>FTE</th>
-              <th>Work Hrs</th><th>Active</th><th>Occupancy</th><th>Warning</th>
-            </tr></thead>
-            <tbody>${chunk.map(r=>{
-              const wc = occBgInline(r.occ);
-              const ws = r.warning!=null?(r.warning>=0?'+':''):'';
-              return `<tr>
-                <td style="text-align:left">${rowLabel(r)}</td>
-                <td>${num(r.inTime)}</td><td>${num(r.inCalls)}</td>
-                <td>${num(r.outTime)}</td><td>${num(r.emails)}</td>
-                <td>${num(r.disp)}</td><td>${r.fte||'—'}</td>
-                <td>${num(r.workMin)}</td><td>${num(r.active)}</td>
-                <td><span class="sl-occ-badge" style="background:${occBg(r.occ)};color:${occColor(r.occ)}">${pct(r.occ)}</span></td>
-                <td style="color:${r.warning>=0?'#16a34a':'#dc2626'};font-weight:700">${r.warning!=null?ws+pct(r.warning):'—'}</td>
-              </tr>`;
-            }).join('')}</tbody>
-          </table>
-        </div>
-      </div>`);
+  /* ── Slides 4+: Data table (13 rows per slide) ── */
+  const PAGE=13;
+  for(let p=0;p<rows.length;p+=PAGE){
+    const chunk = rows.slice(p,p+PAGE);
+    const tPages = Math.ceil(rows.length/PAGE);
+    const pg = tPages>1 ? ` — Part ${Math.floor(p/PAGE)+1} of ${tPages}` : '';
+    const slideN = html.length+1;
+    names.push(`Detail Data${pg}`);
+    html.push(`<div class="sl-tbl">
+      <div class="sl-hbar"><div class="sl-hbar-accent"></div><h2>Detail Data${pg}</h2><span class="sl-hbar-period">${period}</span></div>
+      <div class="sl-tbl-body">
+        <table class="sl-table">
+          <thead><tr>
+            <th style="text-align:left">Period</th>
+            <th>IN Time</th><th>IN Calls</th><th>OUT Time</th>
+            <th>Emails</th><th>Disp.</th><th>FTE</th>
+            <th>Work Hrs</th><th>Active (min)</th><th>Occupancy</th><th>Warning</th>
+          </tr></thead>
+          <tbody>${chunk.map(r=>{
+            const ws=r.warning!=null?(r.warning>=0?'+':''):'';
+            return `<tr>
+              <td>${rowLabel(r)}</td>
+              <td>${num(r.inTime)}</td><td>${num(r.inCalls)}</td>
+              <td>${num(r.outTime)}</td><td>${num(r.emails)}</td>
+              <td>${num(r.disp)}</td><td>${r.fte||'—'}</td>
+              <td>${num(r.workMin)}</td><td>${num(r.active)}</td>
+              <td><span class="sl-occ-pill" style="background:${occBg(r.occ)};color:${occColor(r.occ)}">${pct(r.occ)}</span></td>
+              <td class="sl-warn" style="color:${r.warning!=null?(r.warning>=0?'#16a34a':'#dc2626'):'#94a3b8'}">${r.warning!=null?ws+pct(r.warning):'—'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>
+      ${slideFooter(period,slideN,total)}
+    </div>`);
   }
 
-  return slides;
+  return {html, names};
 }
 
-function occBg(occ){
-  if(occ===null) return '#f1f5f9';
-  const p=occ*100;
-  if(p<70)  return '#dbeafe';
-  if(p<85)  return '#dcfce7';
-  if(p<90)  return '#fef3c7';
-  return '#fee2e2';
-}
-function occBgInline(occ){ return occBg(occ); }
-
-/* ── Standalone chart SVG builder (light mode, for slides) ── */
-function buildChartSVG(valid, tgt, darkMode){
-  const W=860, H=240;
-  const pL=52,pR=24,pT=18,pB=48;
+/* ── Standalone chart SVG builder ── */
+function buildChartSVG(valid, tgt){
+  const W=916, H=400;
+  const pL=54,pR=26,pT=22,pB=52;
   const gW=W-pL-pR, gH=H-pT-pB;
   const n=valid.length;
   const xs=valid.map((_,i)=>pL+(n===1?gW/2:i/(n-1)*gW));
   const toY=o=>pT+gH*(1-Math.min(o,1.15)/1.15);
-  const cardBg=darkMode?'#1e293b':'#f8fafc';
-  const gridC =darkMode?'#334155':'#e2e8f0';
-  const lblC  =darkMode?'#64748b':'#94a3b8';
-  const axisC =darkMode?'#475569':'#cbd5e1';
+  const gridC='#e2e8f0', lblC='#94a3b8', axisC='#cbd5e1';
   let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="font-family:system-ui,sans-serif;display:block">`;
-  svg+=`<rect width="${W}" height="${H}" fill="${cardBg}" rx="8"/>`;
+  svg+=`<rect width="${W}" height="${H}" fill="#fff"/>`;
   [0,25,50,75,100].forEach(v=>{
     const y=pT+gH*(1-v/115);
     svg+=`<line x1="${pL}" y1="${y.toFixed(1)}" x2="${pL+gW}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width="1"/>`;
-    svg+=`<text x="${pL-7}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="11" fill="${lblC}">${v}%</text>`;
+    svg+=`<text x="${pL-8}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="12" fill="${lblC}">${v}%</text>`;
   });
   const ty=toY(tgt);
-  svg+=`<line x1="${pL}" y1="${ty.toFixed(1)}" x2="${pL+gW}" y2="${ty.toFixed(1)}" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6,4" opacity=".7"/>`;
-  svg+=`<text x="${pL+gW-4}" y="${(ty-6).toFixed(1)}" text-anchor="end" font-size="10" fill="#dc2626" opacity=".85">Target ${Math.round(tgt*100)}%</text>`;
+  svg+=`<line x1="${pL}" y1="${ty.toFixed(1)}" x2="${pL+gW}" y2="${ty.toFixed(1)}" stroke="#f87171" stroke-width="2" stroke-dasharray="7,4"/>`;
+  svg+=`<text x="${pL+gW}" y="${(ty-8).toFixed(1)}" text-anchor="end" font-size="11" fill="#f87171" font-weight="700">Target ${Math.round(tgt*100)}%</text>`;
+  // Gradient area fill
+  const gradId='cg'+Math.random().toString(36).slice(2,6);
+  svg+=`<defs><linearGradient id="${gradId}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#2563eb" stop-opacity=".15"/><stop offset="100%" stop-color="#2563eb" stop-opacity="0"/></linearGradient></defs>`;
   let area=`M${xs[0].toFixed(1)},${pT+gH}`;
   valid.forEach((r,i)=>area+=` L${xs[i].toFixed(1)},${toY(r.occ).toFixed(1)}`);
   area+=` L${xs[n-1].toFixed(1)},${pT+gH} Z`;
-  svg+=`<path d="${area}" fill="rgba(37,99,235,.08)"/>`;
+  svg+=`<path d="${area}" fill="url(#${gradId})"/>`;
   let path=`M${xs[0].toFixed(1)},${toY(valid[0].occ).toFixed(1)}`;
   valid.forEach((r,i)=>{ if(i) path+=` L${xs[i].toFixed(1)},${toY(r.occ).toFixed(1)}`; });
-  svg+=`<path d="${path}" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round"/>`;
-  const showVal=n<=18, step=Math.ceil(n/26);
+  svg+=`<path d="${path}" fill="none" stroke="#2563eb" stroke-width="2.5" stroke-linejoin="round"/>`;
+  const showVal=n<=20, step=Math.ceil(n/28);
   valid.forEach((r,i)=>{
     const x=xs[i],y=toY(r.occ),col=occColor(r.occ);
-    svg+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${col}" stroke="${cardBg}" stroke-width="2"/>`;
+    svg+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="5" fill="${col}" stroke="#fff" stroke-width="2.5"/>`;
     if(showVal){
-      const above=y-14>pT;
-      svg+=`<text x="${x.toFixed(1)}" y="${above?y-9:y+13}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${(r.occ*100).toFixed(1)}%</text>`;
+      const above=y-18>pT;
+      svg+=`<text x="${x.toFixed(1)}" y="${above?y-10:y+15}" text-anchor="middle" font-size="10" fill="${col}" font-weight="700">${(r.occ*100).toFixed(1)}%</text>`;
     }
-    if(i%step===0||n<=24){
-      const lbl=rowLabel(r);
-      svg+=`<text x="${x.toFixed(1)}" y="${pT+gH+16}" text-anchor="middle" font-size="9.5" fill="${lblC}">${lbl.slice(0,7)}</text>`;
+    if(i%step===0||n<=28){
+      svg+=`<text x="${x.toFixed(1)}" y="${pT+gH+18}" text-anchor="middle" font-size="10" fill="${lblC}">${rowLabel(r).slice(0,7)}</text>`;
     }
   });
   svg+=`<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+gH}" stroke="${axisC}" stroke-width="1.5"/>`;
@@ -1412,48 +1601,70 @@ function buildChartSVG(valid, tgt, darkMode){
 
 /* ── Print / PDF ── */
 function printPresentation(){
-  const slides = presSlides;
-  const period = getPeriodLabel();
-  const win = window.open('','_blank');
+  const period=getPeriodLabel();
+  const css = Array.from(document.styleSheets).flatMap(ss=>{
+    try{ return Array.from(ss.cssRules).map(r=>r.cssText); }catch(e){ return []; }
+  }).filter(r=>r.includes('.sl-')||r.includes(':root')).join('\n');
+  const win=window.open('','_blank');
   win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Occupancy Report — ${period}</title>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff}
-    .slide{width:297mm;height:167mm;page-break-after:always;overflow:hidden;display:flex;flex-direction:column;position:relative}
-    .slide:last-child{page-break-after:avoid}
     @page{size:A4 landscape;margin:0}
-    @media print{body{margin:0}}
-    /* copy relevant styles */
-    .sl-cover{background:linear-gradient(135deg,#1e3a8a,#2563eb 60%,#3b82f6);color:#fff;align-items:center;justify-content:center;text-align:center;padding:40px;gap:12px;display:flex;flex-direction:column}
-    .sl-logo{font-size:52px}
-    .sl-cover h1{font-size:32px;font-weight:900;letter-spacing:-.5px}
-    .sl-period{font-size:18px;opacity:.85;margin-top:4px}
-    .sl-date{font-size:13px;opacity:.6;margin-top:8px}
-    .sl-params{display:flex;gap:24px;margin-top:20px;background:rgba(255,255,255,.12);border-radius:10px;padding:12px 24px;font-size:12px}
-    .sl-params span{display:flex;flex-direction:column;align-items:center;gap:2px}
-    .sl-params strong{font-size:20px;font-weight:800}
-    .sl-header{background:#1e3a8a;color:#fff;padding:12px 28px;font-size:14px;font-weight:800;letter-spacing:.04em;display:flex;align-items:center;gap:8px;flex-shrink:0}
-    .sl-content{flex:1;padding:14px 28px;overflow:hidden}
-    .sl-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:100%}
-    .sl-stat{border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center}
-    .s-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}
-    .s-val{font-size:36px;font-weight:900;line-height:1}
-    .s-sub{font-size:11px;color:#64748b;margin-top:3px}
-    .sl-chart-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
-    .sl-chart-inner svg{width:100%;height:100%}
-    .sl-table{width:100%;border-collapse:collapse;font-size:11px}
-    .sl-table th{background:#1e3a8a;color:#fff;padding:5px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase}
-    .sl-table th:first-child{text-align:left}
-    .sl-table td{padding:4px 8px;text-align:right;border-bottom:1px solid #e2e8f0}
-    .sl-table td:first-child{text-align:left;font-weight:700}
-    .sl-table tr:nth-child(even) td{background:#f8fafc}
-    .sl-occ-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-weight:800;font-size:11px}
+    @media print{.page-slide{page-break-after:always}.page-slide:last-child{page-break-after:avoid}}
+    .page-slide{width:297mm;height:167mm;overflow:hidden;position:relative;display:block}
+    /* Slide styles */
+    .sl-cover{width:100%;height:100%;background:#0f172a;color:#fff;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:40px 56px;position:relative;overflow:hidden}
+    .sl-cover-line{position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#2563eb,#6366f1,#60a5fa)}
+    .sl-cover-deco1{position:absolute;top:-60px;right:-60px;width:280px;height:280px;border-radius:50%;background:rgba(37,99,235,.3)}
+    .sl-cover-deco2{position:absolute;bottom:-40px;right:90px;width:160px;height:160px;border-radius:50%;background:rgba(59,130,246,.12)}
+    .sl-cover-deco3{position:absolute;top:50px;right:130px;width:70px;height:70px;border-radius:50%;background:rgba(99,102,241,.18)}
+    .sl-cover-icon{position:absolute;right:56px;top:50%;transform:translateY(-50%);width:120px;height:120px;background:rgba(37,99,235,.18);border:1px solid rgba(99,162,255,.2);border-radius:22px;display:flex;align-items:center;justify-content:center}
+    .sl-cover-icon svg{width:60px;height:60px;stroke:rgba(147,197,253,.8)}
+    .sl-cover-chip{display:inline-flex;align-items:center;gap:5px;background:rgba(37,99,235,.22);border:1px solid rgba(99,162,255,.3);border-radius:20px;padding:3px 11px;font-size:10px;font-weight:700;color:#93c5fd;letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px}
+    .sl-cover h1{font-size:32px;font-weight:900;line-height:1.1;letter-spacing:-.5px;margin:0 0 8px;max-width:460px}
+    .sl-period{font-size:16px;color:#93c5fd;font-weight:600;margin-bottom:4px}
+    .sl-date{font-size:11px;color:rgba(255,255,255,.4);margin-bottom:28px}
+    .sl-cover-params{display:flex;gap:0;border:1px solid rgba(255,255,255,.1);border-radius:8px;overflow:hidden}
+    .sl-cover-param{padding:8px 18px;display:flex;flex-direction:column;gap:2px;border-right:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04)}
+    .sl-cover-param:last-child{border-right:none}
+    .sl-cover-param strong{font-size:16px;font-weight:800;color:#fff}
+    .sl-cover-param span{font-size:9px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em}
+    .sl-hbar{height:40px;flex-shrink:0;display:flex;align-items:center;gap:10px;padding:0 24px;background:#fff;border-bottom:3px solid #e2e8f0}
+    .sl-hbar-accent{width:4px;height:20px;border-radius:2px;background:linear-gradient(180deg,#2563eb,#6366f1)}
+    .sl-hbar h2{font-size:13px;font-weight:800;color:#1e293b;margin:0;flex:1}
+    .sl-hbar-period{font-size:10px;color:#64748b;font-weight:600}
+    .sl-stats{width:100%;height:100%;background:#f8fafc;display:flex;flex-direction:column}
+    .sl-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(2,1fr);gap:8px;padding:10px 16px 12px;flex:1}
+    .sl-scard{background:#fff;border-radius:10px;padding:12px 14px;display:flex;align-items:flex-start;gap:10px;border:1px solid #e2e8f0}
+    .sl-scard-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .sl-scard-icon svg{width:16px;height:16px}
+    .sl-scard-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:3px}
+    .sl-scard-val{font-size:24px;font-weight:900;line-height:1;margin-bottom:2px}
+    .sl-scard-sub{font-size:9px;color:#64748b}
+    .sl-chart{width:100%;height:100%;background:#fff;display:flex;flex-direction:column}
+    .sl-chart-body{flex:1;padding:8px 16px 12px;display:flex;align-items:center}
+    .sl-chart-body svg{width:100%;height:100%}
+    .sl-tbl{width:100%;height:100%;background:#fff;display:flex;flex-direction:column}
+    .sl-tbl-body{flex:1;padding:8px 16px 10px;overflow:hidden}
+    .sl-table{width:100%;border-collapse:collapse;font-size:9.5px}
+    .sl-table thead th{background:#1e293b;color:#fff;padding:6px 8px;text-align:right;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+    .sl-table thead th:first-child{text-align:left}
+    .sl-table tbody td{padding:5px 8px;text-align:right;border-bottom:1px solid #f1f5f9;font-size:9.5px}
+    .sl-table tbody td:first-child{text-align:left;font-weight:700;color:#1e293b}
+    .sl-table tbody tr:nth-child(even) td{background:#f8fafc}
+    .sl-occ-pill{display:inline-block;padding:1px 7px;border-radius:20px;font-weight:800;font-size:8.5px}
+    .sl-warn{font-weight:700;font-size:8.5px}
+    .sl-footer{height:22px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 18px;background:#f8fafc;border-top:1px solid #e2e8f0}
+    .sl-footer-logo{display:flex;align-items:center;gap:4px;font-size:8px;color:#94a3b8;font-weight:600}
+    .sl-footer-logo-dot{width:5px;height:5px;border-radius:50%;background:#2563eb}
+    .sl-footer-left,.sl-footer-right{font-size:8px;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:.05em}
   </style></head><body>
-  ${slides.map(s=>`<div class="slide">${s}</div>`).join('')}
+  ${presSlides.map(s=>`<div class="page-slide">${s}</div>`).join('')}
   </body></html>`);
   win.document.close();
-  setTimeout(()=>win.print(),600);
+  setTimeout(()=>win.print(),700);
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -1625,7 +1836,7 @@ function switchImportTab(tab){
   document.getElementById('paneGrid').classList.toggle('hidden', tab!=='grid');
   document.getElementById('tabCSV').classList.toggle('on',  tab==='csv');
   document.getElementById('tabGrid').classList.toggle('on', tab==='grid');
-  document.getElementById('importConfirmBtn').textContent = tab==='csv' ? 'Import CSV' : 'Save Year Data';
+  document.getElementById('importConfirmBtn').textContent = tab==='csv' ? 'Import File' : 'Save Year Data';
 }
 
 /* ── File drag/drop ── */
@@ -1633,16 +1844,36 @@ function onFileDrop(e){
   e.preventDefault();
   document.getElementById('dropZone').classList.remove('over');
   const file = e.dataTransfer.files[0];
-  if(file) readFileIntoTextarea(file);
+  if(file) handleImportFile(file);
 }
 function onFileSelect(input){
-  if(input.files[0]) readFileIntoTextarea(input.files[0]);
+  if(input.files[0]) handleImportFile(input.files[0]);
   input.value='';
 }
-function readFileIntoTextarea(file){
-  const reader = new FileReader();
-  reader.onload = e => { document.getElementById('csvText').value = e.target.result; };
-  reader.readAsText(file);
+function handleImportFile(file){
+  if(/\.xlsx?$/i.test(file.name)){
+    // XLSX — use SheetJS
+    const doRead=()=>{
+      const reader=new FileReader();
+      reader.onload=e=>{
+        try{
+          const wb=XLSX.read(e.target.result,{type:'array'});
+          const ws=wb.Sheets[wb.SheetNames[0]];
+          // Convert to CSV so existing parser handles it
+          const csv=XLSX.utils.sheet_to_csv(ws,{blankrows:false});
+          document.getElementById('csvText').value=csv;
+          showToast(`Excel loaded (${wb.SheetNames[0]}) — review then Import`,'ok');
+        }catch(err){ showToast('Could not read Excel file','err'); }
+      };
+      reader.readAsArrayBuffer(file);
+    };
+    if(typeof XLSX==='undefined') loadSheetJS(doRead); else doRead();
+  } else {
+    // CSV / plain text
+    const reader=new FileReader();
+    reader.onload=e=>{ document.getElementById('csvText').value=e.target.result; };
+    reader.readAsText(file);
+  }
 }
 
 /* ── CSV parser ── */
