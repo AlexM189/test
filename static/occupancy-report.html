@@ -110,15 +110,15 @@ input[type=range]{width:100%;accent-color:var(--primary);cursor:pointer;height:5
 .table-actions{display:flex;gap:8px}
 .t-scroll{overflow-x:auto}
 
-table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+table{width:100%;border-collapse:collapse;font-size:11.5px;white-space:nowrap}
 thead th{
-  padding:10px 12px;text-align:right;background:var(--card2);
-  border-bottom:2px solid var(--border);font-size:11px;font-weight:700;
+  padding:6px 8px;text-align:right;background:var(--card2);
+  border-bottom:2px solid var(--border);font-size:10px;font-weight:700;
   color:var(--muted);text-transform:uppercase;letter-spacing:.04em;
   position:sticky;top:0;z-index:5;
 }
 thead th:first-child{text-align:left;position:sticky;left:0;z-index:6;background:var(--card2)}
-tbody td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--border)}
+tbody td{padding:5px 8px;text-align:right;border-bottom:1px solid var(--border)}
 tbody td:first-child{text-align:left;font-weight:700;position:sticky;left:0;background:var(--card);z-index:2}
 tbody tr:last-child td{border-bottom:none}
 tbody tr:hover td{background:var(--card2)}
@@ -127,20 +127,20 @@ tbody tr:hover td:first-child{background:var(--card2)}
 
 /* editable inputs inside cells */
 .cell-inp{
-  width:96px;padding:4px 7px;border:1px solid transparent;border-radius:6px;
-  font-size:12px;text-align:right;background:transparent;color:var(--text);font-family:inherit;
+  width:76px;padding:3px 5px;border:1px solid transparent;border-radius:5px;
+  font-size:11px;text-align:right;background:transparent;color:var(--text);font-family:inherit;
 }
 .cell-inp:hover{border-color:var(--border)}
 .cell-inp:focus{border-color:var(--primary);background:var(--primary-l);outline:none}
 
 /* ── Occupancy badge ── */
-.occ-badge{display:inline-block;padding:3px 11px;border-radius:20px;font-weight:800;font-size:13px}
+.occ-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-weight:800;font-size:11px}
 .occ-low {background:var(--blue-l);    color:var(--blue)}
 .occ-ok  {background:var(--success-l); color:var(--success)}
 .occ-warn{background:var(--warn-l);    color:var(--warn)}
 .occ-over{background:var(--danger-l);  color:var(--danger)}
 
-.warn-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.warn-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:700}
 .warn-ok {background:var(--success-l);color:var(--success)}
 .warn-bad{background:var(--danger-l); color:var(--danger)}
 
@@ -468,6 +468,7 @@ tbody tr:hover td:first-child{background:var(--card2)}
     <button class="tb-btn" onclick="exportExcel()">📊 Excel</button>
     <button class="tb-btn" onclick="openPresentation()">📋 Present</button>
     <button class="tb-btn" onclick="saveDB()" title="Save all data to a .json backup file" style="border-color:var(--success);color:var(--success)">💾 Save DB</button>
+    <button class="tb-btn" onclick="openLoadDB()" title="Restore data from a .json backup file" style="border-color:var(--warn);color:var(--warn)">📂 Load DB</button>
     <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
   </div>
 </div>
@@ -1422,7 +1423,12 @@ function showDBPreview(db, filename){
       ${db.target ? `<span style="color:var(--muted)">Target</span><span>${db.target}%</span>` : ''}
     </div>`;
   document.getElementById('dbPreview').style.display = 'block';
-  document.getElementById('importConfirmBtn').textContent = 'Restore Backup';
+  // Enable the confirm button now that a valid file is loaded
+  const btn = document.getElementById('importConfirmBtn');
+  btn.textContent = 'Restore Backup';
+  btn.disabled = false;
+  btn.classList.remove('btn-ghost');
+  btn.classList.add('btn-primary');
 }
 
 function runDBImport(){
@@ -1962,6 +1968,10 @@ function closeImport(){
   document.getElementById('importOverlay').classList.add('hidden');
   pendingDB = null;
 }
+function openLoadDB(){
+  openImport();
+  switchImportTab('db');
+}
 function switchImportTab(tab){
   importTab = tab;
   document.getElementById('paneCSV').classList.toggle('hidden',  tab!=='csv');
@@ -1971,10 +1981,13 @@ function switchImportTab(tab){
   document.getElementById('tabGrid').classList.toggle('on', tab==='grid');
   document.getElementById('tabDB').classList.toggle('on',   tab==='db');
   if(tab==='db'){
-    // reset preview when switching to DB tab
     pendingDB = null;
     document.getElementById('dbPreview').style.display='none';
-    document.getElementById('importConfirmBtn').textContent='Load DB File First';
+    const btn = document.getElementById('importConfirmBtn');
+    btn.textContent = 'Load DB File First';
+    btn.disabled = true;
+    btn.classList.add('btn-ghost');
+    btn.classList.remove('btn-primary');
   } else {
     document.getElementById('importConfirmBtn').textContent = tab==='csv' ? 'Import File' : 'Save Year Data';
   }
