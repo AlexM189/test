@@ -247,6 +247,94 @@ tbody tr:hover td:first-child{background:var(--card2)}
 }
 .import-grid .gi:focus{outline:none;border-color:var(--primary);background:var(--primary-l)}
 .import-note{font-size:11px;color:var(--muted);margin-top:10px}
+
+/* ── Presentation overlay ── */
+.pres-overlay{
+  position:fixed;inset:0;background:#0a0a12;z-index:600;
+  display:flex;flex-direction:column;
+}
+.pres-overlay.hidden{display:none}
+.pres-topbar{
+  display:flex;align-items:center;justify-content:space-between;padding:0 16px;
+  height:50px;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.1);
+  flex-shrink:0;
+}
+.pres-topbar-left{font-size:13px;font-weight:700;color:rgba(255,255,255,.7)}
+.pres-topbar-right{display:flex;gap:8px;align-items:center}
+.pres-btn{
+  padding:6px 14px;border-radius:7px;border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.08);color:#fff;font-size:12px;font-weight:600;
+  cursor:pointer;display:flex;align-items:center;gap:5px;transition:.15s;
+}
+.pres-btn:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4)}
+.pres-btn.accent{background:#2563eb;border-color:#2563eb}
+.pres-btn.accent:hover{background:#1d4ed8}
+.pres-stage-wrap{
+  flex:1;display:flex;align-items:center;justify-content:center;gap:16px;overflow:hidden;padding:12px;
+}
+.pres-arrow{
+  width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.07);color:#fff;font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s;
+}
+.pres-arrow:hover{background:rgba(255,255,255,.18)}
+.pres-arrow:disabled{opacity:.25;cursor:default}
+.pres-slide-wrap{
+  flex:1;max-width:960px;aspect-ratio:16/9;background:#fff;border-radius:10px;
+  box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden;position:relative;
+}
+.pres-slide{
+  width:100%;height:100%;display:flex;flex-direction:column;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+}
+/* slide 1 cover */
+.sl-cover{
+  background:linear-gradient(135deg,#1e3a8a 0%,#2563eb 60%,#3b82f6 100%);
+  color:#fff;align-items:center;justify-content:center;text-align:center;padding:40px;gap:12px;
+}
+.sl-cover .sl-logo{font-size:52px;margin-bottom:8px}
+.sl-cover h1{font-size:clamp(18px,3vw,32px);font-weight:900;letter-spacing:-.5px;margin:0}
+.sl-cover .sl-period{font-size:clamp(12px,1.8vw,18px);opacity:.85;margin-top:4px}
+.sl-cover .sl-date{font-size:clamp(10px,1.3vw,13px);opacity:.6;margin-top:8px}
+.sl-cover .sl-params{
+  display:flex;gap:24px;margin-top:20px;background:rgba(255,255,255,.12);
+  border-radius:10px;padding:12px 24px;font-size:clamp(9px,1.2vw,12px);
+}
+.sl-cover .sl-params span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.sl-cover .sl-params strong{font-size:clamp(13px,1.8vw,20px);font-weight:800}
+/* slide headers */
+.sl-header{
+  background:#1e3a8a;color:#fff;padding:14px 28px;
+  font-size:clamp(10px,1.5vw,15px);font-weight:800;letter-spacing:.04em;
+  display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+.sl-content{flex:1;padding:16px 28px;overflow:hidden}
+/* stats slide */
+.sl-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:100%}
+.sl-stat{
+  border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;
+}
+.sl-stat .s-lbl{font-size:clamp(8px,1.1vw,11px);font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}
+.sl-stat .s-val{font-size:clamp(18px,3vw,36px);font-weight:900;line-height:1}
+.sl-stat .s-sub{font-size:clamp(8px,1vw,11px);color:#64748b;margin-top:3px}
+/* chart slide */
+.sl-chart-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sl-chart-inner svg{width:100%;height:100%;display:block}
+/* table slide */
+.sl-table{width:100%;border-collapse:collapse;font-size:clamp(7px,1vw,11px)}
+.sl-table th{background:#1e3a8a;color:#fff;padding:5px 8px;text-align:right;font-size:clamp(6px,.9vw,10px);font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+.sl-table th:first-child{text-align:left}
+.sl-table td{padding:4px 8px;text-align:right;border-bottom:1px solid #e2e8f0}
+.sl-table td:first-child{text-align:left;font-weight:700}
+.sl-table tr:nth-child(even) td{background:#f8fafc}
+.sl-occ-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-weight:800;font-size:clamp(7px,1vw,11px)}
+/* dots */
+.pres-dots{display:flex;justify-content:center;gap:7px;padding:10px;flex-shrink:0}
+.pres-dot{
+  width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,.25);
+  cursor:pointer;transition:.15s;border:none;padding:0;
+}
+.pres-dot.on{background:#fff;transform:scale(1.2)}
 </style>
 </head>
 <body>
@@ -276,7 +364,9 @@ tbody tr:hover td:first-child{background:var(--card2)}
   </div>
 
   <div class="topbar-right">
-    <button class="tb-btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="tb-btn" onclick="exportCSV()">⬇ CSV</button>
+    <button class="tb-btn" onclick="exportExcel()">📊 Excel</button>
+    <button class="tb-btn" onclick="openPresentation()">📋 Present</button>
     <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
   </div>
 </div>
@@ -366,6 +456,28 @@ tbody tr:hover td:first-child{background:var(--card2)}
   </div>
 
 </div><!-- /page -->
+
+<!-- ── Presentation Overlay ── -->
+<div class="pres-overlay hidden" id="presOverlay">
+  <div class="pres-topbar">
+    <div class="pres-topbar-left">
+      <span id="presSlideLbl">Slide 1 of 4</span>
+      &nbsp;·&nbsp; <span id="presPeriodLbl" style="opacity:.6"></span>
+    </div>
+    <div class="pres-topbar-right">
+      <button class="pres-btn" onclick="exportExcel()">📊 Excel</button>
+      <button class="pres-btn" onclick="exportPptx()">⬇ .pptx</button>
+      <button class="pres-btn" onclick="printPresentation()">🖨 PDF</button>
+      <button class="pres-btn" style="border-color:rgba(255,255,255,.4)" onclick="closePresentation()">✕ Close</button>
+    </div>
+  </div>
+  <div class="pres-stage-wrap">
+    <button class="pres-arrow" id="presBack" onclick="goSlide(-1)">&#9664;</button>
+    <div class="pres-slide-wrap" id="presStage"></div>
+    <button class="pres-arrow" id="presNext" onclick="goSlide(1)">&#9654;</button>
+  </div>
+  <div class="pres-dots" id="presDots"></div>
+</div>
 
 <!-- ── Import Modal ── -->
 <div class="modal-overlay hidden" id="importOverlay" onclick="if(event.target===this)closeImport()">
@@ -998,6 +1110,491 @@ function render(){
   if(view==='month')   renderMonthTable();
   else if(view==='quarter') renderQuarterTable();
   else renderYearTable();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PERIOD HELPERS (used by Excel + Presentation)
+══════════════════════════════════════════════════════════════ */
+function getCurrentRows(){
+  if(view==='month')   return monthRows().map(r=>({...r,...compute(r)}));
+  if(view==='quarter') return quarterRows().filter(r=>!r.empty).map(r=>({...r,...compute(r)}));
+  return yearRows().map(r=>({...r,...compute(r)}));
+}
+function getPeriodLabel(){
+  if(view==='month')   return `Monthly ${selYear}`;
+  if(view==='quarter') return `Quarterly ${selYear}`;
+  return 'All Years';
+}
+function rowLabel(r){ return r.label || monLabel(r.month||''); }
+
+/* ══════════════════════════════════════════════════════════════
+   EXCEL EXPORT (SheetJS)
+══════════════════════════════════════════════════════════════ */
+function exportExcel(){
+  if(typeof XLSX==='undefined'){ showToast('Loading SheetJS…',''); loadSheetJS(exportExcel); return; }
+
+  const rows   = getCurrentRows();
+  const period = getPeriodLabel();
+  const tgt    = targetPct();
+  const valid  = rows.filter(r=>r.occ!=null);
+  const avgOcc = valid.length ? valid.reduce((s,r)=>s+r.occ,0)/valid.length : null;
+  const peak   = valid.length ? Math.max(...valid.map(r=>r.occ)) : null;
+  const lowest = valid.length ? Math.min(...valid.map(r=>r.occ)) : null;
+  const atTgt  = valid.filter(r=>r.occ>=tgt/100).length;
+
+  const wb = XLSX.utils.book_new();
+
+  /* ── Summary sheet ── */
+  const sum = [
+    ['Call Centre Occupancy Report'],
+    ['Period', period],
+    ['Generated', new Date().toLocaleDateString()],
+    [],
+    ['Parameters'],
+    ['Email AVG Time (min)', params.email],
+    ['Outbound DS Time (min)', params.ds],
+    ['Case Handling Time (min)', params.caseH],
+    ['Occupancy Target (%)', tgt],
+    [],
+    ['Key Metrics'],
+    ['Average Occupancy', avgOcc!=null?(avgOcc*100).toFixed(2)+'%':'—'],
+    ['Peak Occupancy',    peak!=null?(peak*100).toFixed(2)+'%':'—'],
+    ['Lowest Occupancy',  lowest!=null?(lowest*100).toFixed(2)+'%':'—'],
+    ['Periods at/above Target', `${atTgt} of ${valid.length}`],
+  ];
+  const ws0 = XLSX.utils.aoa_to_sheet(sum);
+  ws0['!cols']=[{wch:28},{wch:20}];
+  XLSX.utils.book_append_sheet(wb, ws0, 'Summary');
+
+  /* ── Data sheet ── */
+  const hdr = ['Period','IN Time (min)','IN Calls','Case Time* (min)','OUT Time (min)',
+    'Emails','Email Time* (min)','Dispositions','Disp Time* (min)','FTE',
+    'Working Hours (min)','Active Time* (min)','Free Time* (min)','Occupancy %*','Warning %*'];
+  const data = rows.map(r=>[
+    rowLabel(r),
+    r.inTime??'', r.inCalls??'',
+    r.caseTime!=null?Math.round(r.caseTime):'',
+    r.outTime??'', r.emails??'',
+    r.emailTime!=null?Math.round(r.emailTime):'',
+    r.disp??'',
+    r.dispTime!=null?Math.round(r.dispTime):'',
+    r.fte??'', r.workMin??'',
+    r.active!=null?Math.round(r.active):'',
+    r.free!=null?Math.round(r.free):'',
+    r.occ!=null?+(r.occ*100).toFixed(2):'',
+    r.warning!=null?+(r.warning*100).toFixed(2):'',
+  ]);
+  const ws1 = XLSX.utils.aoa_to_sheet([hdr,...data]);
+  ws1['!cols'] = hdr.map(()=>({wch:16}));
+  ws1['!cols'][0]={wch:14};
+  XLSX.utils.book_append_sheet(wb, ws1, 'Data');
+
+  XLSX.writeFile(wb, `occupancy-${period.replace(/\s+/g,'-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.xlsx`);
+  showToast('Excel downloaded!','ok');
+}
+
+function loadSheetJS(cb){
+  const s=document.createElement('script');
+  s.src='https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js';
+  s.onload=cb; s.onerror=()=>showToast('Could not load SheetJS (needs internet)','err');
+  document.head.appendChild(s);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PRESENTATION
+══════════════════════════════════════════════════════════════ */
+let presSlides=[], presIdx=0;
+
+function openPresentation(){
+  presSlides = buildSlides();
+  presIdx = 0;
+  document.getElementById('presPeriodLbl').textContent = getPeriodLabel();
+  document.getElementById('presOverlay').classList.remove('hidden');
+  renderPresSlide();
+  document.addEventListener('keydown', presKeyNav);
+}
+function closePresentation(){
+  document.getElementById('presOverlay').classList.add('hidden');
+  document.removeEventListener('keydown', presKeyNav);
+}
+function presKeyNav(e){
+  if(e.key==='Escape') closePresentation();
+  if(e.key==='ArrowRight'||e.key==='ArrowDown') goSlide(1);
+  if(e.key==='ArrowLeft' ||e.key==='ArrowUp')   goSlide(-1);
+}
+function goSlide(d){
+  presIdx = Math.max(0,Math.min(presSlides.length-1, presIdx+d));
+  renderPresSlide();
+}
+function renderPresSlide(){
+  const n = presSlides.length;
+  document.getElementById('presSlideLbl').textContent = `Slide ${presIdx+1} of ${n}`;
+  document.getElementById('presStage').innerHTML = presSlides[presIdx];
+  document.getElementById('presBack').disabled = presIdx===0;
+  document.getElementById('presNext').disabled = presIdx===n-1;
+  document.getElementById('presDots').innerHTML =
+    presSlides.map((_,i)=>`<button class="pres-dot${i===presIdx?' on':''}" onclick="presIdx=${i};renderPresSlide()"></button>`).join('');
+}
+
+/* ── Build slides ── */
+function buildSlides(){
+  const rows   = getCurrentRows();
+  const period = getPeriodLabel();
+  const tgt    = targetPct();
+  const valid  = rows.filter(r=>r.occ!=null);
+  const slides = [];
+
+  /* Slide 1 — Cover */
+  const avgOcc = valid.length ? valid.reduce((s,r)=>s+r.occ,0)/valid.length : null;
+  slides.push(`
+    <div class="pres-slide sl-cover">
+      <div class="sl-logo">📞</div>
+      <h1>Call Centre Occupancy Report</h1>
+      <div class="sl-period">${period}</div>
+      <div class="sl-date">Generated ${new Date().toLocaleDateString(undefined,{year:'numeric',month:'long',day:'numeric'})}</div>
+      <div class="sl-params">
+        <span><strong>${params.email} min</strong>Email AVG</span>
+        <span><strong>${params.ds} min</strong>Outbound DS</span>
+        <span><strong>${params.caseH} min</strong>Case Handling</span>
+        <span><strong>${tgt}%</strong>Target</span>
+      </div>
+    </div>`);
+
+  /* Slide 2 — Key Metrics */
+  if(valid.length){
+    const peak   = Math.max(...valid.map(r=>r.occ));
+    const lowest = Math.min(...valid.map(r=>r.occ));
+    const atTgt  = valid.filter(r=>r.occ>=tgt/100).length;
+    const peakLbl  = rowLabel(valid.find(r=>r.occ===peak)||{});
+    const loLbl    = rowLabel(valid.find(r=>r.occ===lowest)||{});
+    const totalAct = Math.round(valid.reduce((s,r)=>s+(r.active||0),0)/60);
+    const card=(lbl,val,sub,bg,col)=>
+      `<div class="sl-stat" style="background:${bg}">
+        <div class="s-lbl">${lbl}</div>
+        <div class="s-val" style="color:${col}">${val}</div>
+        <div class="s-sub">${sub}</div>
+      </div>`;
+    slides.push(`
+      <div class="pres-slide">
+        <div class="sl-header">📊 Key Metrics — ${period}</div>
+        <div class="sl-content" style="display:flex;align-items:center">
+          <div class="sl-stats-grid" style="width:100%">
+            ${card('Average Occupancy', pct(avgOcc), `${valid.length} periods`, occBg(avgOcc), occColor(avgOcc))}
+            ${card('Peak Occupancy', pct(peak), peakLbl, occBg(peak), occColor(peak))}
+            ${card('Lowest Occupancy', pct(lowest), loLbl, occBg(lowest), occColor(lowest))}
+            ${card(`Periods ≥ ${tgt}%`, atTgt+' / '+valid.length, 'at or above target',
+              atTgt?'#fee2e2':'#dcfce7', atTgt?'#dc2626':'#16a34a')}
+            ${card('Total Active Time', totalAct.toLocaleString()+' h', 'across all periods', '#eff6ff', '#2563eb')}
+            ${card('Avg FTE', (valid.reduce((s,r)=>s+(r.fte||0),0)/valid.filter(r=>r.fte).length||0).toFixed(1),
+              'agents', '#f8fafc', '#1e293b')}
+          </div>
+        </div>
+      </div>`);
+  }
+
+  /* Slide 3 — Chart */
+  if(valid.length){
+    // Temporarily render chart in light mode for embedding
+    const savedDark = dark;
+    dark = false;
+    const chartDiv = document.createElement('div');
+    document.body.appendChild(chartDiv);
+    const chartRows = valid.map(r=>({...r}));
+    // Build SVG inline (reuse renderChart logic but capture output)
+    const svgHtml = buildChartSVG(valid, tgt/100, false);
+    document.body.removeChild(chartDiv);
+    dark = savedDark;
+    slides.push(`
+      <div class="pres-slide">
+        <div class="sl-header">📈 Occupancy Trend — ${period}</div>
+        <div class="sl-content">
+          <div class="sl-chart-inner">${svgHtml}</div>
+        </div>
+      </div>`);
+  }
+
+  /* Slide 4+ — Data table (paginated, max 12 rows per slide) */
+  const PAGE = 12;
+  for(let p=0; p<rows.length; p+=PAGE){
+    const chunk = rows.slice(p, p+PAGE);
+    const pageNum = Math.floor(p/PAGE)+1;
+    const totalPages = Math.ceil(rows.length/PAGE);
+    const pg = totalPages>1 ? ` (${pageNum}/${totalPages})` : '';
+    slides.push(`
+      <div class="pres-slide">
+        <div class="sl-header">📋 Detail Data — ${period}${pg}</div>
+        <div class="sl-content" style="overflow:hidden">
+          <table class="sl-table">
+            <thead><tr>
+              <th style="text-align:left">Period</th>
+              <th>IN Time</th><th>IN Calls</th><th>OUT Time</th>
+              <th>Emails</th><th>Disp.</th><th>FTE</th>
+              <th>Work Hrs</th><th>Active</th><th>Occupancy</th><th>Warning</th>
+            </tr></thead>
+            <tbody>${chunk.map(r=>{
+              const wc = occBgInline(r.occ);
+              const ws = r.warning!=null?(r.warning>=0?'+':''):'';
+              return `<tr>
+                <td style="text-align:left">${rowLabel(r)}</td>
+                <td>${num(r.inTime)}</td><td>${num(r.inCalls)}</td>
+                <td>${num(r.outTime)}</td><td>${num(r.emails)}</td>
+                <td>${num(r.disp)}</td><td>${r.fte||'—'}</td>
+                <td>${num(r.workMin)}</td><td>${num(r.active)}</td>
+                <td><span class="sl-occ-badge" style="background:${occBg(r.occ)};color:${occColor(r.occ)}">${pct(r.occ)}</span></td>
+                <td style="color:${r.warning>=0?'#16a34a':'#dc2626'};font-weight:700">${r.warning!=null?ws+pct(r.warning):'—'}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>
+      </div>`);
+  }
+
+  return slides;
+}
+
+function occBg(occ){
+  if(occ===null) return '#f1f5f9';
+  const p=occ*100;
+  if(p<70)  return '#dbeafe';
+  if(p<85)  return '#dcfce7';
+  if(p<90)  return '#fef3c7';
+  return '#fee2e2';
+}
+function occBgInline(occ){ return occBg(occ); }
+
+/* ── Standalone chart SVG builder (light mode, for slides) ── */
+function buildChartSVG(valid, tgt, darkMode){
+  const W=860, H=240;
+  const pL=52,pR=24,pT=18,pB=48;
+  const gW=W-pL-pR, gH=H-pT-pB;
+  const n=valid.length;
+  const xs=valid.map((_,i)=>pL+(n===1?gW/2:i/(n-1)*gW));
+  const toY=o=>pT+gH*(1-Math.min(o,1.15)/1.15);
+  const cardBg=darkMode?'#1e293b':'#f8fafc';
+  const gridC =darkMode?'#334155':'#e2e8f0';
+  const lblC  =darkMode?'#64748b':'#94a3b8';
+  const axisC =darkMode?'#475569':'#cbd5e1';
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" style="font-family:system-ui,sans-serif;display:block">`;
+  svg+=`<rect width="${W}" height="${H}" fill="${cardBg}" rx="8"/>`;
+  [0,25,50,75,100].forEach(v=>{
+    const y=pT+gH*(1-v/115);
+    svg+=`<line x1="${pL}" y1="${y.toFixed(1)}" x2="${pL+gW}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width="1"/>`;
+    svg+=`<text x="${pL-7}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="11" fill="${lblC}">${v}%</text>`;
+  });
+  const ty=toY(tgt);
+  svg+=`<line x1="${pL}" y1="${ty.toFixed(1)}" x2="${pL+gW}" y2="${ty.toFixed(1)}" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6,4" opacity=".7"/>`;
+  svg+=`<text x="${pL+gW-4}" y="${(ty-6).toFixed(1)}" text-anchor="end" font-size="10" fill="#dc2626" opacity=".85">Target ${Math.round(tgt*100)}%</text>`;
+  let area=`M${xs[0].toFixed(1)},${pT+gH}`;
+  valid.forEach((r,i)=>area+=` L${xs[i].toFixed(1)},${toY(r.occ).toFixed(1)}`);
+  area+=` L${xs[n-1].toFixed(1)},${pT+gH} Z`;
+  svg+=`<path d="${area}" fill="rgba(37,99,235,.08)"/>`;
+  let path=`M${xs[0].toFixed(1)},${toY(valid[0].occ).toFixed(1)}`;
+  valid.forEach((r,i)=>{ if(i) path+=` L${xs[i].toFixed(1)},${toY(r.occ).toFixed(1)}`; });
+  svg+=`<path d="${path}" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linejoin="round"/>`;
+  const showVal=n<=18, step=Math.ceil(n/26);
+  valid.forEach((r,i)=>{
+    const x=xs[i],y=toY(r.occ),col=occColor(r.occ);
+    svg+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${col}" stroke="${cardBg}" stroke-width="2"/>`;
+    if(showVal){
+      const above=y-14>pT;
+      svg+=`<text x="${x.toFixed(1)}" y="${above?y-9:y+13}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${(r.occ*100).toFixed(1)}%</text>`;
+    }
+    if(i%step===0||n<=24){
+      const lbl=rowLabel(r);
+      svg+=`<text x="${x.toFixed(1)}" y="${pT+gH+16}" text-anchor="middle" font-size="9.5" fill="${lblC}">${lbl.slice(0,7)}</text>`;
+    }
+  });
+  svg+=`<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+gH}" stroke="${axisC}" stroke-width="1.5"/>`;
+  svg+=`<line x1="${pL}" y1="${pT+gH}" x2="${pL+gW}" y2="${pT+gH}" stroke="${axisC}" stroke-width="1.5"/>`;
+  svg+='</svg>';
+  return svg;
+}
+
+/* ── Print / PDF ── */
+function printPresentation(){
+  const slides = presSlides;
+  const period = getPeriodLabel();
+  const win = window.open('','_blank');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Occupancy Report — ${period}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#fff}
+    .slide{width:297mm;height:167mm;page-break-after:always;overflow:hidden;display:flex;flex-direction:column;position:relative}
+    .slide:last-child{page-break-after:avoid}
+    @page{size:A4 landscape;margin:0}
+    @media print{body{margin:0}}
+    /* copy relevant styles */
+    .sl-cover{background:linear-gradient(135deg,#1e3a8a,#2563eb 60%,#3b82f6);color:#fff;align-items:center;justify-content:center;text-align:center;padding:40px;gap:12px;display:flex;flex-direction:column}
+    .sl-logo{font-size:52px}
+    .sl-cover h1{font-size:32px;font-weight:900;letter-spacing:-.5px}
+    .sl-period{font-size:18px;opacity:.85;margin-top:4px}
+    .sl-date{font-size:13px;opacity:.6;margin-top:8px}
+    .sl-params{display:flex;gap:24px;margin-top:20px;background:rgba(255,255,255,.12);border-radius:10px;padding:12px 24px;font-size:12px}
+    .sl-params span{display:flex;flex-direction:column;align-items:center;gap:2px}
+    .sl-params strong{font-size:20px;font-weight:800}
+    .sl-header{background:#1e3a8a;color:#fff;padding:12px 28px;font-size:14px;font-weight:800;letter-spacing:.04em;display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .sl-content{flex:1;padding:14px 28px;overflow:hidden}
+    .sl-stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;height:100%}
+    .sl-stat{border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center}
+    .s-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#64748b;margin-bottom:4px}
+    .s-val{font-size:36px;font-weight:900;line-height:1}
+    .s-sub{font-size:11px;color:#64748b;margin-top:3px}
+    .sl-chart-inner{width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    .sl-chart-inner svg{width:100%;height:100%}
+    .sl-table{width:100%;border-collapse:collapse;font-size:11px}
+    .sl-table th{background:#1e3a8a;color:#fff;padding:5px 8px;text-align:right;font-size:10px;font-weight:700;text-transform:uppercase}
+    .sl-table th:first-child{text-align:left}
+    .sl-table td{padding:4px 8px;text-align:right;border-bottom:1px solid #e2e8f0}
+    .sl-table td:first-child{text-align:left;font-weight:700}
+    .sl-table tr:nth-child(even) td{background:#f8fafc}
+    .sl-occ-badge{display:inline-block;padding:1px 7px;border-radius:20px;font-weight:800;font-size:11px}
+  </style></head><body>
+  ${slides.map(s=>`<div class="slide">${s}</div>`).join('')}
+  </body></html>`);
+  win.document.close();
+  setTimeout(()=>win.print(),600);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PPTX EXPORT (PptxGenJS)
+══════════════════════════════════════════════════════════════ */
+function exportPptx(){
+  if(typeof PptxGenJS==='undefined'){ showToast('Loading PptxGenJS…',''); loadPptxJS(exportPptx); return; }
+
+  const rows   = getCurrentRows();
+  const period = getPeriodLabel();
+  const tgt    = targetPct();
+  const valid  = rows.filter(r=>r.occ!=null);
+
+  const pptx = new PptxGenJS();
+  pptx.layout = 'LAYOUT_WIDE'; // 13.33" × 7.5"
+  pptx.title  = `Call Centre Occupancy — ${period}`;
+
+  const BLUE='1e3a8a', LBLUE='2563eb', WHITE='FFFFFF', LGRAY='f8fafc', GRAY='64748b';
+
+  /* ── Slide 1: Cover ── */
+  {
+    const sl = pptx.addSlide();
+    sl.background = {fill: LBLUE};
+    sl.addText('📞', {x:5.67,y:.6,w:2,h:.8,fontSize:40,align:'center'});
+    sl.addText('Call Centre Occupancy Report', {x:.5,y:1.6,w:12.33,h:1,fontSize:32,bold:true,color:WHITE,align:'center'});
+    sl.addText(period, {x:.5,y:2.7,w:12.33,h:.5,fontSize:18,color:'BFD7FF',align:'center'});
+    sl.addText(`Generated ${new Date().toLocaleDateString()}`, {x:.5,y:3.25,w:12.33,h:.35,fontSize:12,color:'93C5FD',align:'center'});
+    const paramRows=[[
+      {text:`${params.email} min`, options:{bold:true,fontSize:16,color:WHITE}},
+      {text:`${params.ds} min`,    options:{bold:true,fontSize:16,color:WHITE}},
+      {text:`${params.caseH} min`, options:{bold:true,fontSize:16,color:WHITE}},
+      {text:`${tgt}%`,             options:{bold:true,fontSize:16,color:WHITE}},
+    ],[
+      {text:'Email AVG',      options:{fontSize:10,color:'BFD7FF'}},
+      {text:'Outbound DS',    options:{fontSize:10,color:'BFD7FF'}},
+      {text:'Case Handling',  options:{fontSize:10,color:'BFD7FF'}},
+      {text:'Target',         options:{fontSize:10,color:'BFD7FF'}},
+    ]];
+    sl.addTable(paramRows,{x:2,y:3.8,w:9.33,rowH:.35,border:{color:'4A90D9'},fill:{color:'1D4ED8'}});
+  }
+
+  /* ── Slide 2: Key Metrics ── */
+  if(valid.length){
+    const avgOcc = valid.reduce((s,r)=>s+r.occ,0)/valid.length;
+    const peak   = Math.max(...valid.map(r=>r.occ));
+    const lowest = Math.min(...valid.map(r=>r.occ));
+    const atTgt  = valid.filter(r=>r.occ>=tgt/100).length;
+    const peakLbl  = rowLabel(valid.find(r=>r.occ===peak)||{});
+    const loLbl    = rowLabel(valid.find(r=>r.occ===lowest)||{});
+    const totalAct = Math.round(valid.reduce((s,r)=>s+(r.active||0),0)/60);
+    const avgFte   = +(valid.filter(r=>r.fte).reduce((s,r)=>s+(r.fte||0),0)/(valid.filter(r=>r.fte).length||1)).toFixed(1);
+
+    const sl = pptx.addSlide();
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:.6,fill:{color:BLUE}});
+    sl.addText(`📊  Key Metrics — ${period}`,{x:.3,y:.1,w:12,h:.4,fontSize:14,bold:true,color:WHITE});
+
+    const cards=[
+      {lbl:'Average Occupancy', val:pct(avgOcc), sub:`${valid.length} periods`,    bg:occBg(avgOcc).replace('#',''),  col:occColor(avgOcc).replace('#','')},
+      {lbl:'Peak Occupancy',    val:pct(peak),   sub:peakLbl,                       bg:occBg(peak).replace('#',''),    col:occColor(peak).replace('#','')},
+      {lbl:'Lowest Occupancy',  val:pct(lowest), sub:loLbl,                         bg:occBg(lowest).replace('#',''),  col:occColor(lowest).replace('#','')},
+      {lbl:`Periods ≥ ${tgt}%`, val:`${atTgt} / ${valid.length}`, sub:'at/above target', bg:atTgt?'fee2e2':'dcfce7', col:atTgt?'dc2626':'16a34a'},
+      {lbl:'Total Active Time', val:`${totalAct.toLocaleString()} h`, sub:'all periods', bg:'eff6ff', col:'2563eb'},
+      {lbl:'Average FTE',       val:String(avgFte), sub:'agents',                   bg:'f8fafc',  col:'1e293b'},
+    ];
+    const cols=3, cW=4.1, cH=2.8, cPad=.18;
+    cards.forEach((c,i)=>{
+      const cx=.15+(i%cols)*(cW+cPad), cy=.75+Math.floor(i/cols)*(cH/2+cPad);
+      sl.addShape(pptx.ShapeType.roundRect,{x:cx,y:cy,w:cW,h:cH/2,fill:{color:c.bg},rectRadius:.08});
+      sl.addText(c.lbl,{x:cx+.15,y:cy+.06,w:cW-.3,h:.25,fontSize:9,bold:true,color:GRAY,charSpacing:1});
+      sl.addText(c.val,{x:cx+.15,y:cy+.3,w:cW-.3,h:.6,fontSize:28,bold:true,color:c.col});
+      sl.addText(c.sub,{x:cx+.15,y:cy+.88,w:cW-.3,h:.2,fontSize:9,color:GRAY});
+    });
+  }
+
+  /* ── Slide 3: Chart (as table since SVG not embeddable easily) ── */
+  if(valid.length){
+    const sl = pptx.addSlide();
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:.6,fill:{color:BLUE}});
+    sl.addText(`📈  Occupancy Trend — ${period}`,{x:.3,y:.1,w:12,h:.4,fontSize:14,bold:true,color:WHITE});
+
+    const labels = valid.map(r=>rowLabel(r));
+    const occs   = valid.map(r=>+(r.occ*100).toFixed(2));
+    const chartData = [{name:'Occupancy %', labels, values:occs},{name:`Target ${tgt}%`, labels, values:labels.map(()=>tgt)}];
+    sl.addChart(pptx.ChartType.line, chartData, {
+      x:.4,y:.7,w:12.5,h:6.5,
+      showLegend:true,legendPos:'b',legendFontSize:10,
+      lineDataSymbol:'circle',lineDataSymbolSize:6,
+      dataLabelFontSize:8,showValue:valid.length<=15,
+      valAxisMinVal:0, valAxisMaxVal:110,
+      valGridLine:{style:'solid',color:'E2E8F0'},
+      chartColors:[occColor(valid.reduce((s,r)=>s+r.occ,0)/valid.length).replace('#',''),'DC2626'],
+    });
+  }
+
+  /* ── Slides 4+: Data table ── */
+  const PAGE=14;
+  for(let p=0;p<rows.length;p+=PAGE){
+    const chunk=rows.slice(p,p+PAGE);
+    const totalPages=Math.ceil(rows.length/PAGE);
+    const pg=totalPages>1?` (${Math.floor(p/PAGE)+1}/${totalPages})`:'';
+    const sl=pptx.addSlide();
+    sl.addShape(pptx.ShapeType.rect,{x:0,y:0,w:13.33,h:.6,fill:{color:BLUE}});
+    sl.addText(`📋  Detail Data — ${period}${pg}`,{x:.3,y:.1,w:12,h:.4,fontSize:14,bold:true,color:WHITE});
+
+    const tblHdr=[
+      ['Period','IN Time','IN Calls','OUT Time','Emails','Disp.','FTE','Work Hrs (min)','Active (min)','Occupancy %','Warning %']
+        .map(h=>({text:h,options:{bold:true,color:WHITE,fill:{color:BLUE},fontSize:8.5}}))
+    ];
+    const tblRows=chunk.map(r=>{
+      const ws=r.warning!=null?(r.warning>=0?'+':''):'';
+      const fill=r.warning==null?{}:{color:r.warning>=0?'dcfce7':'fee2e2'};
+      return [
+        {text:rowLabel(r),         options:{bold:true,fontSize:9}},
+        {text:num(r.inTime),       options:{fontSize:9}},
+        {text:num(r.inCalls),      options:{fontSize:9}},
+        {text:num(r.outTime),      options:{fontSize:9}},
+        {text:num(r.emails),       options:{fontSize:9}},
+        {text:num(r.disp),         options:{fontSize:9}},
+        {text:String(r.fte||'—'),  options:{fontSize:9}},
+        {text:num(r.workMin),      options:{fontSize:9}},
+        {text:num(r.active),       options:{fontSize:9}},
+        {text:pct(r.occ),          options:{bold:true,fontSize:9,color:occColor(r.occ).replace('#',''),fill:{color:occBg(r.occ).replace('#','')}}},
+        {text:r.warning!=null?ws+pct(r.warning):'—', options:{bold:true,fontSize:9,...fill}},
+      ];
+    });
+    sl.addTable([...tblHdr,...tblRows],{
+      x:.3,y:.7,w:12.73,rowH:.33,
+      border:{color:'E2E8F0'},colW:[1.3,1.1,1,1.1,1,1,.7,1.5,1.4,1.2,1.12],
+      autoPage:false,
+    });
+  }
+
+  pptx.writeFile({fileName:`occupancy-${period.replace(/\s+/g,'-').toLowerCase()}-${new Date().toISOString().slice(0,10)}.pptx`})
+    .then(()=>showToast('PowerPoint downloaded!','ok'));
+}
+
+function loadPptxJS(cb){
+  const s=document.createElement('script');
+  s.src='https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js';
+  s.onload=cb; s.onerror=()=>showToast('Could not load PptxGenJS (needs internet)','err');
+  document.head.appendChild(s);
 }
 
 /* ══════════════════════════════════════════════════════════════
