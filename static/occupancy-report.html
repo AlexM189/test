@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Call Centre Occupancy Report</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f0f4f8;
+  --card:#ffffff;
+  --card2:#f8fafc;
+  --border:#e2e8f0;
+  --text:#1e293b;
+  --muted:#64748b;
+  --primary:#2563eb;
+  --primary-l:#eff6ff;
+  --success:#16a34a;
+  --success-l:#dcfce7;
+  --warn:#d97706;
+  --warn-l:#fef3c7;
+  --danger:#dc2626;
+  --danger-l:#fee2e2;
+  --blue:#3b82f6;
+  --blue-l:#dbeafe;
+  --radius:12px;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 1px 2px rgba(0,0,0,.05);
+  --sh-lg:0 10px 25px rgba(0,0,0,.10);
+}
+[data-theme=dark]{
+  --bg:#0f172a;--card:#1e293b;--card2:#243347;--border:#334155;
+  --text:#f1f5f9;--muted:#94a3b8;--primary:#60a5fa;--primary-l:#172554;
+  --success:#4ade80;--success-l:#052e16;--warn:#fbbf24;--warn-l:#451a03;
+  --danger:#f87171;--danger-l:#450a0a;--blue:#60a5fa;--blue-l:#172554;
+  color-scheme:dark;
+}
+[data-theme=dark] input,[data-theme=dark] select{
+  background:var(--card2);color:var(--text);border-color:var(--border);
+}
+
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;
+  min-height:100vh;
+}
+
+/* ── Top bar ── */
+.topbar{
+  background:var(--card);border-bottom:1px solid var(--border);
+  padding:0 28px;display:flex;align-items:center;gap:16px;height:58px;
+  position:sticky;top:0;z-index:100;box-shadow:var(--sh);
+}
+.brand{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:800;color:var(--primary);white-space:nowrap}
+.brand-icon{width:34px;height:34px;background:var(--primary);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.brand-icon svg{stroke:#fff}
+.topbar-mid{flex:1;display:flex;align-items:center;justify-content:center;gap:10px}
+.seg{display:inline-flex;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+.seg button{background:none;border:none;padding:5px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:600;color:var(--muted);transition:.15s}
+.seg button.on{background:var(--primary);color:#fff;box-shadow:0 1px 4px rgba(37,99,235,.35)}
+.yr-nav{display:flex;align-items:center;gap:6px}
+#yrNav button{width:30px;height:30px;border:1px solid var(--border);background:var(--card2);border-radius:7px;cursor:pointer;font-size:13px;color:var(--muted);transition:.15s}
+#yrNav button:hover{border-color:var(--primary);color:var(--primary)}
+#yearLbl{font-weight:800;font-size:15px;min-width:48px;text-align:center}
+.topbar-right{display:flex;align-items:center;gap:8px}
+.tb-btn{border:1px solid var(--border);background:var(--card2);color:var(--text);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;transition:.15s;white-space:nowrap}
+.tb-btn:hover{border-color:var(--primary);color:var(--primary)}
+.theme-btn{border:1px solid var(--border);background:none;border-radius:8px;padding:5px 8px;font-size:17px;cursor:pointer;line-height:1}
+
+/* ── Page layout ── */
+.page{padding:22px 28px;max-width:1700px;margin:0 auto}
+
+/* ── Parameter panel ── */
+.params{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px 24px;margin-bottom:20px;box-shadow:var(--sh);
+}
+.params-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px}
+.params-head h2{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.params-target{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600}
+.params-target input{width:64px;padding:5px 8px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--card);color:var(--text);text-align:center}
+.params-target input:focus{outline:none;border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-l)}
+.slider-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
+.sl-item{display:flex;flex-direction:column;gap:7px}
+.sl-label{display:flex;justify-content:space-between;align-items:center}
+.sl-name{font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px}
+.sl-name .ico{font-size:16px}
+.sl-val{background:var(--primary-l);color:var(--primary);border-radius:20px;padding:2px 11px;font-weight:800;font-size:13px}
+input[type=range]{width:100%;accent-color:var(--primary);cursor:pointer;height:5px}
+.legend-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--border)}
+.legend-row span{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block;flex-shrink:0}
+
+/* ── Stat cards ── */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:20px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--sh)}
+.stat-card .sc-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:4px}
+.stat-card .sc-val{font-size:30px;font-weight:800;line-height:1;margin-bottom:3px}
+.stat-card .sc-sub{font-size:12px;color:var(--muted)}
+
+/* ── Chart ── */
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;box-shadow:var(--sh)}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-head h2{font-size:14px;font-weight:700}
+.chart-scroll{overflow-x:auto}
+
+/* ── Table card ── */
+.table-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--sh)}
+.table-toolbar{padding:14px 20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:8px}
+.table-toolbar h2{font-size:14px;font-weight:700}
+.table-actions{display:flex;gap:8px}
+.t-scroll{overflow-x:auto}
+
+table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
+thead th{
+  padding:10px 12px;text-align:right;background:var(--card2);
+  border-bottom:2px solid var(--border);font-size:11px;font-weight:700;
+  color:var(--muted);text-transform:uppercase;letter-spacing:.04em;
+  position:sticky;top:0;z-index:5;
+}
+thead th:first-child{text-align:left;position:sticky;left:0;z-index:6;background:var(--card2)}
+tbody td{padding:8px 12px;text-align:right;border-bottom:1px solid var(--border)}
+tbody td:first-child{text-align:left;font-weight:700;position:sticky;left:0;background:var(--card);z-index:2}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--card2)}
+tbody tr:hover td:first-child{background:var(--card2)}
+.calc-td{color:var(--muted)}
+
+/* editable inputs inside cells */
+.cell-inp{
+  width:96px;padding:4px 7px;border:1px solid transparent;border-radius:6px;
+  font-size:12px;text-align:right;background:transparent;color:var(--text);font-family:inherit;
+}
+.cell-inp:hover{border-color:var(--border)}
+.cell-inp:focus{border-color:var(--primary);background:var(--primary-l);outline:none}
+
+/* ── Occupancy badge ── */
+.occ-badge{display:inline-block;padding:3px 11px;border-radius:20px;font-weight:800;font-size:13px}
+.occ-low {background:var(--blue-l);    color:var(--blue)}
+.occ-ok  {background:var(--success-l); color:var(--success)}
+.occ-warn{background:var(--warn-l);    color:var(--warn)}
+.occ-over{background:var(--danger-l);  color:var(--danger)}
+
+.warn-badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:700}
+.warn-ok {background:var(--success-l);color:var(--success)}
+.warn-bad{background:var(--danger-l); color:var(--danger)}
+
+/* ── Add-row strip ── */
+.add-strip{
+  padding:11px 20px;border-top:1px solid var(--border);
+  display:none;align-items:center;gap:10px;flex-wrap:wrap;background:var(--card2)
+}
+.add-strip.open{display:flex}
+.add-strip label{font-size:13px;font-weight:600;color:var(--muted)}
+.add-strip input[type=month]{
+  padding:5px 10px;border:1px solid var(--border);border-radius:7px;
+  font-size:13px;background:var(--card);color:var(--text);
+}
+.add-strip input[type=month]:focus{outline:none;border-color:var(--primary)}
+
+/* ── Buttons ── */
+.btn{border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;display:inline-flex;align-items:center;gap:5px;transition:.15s}
+.btn-primary{background:var(--primary);color:#fff}
+.btn-primary:hover{opacity:.88}
+.btn-ghost{background:none;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--primary);color:var(--primary)}
+.btn-danger{background:none;border:1px solid transparent;color:var(--danger);cursor:pointer;font-size:15px;padding:0 5px;opacity:.4}
+.btn-danger:hover{opacity:1}
+
+/* ── Empty ── */
+.empty{padding:50px;text-align:center;color:var(--muted)}
+.empty .ei{font-size:42px;margin-bottom:12px}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:24px;right:24px;padding:11px 18px;border-radius:9px;
+  font-size:13px;font-weight:600;color:#fff;background:var(--text);
+  box-shadow:var(--sh-lg);opacity:0;transform:translateY(8px);
+  transition:.25s;z-index:999;pointer-events:none;
+}
+.toast.show{opacity:1;transform:none}
+.toast.ok{background:var(--success)}
+.toast.err{background:var(--danger)}
+
+/* footnote */
+.footnote{font-size:11px;color:var(--muted);padding:10px 20px 14px;border-top:1px solid var(--border)}
+.footnote code{background:var(--card2);padding:1px 5px;border-radius:4px;font-size:11px}
+</style>
+</head>
+<body>
+
+<!-- ── Top bar ── -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.8 19.8 0 0 1 3.07 4.18 2 2 0 0 1 5 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L9.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+      </svg>
+    </div>
+    Call Centre Occupancy
+  </div>
+
+  <div class="topbar-mid">
+    <div class="seg">
+      <button id="btnMonth"   class="on" onclick="setView('month')">Month</button>
+      <button id="btnQuarter"           onclick="setView('quarter')">Quarter</button>
+      <button id="btnYear"              onclick="setView('year')">Year</button>
+    </div>
+    <div class="yr-nav" id="yrNav">
+      <button onclick="changeYear(-1)">◀</button>
+      <span id="yearLbl"></span>
+      <button onclick="changeYear(1)">▶</button>
+    </div>
+  </div>
+
+  <div class="topbar-right">
+    <button class="tb-btn" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
+  </div>
+</div>
+
+<!-- ── Page ── -->
+<div class="page">
+
+  <!-- Parameters -->
+  <div class="params">
+    <div class="params-head">
+      <h2>⚙ Parameters</h2>
+      <div class="params-target">
+        <span>🎯 Occupancy target</span>
+        <input type="number" id="targetPct" value="85" min="50" max="100" step="1">
+        <span>%</span>
+      </div>
+    </div>
+    <div class="slider-grid">
+      <div class="sl-item">
+        <div class="sl-label">
+          <span class="sl-name"><span class="ico">📧</span> Email AVG Time</span>
+          <span class="sl-val" id="lblEmail">10 min</span>
+        </div>
+        <input type="range" id="slEmail" min="1" max="60" value="10" step="1">
+      </div>
+      <div class="sl-item">
+        <div class="sl-label">
+          <span class="sl-name"><span class="ico">📤</span> Outbound DS Time</span>
+          <span class="sl-val" id="lblDS">4 min</span>
+        </div>
+        <input type="range" id="slDS" min="1" max="30" value="4" step="1">
+      </div>
+      <div class="sl-item">
+        <div class="sl-label">
+          <span class="sl-name"><span class="ico">🗂</span> Case Handling Time</span>
+          <span class="sl-val" id="lblCase">10 min</span>
+        </div>
+        <input type="range" id="slCase" min="1" max="60" value="10" step="1">
+      </div>
+    </div>
+    <div class="legend-row">
+      <span><span class="sw" style="background:var(--blue)"></span>Below 70% — Under-utilised</span>
+      <span><span class="sw" style="background:var(--success)"></span>70–84% — Healthy</span>
+      <span><span class="sw" style="background:var(--warn)"></span>85–89% — At target / watch</span>
+      <span><span class="sw" style="background:var(--danger)"></span>≥ 90% — Over target ⚠</span>
+    </div>
+  </div>
+
+  <!-- Stat cards -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- Chart -->
+  <div class="chart-card">
+    <div class="card-head">
+      <h2>📈 Occupancy Trend</h2>
+      <span id="chartSub" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div class="chart-scroll" id="chartArea"></div>
+  </div>
+
+  <!-- Table -->
+  <div class="table-card">
+    <div class="table-toolbar">
+      <h2 id="tableTitle">Monthly Data</h2>
+      <div class="table-actions">
+        <button class="btn btn-primary" onclick="openAddRow()">+ Add Month</button>
+      </div>
+    </div>
+    <div class="t-scroll">
+      <table>
+        <thead id="tHead"></thead>
+        <tbody id="tBody"></tbody>
+      </table>
+    </div>
+    <div class="add-strip" id="addStrip">
+      <label>New month:</label>
+      <input type="month" id="newMonthPick">
+      <button class="btn btn-primary" onclick="confirmAdd()">Add</button>
+      <button class="btn btn-ghost"   onclick="closeAddRow()">Cancel</button>
+    </div>
+    <div class="footnote">
+      * Calculated &nbsp;|&nbsp;
+      <code>Occupancy = (IN Time + IN Calls×Case Time + OUT Time + Emails×Email Time + Dispositions×DS Time) / Working Hours</code>
+      &nbsp;|&nbsp; <code>Warning = Target % − Occupancy %</code> (negative = over target)
+    </div>
+  </div>
+
+</div><!-- /page -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   HISTORICAL DATA
+   [month, inTimeMIN, inCalls, outTimeMIN, emails, dispositions, fte, workingHoursMIN]
+══════════════════════════════════════════════════════════════ */
+const HIST = [
+  ['2019-09',19371,2587, 9075,4069, 8906,18,166320],
+  ['2019-10',22294,3010,11292,3354,10204,18,166320],
+  ['2019-11',23452,3334,10093,3787, 9252,18,166320],
+  ['2019-12',26780,3714,12010,3685,12281,18,166320],
+  ['2020-01',27034,3597,11099,3898,11210,22,203280],
+  ['2020-02',18569,2667,10725,3672,11631,22,184800],
+  ['2020-03',27162,3384,11929,5741,12730,22,203280],
+  ['2020-04',25539,3610,14467,5685,12072,22,203280],
+  ['2020-05',21203,2582,12378,4549, 9740,22,194040],
+  ['2020-06',22876,2707,14124,4327,11293,22,203280],
+  ['2020-07',22601,2920,13313,4847,10000,22,212520],
+  ['2020-08',23653,3200,13937,4769,11809,22,194040],
+  ['2020-09',22427,3342,10346,5135, 9095,22,203280],
+  ['2020-10',21323,3422,10082,3835, 8753,20,184800],
+  ['2020-11',19652,2955, 8435,4218, 6768,20,168000],
+  ['2020-12',17289,2792,10101,4134, 8145,21,185220],
+  ['2021-01',14190,2474,12105,3320,13343,21,176400],
+  ['2021-02',14697,2082,10544,3774, 8658,23,193200],
+  ['2021-03',20890,2820,12112,4894, 9970,20,193200],
+  ['2021-04',18133,2477,12817,4190,10559,19,175560],
+  ['2021-05',17885,2313,13630,3686,16172,22,194040],
+  ['2021-06',19477,2710,13319,3922,15268,20,184800],
+  ['2021-07',18819,2997,10010,4529,10871,19,175560],
+  ['2021-08',19290,3159,10874,5354, 8852,20,184800],
+  ['2021-09',17369,3220,10763,4825,11816,20,176400],
+  ['2021-10',20424,3483,10406,5474, 8492,20,176400],
+  ['2021-11',21336,3864, 2767,6990,  723,17,149940],
+  ['2021-12',14510,3145, 6326,6628, 3307,17,157080],
+  ['2022-01',14593,2826, 6478,5051, 4084,17,149940],
+  ['2022-02',16785,3351, 4534,6063, 3173,21,201600],
+  ['2022-03',16925,3636, 8798,5902, 7093,17,187680],
+  ['2022-04',15234,2880,11652,5301, 9080,20,182400],
+  ['2022-05',14116,2613,11092,5181,10783,18,190080],
+  ['2022-06',14483,2822, 9662,5401, 7807,21,201600],
+  ['2022-07',13260,2363, 8014,3948, 6740,18,181440],
+  ['2022-08',12427,2549, 9191,4559, 7494,18,158760],
+  ['2022-09',11394,3229,10843,3780,11393,17,149940],
+  ['2022-10',14803,3175,11794,5024,10796,20,176400],
+  ['2022-11',29207,4385, 6781,7104, 3722,21,185220],
+  ['2022-12',16343,2241, 7945,5679, 5710,19,167580],
+];
+
+const MON_S = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* ══════════════════════════════════════════════════════════════
+   STATE
+══════════════════════════════════════════════════════════════ */
+let view        = 'month';
+let selYear     = 2022;
+let customData  = {};   // YYYY-MM → partial override object
+let params      = { email:10, ds:4, caseH:10 };
+
+/* ══════════════════════════════════════════════════════════════
+   THEME
+══════════════════════════════════════════════════════════════ */
+let dark = localStorage.getItem('cc_theme') === 'dark';
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', dark?'dark':'light');
+  document.getElementById('themeBtn').textContent = dark ? '☀️' : '🌙';
+  localStorage.setItem('cc_theme', dark?'dark':'light');
+}
+document.getElementById('themeBtn').addEventListener('click', ()=>{ dark=!dark; applyTheme(); render(); });
+applyTheme();
+
+/* ══════════════════════════════════════════════════════════════
+   PERSISTENCE
+══════════════════════════════════════════════════════════════ */
+function loadStore(){ try{ customData = JSON.parse(localStorage.getItem('cc_data')||'{}'); }catch(e){ customData={}; } }
+function saveStore(){ localStorage.setItem('cc_data', JSON.stringify(customData)); }
+
+/* ══════════════════════════════════════════════════════════════
+   DATA MERGE
+══════════════════════════════════════════════════════════════ */
+function mergedMap(){
+  const m = {};
+  HIST.forEach(([mo,inT,inC,outT,em,dp,fte,wh])=>{
+    m[mo]={inTime:inT,inCalls:inC,outTime:outT,emails:em,disp:dp,fte,workMin:wh};
+  });
+  Object.entries(customData).forEach(([mo,v])=>{ m[mo]={...(m[mo]||{}), ...v}; });
+  return m;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FORMULA
+   Occupancy = (Total IN Time + Total Case Time + Total OUT Time
+               + Total Email Time + Total Disposition Time) / Working Hours
+   Warning   = Target% − Occupancy% (positive = headroom, negative = overloaded)
+══════════════════════════════════════════════════════════════ */
+function compute(r){
+  const caseTime  = (r.inCalls  ||0) * params.caseH;
+  const emailTime = (r.emails   ||0) * params.email;
+  const dispTime  = (r.disp     ||0) * params.ds;
+  const active    = (r.inTime||0) + caseTime + (r.outTime||0) + emailTime + dispTime;
+  const wh        = r.workMin || 0;
+  const occ       = wh > 0 ? active / wh : null;
+  const target    = targetPct() / 100;
+  const warning   = occ !== null ? target - occ : null;
+  const free      = wh > 0 ? wh - active : null;
+  return { caseTime, emailTime, dispTime, active, occ, warning, free };
+}
+
+function targetPct(){ return +(document.getElementById('targetPct').value)||85; }
+
+function occClass(occ){
+  if(occ===null) return '';
+  const p = occ*100;
+  if(p < 70)  return 'occ-low';
+  if(p < 85)  return 'occ-ok';
+  if(p < 90)  return 'occ-warn';
+  return 'occ-over';
+}
+function occColor(occ){
+  if(occ===null) return '#94a3b8';
+  const p = occ*100;
+  if(p < 70)  return '#3b82f6';
+  if(p < 85)  return '#16a34a';
+  if(p < 90)  return '#d97706';
+  return '#dc2626';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   FORMATTING
+══════════════════════════════════════════════════════════════ */
+function pct(v,dec=1){ return v!=null ? (v*100).toFixed(dec)+'%' : '—'; }
+function num(v){ return v!=null ? Math.round(v).toLocaleString() : '—'; }
+function monLabel(m){ const [y,mo]=m.split('-'); return MON_S[+mo-1]+' '+y; }
+
+/* ══════════════════════════════════════════════════════════════
+   VIEW SWITCHING
+══════════════════════════════════════════════════════════════ */
+function setView(v){
+  view = v;
+  ['month','quarter','year'].forEach(x=>{
+    document.getElementById('btn'+x.charAt(0).toUpperCase()+x.slice(1)).classList.toggle('on', x===v);
+  });
+  document.getElementById('yrNav').style.visibility = v==='year' ? 'hidden' : 'visible';
+  render();
+}
+function changeYear(d){ selYear+=d; render(); }
+
+/* ══════════════════════════════════════════════════════════════
+   AGGREGATION HELPER
+══════════════════════════════════════════════════════════════ */
+function agg(rows){
+  const s={inTime:0,inCalls:0,outTime:0,emails:0,disp:0,workMin:0};
+  let fteSum=0,fteCnt=0;
+  rows.forEach(r=>{
+    ['inTime','inCalls','outTime','emails','disp','workMin'].forEach(k=>s[k]+=(r[k]||0));
+    if(r.fte){ fteSum+=r.fte; fteCnt++; }
+  });
+  return {...s, fte: fteCnt ? +(fteSum/fteCnt).toFixed(1) : null};
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BUILD ROW SETS
+══════════════════════════════════════════════════════════════ */
+function monthRows(){
+  const data = mergedMap();
+  return Array.from({length:12},(_,i)=>{
+    const k = `${selYear}-${String(i+1).padStart(2,'0')}`;
+    return data[k] ? {month:k,...data[k]} : null;
+  }).filter(Boolean);
+}
+
+function quarterRows(){
+  const data = mergedMap();
+  return [1,2,3,4].map(q=>{
+    const mos = [1,2,3].map(i=>`${selYear}-${String((q-1)*3+i).padStart(2,'0')}`);
+    const rows = mos.map(m=>data[m]?{month:m,...data[m]}:null).filter(Boolean);
+    if(!rows.length) return {label:`Q${q} ${selYear}`, empty:true};
+    const a = agg(rows);
+    return {label:`Q${q} ${selYear}`, ...a};
+  });
+}
+
+function yearRows(){
+  const data = mergedMap();
+  const years = [...new Set(Object.keys(data).map(m=>m.slice(0,4)))].sort();
+  return years.map(y=>{
+    const rows = Object.keys(data).filter(m=>m.startsWith(y)).map(m=>({month:m,...data[m]}));
+    const a = agg(rows);
+    return {label:y, ...a};
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STAT CARDS
+══════════════════════════════════════════════════════════════ */
+function renderStats(rows){
+  const valid = rows.filter(r=>r.occ!=null);
+  if(!valid.length){ document.getElementById('statsRow').innerHTML=''; return; }
+  const occs = valid.map(r=>r.occ);
+  const avg  = occs.reduce((a,b)=>a+b,0)/occs.length;
+  const peak = Math.max(...occs), lo = Math.min(...occs);
+  const tgt  = targetPct()/100;
+  const over = valid.filter(r=>r.occ>=tgt).length;
+  const peakLbl = (valid.find(r=>r.occ===peak)||{}).label || monLabel((valid.find(r=>r.occ===peak)||{}).month||'');
+  const loLbl   = (valid.find(r=>r.occ===lo) ||{}).label || monLabel((valid.find(r=>r.occ===lo) ||{}).month||'');
+
+  document.getElementById('statsRow').innerHTML=`
+    <div class="stat-card">
+      <div class="sc-lbl">Avg Occupancy</div>
+      <div class="sc-val" style="color:${occColor(avg)}">${pct(avg)}</div>
+      <div class="sc-sub">${valid.length} period${valid.length!==1?'s':''}</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-lbl">Peak</div>
+      <div class="sc-val" style="color:${occColor(peak)}">${pct(peak)}</div>
+      <div class="sc-sub">${peakLbl}</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-lbl">Lowest</div>
+      <div class="sc-val" style="color:${occColor(lo)}">${pct(lo)}</div>
+      <div class="sc-sub">${loLbl}</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-lbl">≥ ${targetPct()}% Target</div>
+      <div class="sc-val" style="color:${over?'var(--danger)':'var(--success)'}">${over}</div>
+      <div class="sc-sub">of ${valid.length} periods</div>
+    </div>
+    <div class="stat-card">
+      <div class="sc-lbl">Total Active Time</div>
+      <div class="sc-val" style="font-size:22px">${Math.round(valid.reduce((s,r)=>s+(r.active||0),0)/60).toLocaleString()} h</div>
+      <div class="sc-sub">across all periods</div>
+    </div>
+  `;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CHART
+══════════════════════════════════════════════════════════════ */
+function renderChart(rows){
+  const valid = rows.filter(r=>r.occ!=null);
+  document.getElementById('chartSub').textContent = valid.length ? `${valid.length} data points` : '';
+  if(!valid.length){
+    document.getElementById('chartArea').innerHTML='<div class="empty"><div class="ei">📊</div>No data to display</div>';
+    return;
+  }
+  const tgt = targetPct()/100;
+  const W = Math.max(700, valid.length*36+80), H = 260;
+  const pL=52,pR=24,pT=20,pB=52;
+  const gW=W-pL-pR, gH=H-pT-pB;
+  const n=valid.length;
+  const xs = valid.map((_,i)=>pL+(n===1?gW/2:i/(n-1)*gW));
+  const toY = o => pT + gH*(1 - Math.min(o,1.15)/1.15);
+
+  const cardBg = dark ? '#1e293b' : '#f8fafc';
+  const gridC  = dark ? '#334155' : '#e2e8f0';
+  const axisC  = dark ? '#475569' : '#cbd5e1';
+  const lblC   = dark ? '#64748b' : '#94a3b8';
+
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" style="font-family:system-ui,sans-serif;display:block">`;
+  svg += `<rect width="${W}" height="${H}" fill="${cardBg}" rx="10"/>`;
+
+  // Y grid 0 25 50 75 100
+  [0,25,50,75,100].forEach(v=>{
+    const y = pT+gH*(1-v/115);
+    svg += `<line x1="${pL}" y1="${y.toFixed(1)}" x2="${pL+gW}" y2="${y.toFixed(1)}" stroke="${gridC}" stroke-width="1"/>`;
+    svg += `<text x="${pL-7}" y="${(y+4).toFixed(1)}" text-anchor="end" font-size="11" fill="${lblC}">${v}%</text>`;
+  });
+
+  // Target line
+  const ty = toY(tgt);
+  svg += `<line x1="${pL}" y1="${ty.toFixed(1)}" x2="${pL+gW}" y2="${ty.toFixed(1)}" stroke="#dc2626" stroke-width="1.8" stroke-dasharray="6,4" opacity=".7"/>`;
+  svg += `<text x="${pL+gW-4}" y="${(ty-6).toFixed(1)}" text-anchor="end" font-size="10" fill="#dc2626" opacity=".85">Target ${targetPct()}%</text>`;
+
+  // Area
+  let area = `M${xs[0].toFixed(1)},${pT+gH}`;
+  valid.forEach((r,i)=>area += ` L${xs[i].toFixed(1)},${toY(r.occ).toFixed(1)}`);
+  area += ` L${xs[n-1].toFixed(1)},${pT+gH} Z`;
+  svg += `<path d="${area}" fill="${dark?'rgba(96,165,250,.12)':'rgba(37,99,235,.07)'}"/>`;
+
+  // Line
+  let path = `M${xs[0].toFixed(1)},${toY(valid[0].occ).toFixed(1)}`;
+  valid.forEach((r,i)=>{ if(i) path += ` L${xs[i].toFixed(1)},${toY(r.occ).toFixed(1)}`; });
+  svg += `<path d="${path}" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linejoin="round"/>`;
+
+  // Dots + value labels
+  const showVal = n <= 16;
+  const step    = Math.ceil(n/26);
+  valid.forEach((r,i)=>{
+    const x=xs[i], y=toY(r.occ), col=occColor(r.occ);
+    svg += `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.5" fill="${col}" stroke="${cardBg}" stroke-width="2"/>`;
+    if(showVal){
+      const above = y-14>pT;
+      svg += `<text x="${x.toFixed(1)}" y="${above?y-9:y+13}" text-anchor="middle" font-size="9" fill="${col}" font-weight="700">${(r.occ*100).toFixed(1)}%</text>`;
+    }
+    if(i%step===0||n<=24){
+      const lbl = r.label || monLabel(r.month||'');
+      svg += `<text x="${x.toFixed(1)}" y="${pT+gH+16}" text-anchor="middle" font-size="9.5" fill="${lblC}">${lbl.slice(0,7)}</text>`;
+    }
+  });
+
+  svg += `<line x1="${pL}" y1="${pT}" x2="${pL}" y2="${pT+gH}" stroke="${axisC}" stroke-width="1.5"/>`;
+  svg += `<line x1="${pL}" y1="${pT+gH}" x2="${pL+gW}" y2="${pT+gH}" stroke="${axisC}" stroke-width="1.5"/>`;
+  svg += `</svg>`;
+  document.getElementById('chartArea').innerHTML = svg;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TABLE HEADERS (shared)
+══════════════════════════════════════════════════════════════ */
+const TH_EDITABLE = `
+  <th style="text-align:left;position:sticky;left:0;z-index:6">Period</th>
+  <th title="Manually entered">IN Time (min)</th>
+  <th title="Manually entered">IN Calls</th>
+  <th title="= IN Calls × Case Handling Time" style="background:var(--primary-l);color:var(--primary)">Case Time* (min)</th>
+  <th title="Manually entered">OUT Time (min)</th>
+  <th title="Manually entered">Emails</th>
+  <th title="= Emails × Email AVG Time" style="background:var(--primary-l);color:var(--primary)">Email Time* (min)</th>
+  <th title="Manually entered">Dispositions</th>
+  <th title="= Dispositions × Outbound DS Time" style="background:var(--primary-l);color:var(--primary)">Disp. Time* (min)</th>
+  <th title="Manually entered">FTE</th>
+  <th title="Manually entered">Working Hours (min)</th>
+  <th title="Sum of all activity time" style="background:var(--primary-l);color:var(--primary)">Active Time* (min)</th>
+  <th title="Working Hours − Active Time" style="background:var(--primary-l);color:var(--primary)">Free Time* (min)</th>
+  <th title="Active Time / Working Hours" style="background:var(--primary-l);color:var(--primary)">Occupancy*</th>
+  <th title="Target − Occupancy (negative = overloaded)" style="background:var(--primary-l);color:var(--primary)">Warning*</th>
+  <th></th>`;
+
+const TH_AGG = `
+  <th style="text-align:left;position:sticky;left:0;z-index:6">Period</th>
+  <th>IN Time (min)</th><th>IN Calls</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Case Time*</th>
+  <th>OUT Time (min)</th><th>Emails</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Email Time*</th>
+  <th>Dispositions</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Disp. Time*</th>
+  <th>Avg FTE</th><th>Working Hours (min)</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Active Time*</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Free Time*</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Occupancy*</th>
+  <th style="background:var(--primary-l);color:var(--primary)">Warning*</th>`;
+
+function aggCells(r){
+  const c = compute(r);
+  r.occ     = c.occ;
+  r.active  = c.active;
+  r.warning = c.warning;
+  r.free    = c.free;
+  const wc = occClass(c.occ);
+  const ws = c.warning!=null ? (c.warning>=0?'+':'') : '';
+  const wcls = c.warning!=null ? (c.warning>=0?'warn-ok':'warn-bad') : '';
+  return `
+    <td>${num(r.inTime)}</td><td>${num(r.inCalls)}</td>
+    <td class="calc-td">${num(c.caseTime)}</td>
+    <td>${num(r.outTime)}</td><td>${num(r.emails)}</td>
+    <td class="calc-td">${num(c.emailTime)}</td>
+    <td>${num(r.disp)}</td>
+    <td class="calc-td">${num(c.dispTime)}</td>
+    <td>${r.fte||'—'}</td><td>${num(r.workMin)}</td>
+    <td class="calc-td">${num(c.active)}</td>
+    <td class="calc-td">${num(c.free)}</td>
+    <td><span class="occ-badge ${wc}">${pct(c.occ)}</span></td>
+    <td>${c.warning!=null?`<span class="warn-badge ${wcls}">${ws}${pct(c.warning)}</span>`:'—'}</td>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MONTHLY TABLE (editable)
+══════════════════════════════════════════════════════════════ */
+function renderMonthTable(){
+  document.getElementById('tableTitle').textContent = `Monthly Data — ${selYear}`;
+  document.getElementById('tHead').innerHTML = `<tr>${TH_EDITABLE}</tr>`;
+
+  const rows = monthRows();
+  const computed = rows.map(r=>{ const c=compute(r); return {...r,...c}; });
+  renderStats(computed);
+  renderChart(computed);
+
+  if(!rows.length){
+    document.getElementById('tBody').innerHTML=`<tr><td colspan="16"><div class="empty"><div class="ei">📋</div>No data for ${selYear}. Use "+ Add Month" to get started.</div></td></tr>`;
+    return;
+  }
+
+  const data = mergedMap();
+  document.getElementById('tBody').innerHTML = rows.map(r=>{
+    const c   = compute(r);
+    const wc  = occClass(c.occ);
+    const ws  = c.warning!=null?(c.warning>=0?'+':''):'';
+    const wcl = c.warning!=null?(c.warning>=0?'warn-ok':'warn-bad'):'';
+    const isCustom = !!customData[r.month];
+    const inp = (field,val)=>
+      `<input class="cell-inp" type="number" value="${val??''}" placeholder="—"
+        data-m="${r.month}" data-f="${field}" onchange="onCellChange(this)">`;
+    return `<tr data-month="${r.month}">
+      <td>${monLabel(r.month)}${isCustom?'<span title="Custom" style="color:var(--primary);margin-left:5px;font-size:10px">●</span>':''}</td>
+      <td>${inp('inTime', r.inTime)}</td>
+      <td>${inp('inCalls', r.inCalls)}</td>
+      <td class="calc-td">${num(c.caseTime)}</td>
+      <td>${inp('outTime', r.outTime)}</td>
+      <td>${inp('emails', r.emails)}</td>
+      <td class="calc-td">${num(c.emailTime)}</td>
+      <td>${inp('disp', r.disp)}</td>
+      <td class="calc-td">${num(c.dispTime)}</td>
+      <td>${inp('fte', r.fte)}</td>
+      <td>${inp('workMin', r.workMin)}</td>
+      <td class="calc-td">${num(c.active)}</td>
+      <td class="calc-td">${num(c.free)}</td>
+      <td><span class="occ-badge ${wc}">${pct(c.occ)}</span></td>
+      <td>${c.warning!=null?`<span class="warn-badge ${wcl}">${ws}${pct(c.warning)}</span>`:'—'}</td>
+      <td>${isCustom?`<button class="btn-danger" title="Remove custom entry" onclick="deleteCustom('${r.month}')">✕</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   QUARTER TABLE
+══════════════════════════════════════════════════════════════ */
+function renderQuarterTable(){
+  document.getElementById('tableTitle').textContent = `Quarterly Summary — ${selYear}`;
+  document.getElementById('tHead').innerHTML = `<tr>${TH_AGG}</tr>`;
+
+  const rows = quarterRows();
+  const computed = rows.map(r=>{ if(r.empty) return r; const c=compute(r); return {...r,...c}; });
+  renderStats(computed.filter(r=>!r.empty));
+  renderChart(computed.filter(r=>!r.empty));
+
+  document.getElementById('tBody').innerHTML = computed.map(r=>{
+    if(r.empty) return `<tr style="opacity:.4"><td>${r.label}</td><td colspan="14" style="text-align:center;color:var(--muted);font-style:italic">No data</td></tr>`;
+    return `<tr><td>${r.label}</td>${aggCells(r)}</tr>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   YEAR TABLE
+══════════════════════════════════════════════════════════════ */
+function renderYearTable(){
+  document.getElementById('tableTitle').textContent = 'Yearly Summary — All Years';
+  document.getElementById('tHead').innerHTML = `<tr>${TH_AGG}</tr>`;
+
+  const rows = yearRows();
+  const computed = rows.map(r=>{ const c=compute(r); return {...r,...c}; });
+  renderStats(computed);
+  renderChart(computed);
+
+  document.getElementById('tBody').innerHTML = computed.map(r=>{
+    return `<tr><td>${r.label}</td>${aggCells(r)}</tr>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CELL EDIT
+══════════════════════════════════════════════════════════════ */
+function onCellChange(inp){
+  const mo = inp.dataset.m, field = inp.dataset.f;
+  const val = inp.value.trim()==='' ? null : +inp.value;
+  if(!customData[mo]) customData[mo]={};
+  if(val===null) delete customData[mo][field];
+  else customData[mo][field]=val;
+  if(!Object.keys(customData[mo]).length) delete customData[mo];
+  saveStore();
+  renderMonthTable(); // only month view is editable
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ADD / DELETE
+══════════════════════════════════════════════════════════════ */
+function openAddRow(){
+  // Pre-fill with first empty month of current year
+  const data = mergedMap();
+  let def = `${selYear}-01`;
+  for(let m=1;m<=12;m++){
+    const k=`${selYear}-${String(m).padStart(2,'0')}`;
+    if(!data[k]){ def=k; break; }
+  }
+  document.getElementById('newMonthPick').value = def;
+  document.getElementById('addStrip').classList.add('open');
+}
+function closeAddRow(){ document.getElementById('addStrip').classList.remove('open'); }
+function confirmAdd(){
+  const val = document.getElementById('newMonthPick').value;
+  if(!val){ showToast('Select a month','err'); return; }
+  if(!customData[val]) customData[val]={};
+  saveStore();
+  selYear = +val.slice(0,4);
+  closeAddRow();
+  render();
+  showToast('Month added — fill in the values','ok');
+}
+function deleteCustom(mo){
+  if(!confirm(`Remove custom data for ${monLabel(mo)}?`)) return;
+  delete customData[mo];
+  saveStore();
+  render();
+  showToast('Removed');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CSV EXPORT
+══════════════════════════════════════════════════════════════ */
+function exportCSV(){
+  const data = mergedMap();
+  const hdr  = ['Month','IN Time (min)','IN Calls','Case Time (min)','OUT Time (min)',
+    'Emails','Email Time (min)','Dispositions','Disp Time (min)','FTE',
+    'Working Hours (min)','Active Time (min)','Free Time (min)','Occupancy %','Warning %'];
+  const lines = [hdr.join(',')];
+  Object.keys(data).sort().forEach(m=>{
+    const r=data[m], c=compute(r);
+    lines.push([m,r.inTime||'',r.inCalls||'',c.caseTime,r.outTime||'',
+      r.emails||'',c.emailTime,r.disp||'',c.dispTime,r.fte||'',r.workMin||'',
+      Math.round(c.active||0),c.free!=null?Math.round(c.free):'',
+      c.occ!=null?(c.occ*100).toFixed(2):'',
+      c.warning!=null?(c.warning*100).toFixed(2):''].join(','));
+  });
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([lines.join('\n')],{type:'text/csv'}));
+  a.download=`occupancy-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click(); URL.revokeObjectURL(a.href);
+  showToast('CSV downloaded','ok');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SLIDERS
+══════════════════════════════════════════════════════════════ */
+function onSliders(){
+  params.email = +document.getElementById('slEmail').value;
+  params.ds    = +document.getElementById('slDS').value;
+  params.caseH = +document.getElementById('slCase').value;
+  document.getElementById('lblEmail').textContent = params.email+' min';
+  document.getElementById('lblDS').textContent    = params.ds+' min';
+  document.getElementById('lblCase').textContent  = params.caseH+' min';
+  render();
+}
+['slEmail','slDS','slCase'].forEach(id=>
+  document.getElementById(id).addEventListener('input', onSliders)
+);
+document.getElementById('targetPct').addEventListener('input', render);
+
+/* ══════════════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════════════ */
+let _tt;
+function showToast(msg,type=''){
+  const el=document.getElementById('toast');
+  clearTimeout(_tt);
+  el.textContent=msg; el.className='toast show'+(type?' '+type:'');
+  _tt=setTimeout(()=>el.className='toast',3000);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RENDER
+══════════════════════════════════════════════════════════════ */
+function render(){
+  document.getElementById('yearLbl').textContent = selYear;
+  if(view==='month')   renderMonthTable();
+  else if(view==='quarter') renderQuarterTable();
+  else renderYearTable();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   BOOT
+══════════════════════════════════════════════════════════════ */
+loadStore();
+render();
+</script>
+</body>
+</html>
