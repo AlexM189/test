@@ -467,6 +467,7 @@ tbody tr:hover td:first-child{background:var(--card2)}
     <button class="tb-btn" onclick="exportCSV()">⬇ CSV</button>
     <button class="tb-btn" onclick="exportExcel()">📊 Excel</button>
     <button class="tb-btn" onclick="openPresentation()">📋 Present</button>
+    <button class="tb-btn" onclick="saveDB()" title="Save all data to a .json backup file" style="border-color:var(--success);color:var(--success)">💾 Save DB</button>
     <button class="theme-btn" id="themeBtn" title="Toggle theme">🌙</button>
   </div>
 </div>
@@ -627,6 +628,7 @@ tbody tr:hover td:first-child{background:var(--card2)}
     <div class="modal-tabs">
       <button class="modal-tab on" id="tabCSV"  onclick="switchImportTab('csv')">📄 File / Paste</button>
       <button class="modal-tab"    id="tabGrid" onclick="switchImportTab('grid')">🗓 Year Grid</button>
+      <button class="modal-tab"    id="tabDB"   onclick="switchImportTab('db')">💾 Load DB</button>
     </div>
 
     <!-- CSV/XLSX tab -->
@@ -683,6 +685,30 @@ tbody tr:hover td:first-child{background:var(--card2)}
       </div>
       <div class="import-note">
         Existing data for the selected year will be <strong>merged</strong> (field-level override — only filled cells update).
+      </div>
+    </div>
+
+    <!-- Load DB tab -->
+    <div class="modal-body hidden" id="paneDB">
+      <div class="drop-zone" id="dropZoneDB"
+           onclick="document.getElementById('fileInDB').click()"
+           ondragover="event.preventDefault();this.classList.add('over')"
+           ondragleave="this.classList.remove('over')"
+           ondrop="onDBFileDrop(event)">
+        <div style="font-size:36px">💾</div>
+        <strong>Click to browse or drag & drop a DB backup file (.json)</strong>
+        <p>Load a <strong>.json</strong> file previously saved with <em>Save DB</em>.<br>
+           All current custom data will be replaced by the backup.</p>
+        <input type="file" id="fileInDB" accept=".json" style="display:none" onchange="onDBFileSelect(this)">
+      </div>
+      <div id="dbPreview" style="display:none;margin-top:14px">
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;font-size:13px">
+          <div style="font-weight:700;margin-bottom:8px;font-size:14px">📋 Backup preview</div>
+          <div id="dbPreviewContent"></div>
+        </div>
+        <div class="csv-hint" style="margin-top:8px;color:var(--danger)">
+          ⚠ Loading this backup will <strong>replace all your current custom data</strong>. This cannot be undone.
+        </div>
       </div>
     </div>
 
@@ -1331,6 +1357,111 @@ function exportExcel(){
   showToast('Excel downloaded!','ok');
 }
 
+/* ══════════════════════════════════════════════════════════════
+   DB BACKUP — SAVE & LOAD
+   File format: JSON with version, timestamp, customData, params, target
+══════════════════════════════════════════════════════════════ */
+const DB_VERSION = 1;
+
+function saveDB(){
+  const payload = {
+    version:    DB_VERSION,
+    exported:   new Date().toISOString(),
+    appVersion: 'cc-occupancy-v1',
+    customData: customData,
+    params:     { ...params },
+    target:     targetPct(),
+    theme:      dark ? 'dark' : 'light',
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `cc-occupancy-db-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  const months = Object.keys(customData).length;
+  showToast(`DB saved — ${months} custom month${months!==1?'s':''} backed up`,'ok');
+}
+
+/* pending parsed DB (set when file loaded, cleared on confirm/cancel) */
+let pendingDB = null;
+
+function onDBFileDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZoneDB').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if(file) readDBFile(file);
+}
+function onDBFileSelect(input){
+  if(input.files[0]) readDBFile(input.files[0]);
+  input.value='';
+}
+function readDBFile(file){
+  if(!/\.json$/i.test(file.name)){ showToast('Please select a .json DB file','err'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try{
+      const db = JSON.parse(e.target.result);
+      if(!db.customData){ showToast('Invalid DB file — missing data','err'); return; }
+      pendingDB = db;
+      showDBPreview(db, file.name);
+    } catch(err){ showToast('Could not parse file — is it a valid DB backup?','err'); }
+  };
+  reader.readAsText(file);
+}
+function showDBPreview(db, filename){
+  const months = Object.keys(db.customData||{}).sort();
+  const years  = [...new Set(months.map(m=>m.slice(0,4)))];
+  const el = document.getElementById('dbPreviewContent');
+  el.innerHTML = `
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:12px">
+      <span style="color:var(--muted)">File</span><span><strong>${filename}</strong></span>
+      <span style="color:var(--muted)">Exported</span><span>${db.exported ? new Date(db.exported).toLocaleString() : '—'}</span>
+      <span style="color:var(--muted)">Custom months</span><span><strong>${months.length}</strong> ${months.length ? `(${years.join(', ')})` : ''}</span>
+      ${db.params ? `<span style="color:var(--muted)">Parameters</span><span>Email ${db.params.email}min · DS ${db.params.ds}min · Case ${db.params.caseH}min</span>` : ''}
+      ${db.target ? `<span style="color:var(--muted)">Target</span><span>${db.target}%</span>` : ''}
+    </div>`;
+  document.getElementById('dbPreview').style.display = 'block';
+  document.getElementById('importConfirmBtn').textContent = 'Restore Backup';
+}
+
+function runDBImport(){
+  if(!pendingDB){ showToast('No DB file loaded','err'); return; }
+  const db = pendingDB;
+  pendingDB = null;
+
+  // Restore custom data
+  customData = db.customData || {};
+  saveStore();
+
+  // Restore params if present
+  if(db.params){
+    params = { ...params, ...db.params };
+    document.getElementById('slEmail').value = params.email;
+    document.getElementById('slDS').value    = params.ds;
+    document.getElementById('slCase').value  = params.caseH;
+    document.getElementById('lblEmail').textContent = params.email+' min';
+    document.getElementById('lblDS').textContent    = params.ds+' min';
+    document.getElementById('lblCase').textContent  = params.caseH+' min';
+  }
+  if(db.target) document.getElementById('targetPct').value = db.target;
+  if(db.theme){
+    dark = db.theme==='dark';
+    applyTheme();
+  }
+
+  // Navigate to most recent year in the backup
+  const months = Object.keys(customData);
+  if(months.length){
+    selYear = Math.max(...months.map(m=>+m.slice(0,4)));
+  }
+
+  closeImport();
+  render();
+  const n = Object.keys(customData).length;
+  showToast(`Backup restored — ${n} custom month${n!==1?'s':''} loaded`,'ok');
+}
+
 function loadSheetJS(cb){
   const s=document.createElement('script');
   s.src='https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js';
@@ -1829,14 +1960,24 @@ function openImport(){
 }
 function closeImport(){
   document.getElementById('importOverlay').classList.add('hidden');
+  pendingDB = null;
 }
 function switchImportTab(tab){
   importTab = tab;
   document.getElementById('paneCSV').classList.toggle('hidden',  tab!=='csv');
   document.getElementById('paneGrid').classList.toggle('hidden', tab!=='grid');
+  document.getElementById('paneDB').classList.toggle('hidden',   tab!=='db');
   document.getElementById('tabCSV').classList.toggle('on',  tab==='csv');
   document.getElementById('tabGrid').classList.toggle('on', tab==='grid');
-  document.getElementById('importConfirmBtn').textContent = tab==='csv' ? 'Import File' : 'Save Year Data';
+  document.getElementById('tabDB').classList.toggle('on',   tab==='db');
+  if(tab==='db'){
+    // reset preview when switching to DB tab
+    pendingDB = null;
+    document.getElementById('dbPreview').style.display='none';
+    document.getElementById('importConfirmBtn').textContent='Load DB File First';
+  } else {
+    document.getElementById('importConfirmBtn').textContent = tab==='csv' ? 'Import File' : 'Save Year Data';
+  }
 }
 
 /* ── File drag/drop ── */
@@ -1976,7 +2117,8 @@ function clearYearGrid(){
 
 /* ── Run import ── */
 function runImport(){
-  if(importTab==='csv') runCSVImport();
+  if(importTab==='csv')  runCSVImport();
+  else if(importTab==='db') runDBImport();
   else runGridImport();
 }
 
