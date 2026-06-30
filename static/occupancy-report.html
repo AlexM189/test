@@ -184,6 +184,69 @@ tbody tr:hover td:first-child{background:var(--card2)}
 /* footnote */
 .footnote{font-size:11px;color:var(--muted);padding:10px 20px 14px;border-top:1px solid var(--border)}
 .footnote code{background:var(--card2);padding:1px 5px;border-radius:4px;font-size:11px}
+
+/* ── Import modal ── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;
+  display:flex;align-items:center;justify-content:center;padding:16px;
+}
+.modal-overlay.hidden{display:none}
+.modal-box{
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  width:100%;max-width:860px;max-height:90vh;display:flex;flex-direction:column;
+  box-shadow:var(--sh-lg);
+}
+.modal-head{
+  padding:16px 20px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.modal-head h2{font-size:15px;font-weight:800}
+.modal-close-x{background:none;border:none;font-size:18px;cursor:pointer;color:var(--muted);line-height:1;padding:2px 6px}
+.modal-close-x:hover{color:var(--text)}
+.modal-tabs{display:flex;border-bottom:2px solid var(--border);flex-shrink:0}
+.modal-tab{
+  padding:10px 20px;border:none;background:none;cursor:pointer;
+  font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;
+}
+.modal-tab.on{color:var(--primary);border-bottom-color:var(--primary)}
+.modal-body{padding:20px;overflow-y:auto;flex:1}
+.modal-foot{padding:14px 20px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0}
+
+/* CSV tab */
+.drop-zone{
+  border:2px dashed var(--border);border-radius:10px;padding:24px;text-align:center;
+  cursor:pointer;transition:.15s;margin-bottom:14px;
+}
+.drop-zone:hover,.drop-zone.over{border-color:var(--primary);background:var(--primary-l)}
+.drop-zone p{font-size:13px;color:var(--muted);margin-top:6px}
+#csvText{
+  width:100%;height:160px;border:1px solid var(--border);border-radius:8px;
+  padding:10px;font-size:12px;font-family:monospace;background:var(--card2);color:var(--text);
+  resize:vertical;
+}
+#csvText:focus{outline:none;border-color:var(--primary)}
+.csv-hint{font-size:11px;color:var(--muted);margin-top:6px}
+
+/* Grid tab */
+.grid-controls{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.grid-controls label{font-size:13px;font-weight:600}
+.grid-controls select{padding:5px 10px;border:1px solid var(--border);border-radius:7px;font-size:13px;background:var(--card);color:var(--text)}
+.grid-controls select:focus{outline:none;border-color:var(--primary)}
+.import-grid-wrap{overflow-x:auto}
+.import-grid{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap}
+.import-grid th{
+  padding:7px 8px;background:var(--card2);border-bottom:2px solid var(--border);
+  font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;text-align:right;
+}
+.import-grid th:first-child{text-align:left}
+.import-grid td{padding:4px 5px;border-bottom:1px solid var(--border);text-align:right}
+.import-grid td:first-child{text-align:left;font-weight:700;color:var(--muted);font-size:11px;width:50px}
+.import-grid .gi{
+  width:88px;padding:4px 6px;border:1px solid var(--border);border-radius:5px;
+  font-size:12px;text-align:right;background:var(--card);color:var(--text);
+}
+.import-grid .gi:focus{outline:none;border-color:var(--primary);background:var(--primary-l)}
+.import-note{font-size:11px;color:var(--muted);margin-top:10px}
 </style>
 </head>
 <body>
@@ -279,6 +342,7 @@ tbody tr:hover td:first-child{background:var(--card2)}
     <div class="table-toolbar">
       <h2 id="tableTitle">Monthly Data</h2>
       <div class="table-actions">
+        <button class="btn btn-ghost" onclick="openImport()">⬆ Import</button>
         <button class="btn btn-primary" onclick="openAddRow()">+ Add Month</button>
       </div>
     </div>
@@ -302,6 +366,82 @@ tbody tr:hover td:first-child{background:var(--card2)}
   </div>
 
 </div><!-- /page -->
+
+<!-- ── Import Modal ── -->
+<div class="modal-overlay hidden" id="importOverlay" onclick="if(event.target===this)closeImport()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2>⬆ Import Data</h2>
+      <button class="modal-close-x" onclick="closeImport()">✕</button>
+    </div>
+    <div class="modal-tabs">
+      <button class="modal-tab on" id="tabCSV"  onclick="switchImportTab('csv')">📄 CSV / Paste</button>
+      <button class="modal-tab"    id="tabGrid" onclick="switchImportTab('grid')">🗓 Year Grid</button>
+    </div>
+
+    <!-- CSV tab -->
+    <div class="modal-body" id="paneCSV">
+      <div class="drop-zone" id="dropZone"
+           onclick="document.getElementById('fileIn').click()"
+           ondragover="event.preventDefault();this.classList.add('over')"
+           ondragleave="this.classList.remove('over')"
+           ondrop="onFileDrop(event)">
+        <div style="font-size:32px">📂</div>
+        <strong>Click to browse or drag & drop a CSV file</strong>
+        <p>Supports CSV exported from this tool, or any CSV with columns:<br>
+           <em>Month, IN Time, IN Calls, OUT Time, Emails, Dispositions, FTE, Working Hours</em></p>
+        <input type="file" id="fileIn" accept=".csv,.txt" style="display:none" onchange="onFileSelect(this)">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted);font-size:12px">
+        <hr style="flex:1;border-color:var(--border)"> or paste CSV below <hr style="flex:1;border-color:var(--border)">
+      </div>
+      <textarea id="csvText" placeholder="Month,IN Time (min),IN Calls,OUT Time (min),Emails,Dispositions,FTE,Working Hours (min)
+2023-01,14500,2700,8200,5100,9300,18,158400
+2023-02,13800,2500,7900,4800,8700,18,143520
+..."></textarea>
+      <div class="csv-hint">
+        • First row can be a header (auto-detected) &nbsp;|&nbsp; Month format: <code>YYYY-MM</code><br>
+        • Calculated columns (Case Time, Email Time etc.) are ignored if present — they are recomputed from sliders.<br>
+        • Existing months will be <strong>overwritten</strong>; months not in the CSV are untouched.
+      </div>
+    </div>
+
+    <!-- Grid tab -->
+    <div class="modal-body hidden" id="paneGrid">
+      <div class="grid-controls">
+        <label>Year:</label>
+        <select id="gridYear" onchange="renderYearGrid()"></select>
+        <button class="btn btn-ghost" style="font-size:12px" onclick="clearYearGrid()">🗑 Clear grid</button>
+        <span style="font-size:12px;color:var(--muted)">Fill only the months you have data for — empty rows are skipped.</span>
+      </div>
+      <div class="import-grid-wrap">
+        <table class="import-grid">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th>IN Time<br>(min)</th>
+              <th>IN Calls</th>
+              <th>OUT Time<br>(min)</th>
+              <th>Emails</th>
+              <th>Dispositions</th>
+              <th>FTE</th>
+              <th>Working Hours<br>(min)</th>
+            </tr>
+          </thead>
+          <tbody id="gridBody"></tbody>
+        </table>
+      </div>
+      <div class="import-note">
+        Existing data for the selected year will be <strong>merged</strong> (field-level override — only filled cells update).
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeImport()">Cancel</button>
+      <button class="btn btn-primary" id="importConfirmBtn" onclick="runImport()">Import</button>
+    </div>
+  </div>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -859,6 +999,206 @@ function render(){
   else if(view==='quarter') renderQuarterTable();
   else renderYearTable();
 }
+
+/* ══════════════════════════════════════════════════════════════
+   IMPORT MODAL
+══════════════════════════════════════════════════════════════ */
+let importTab = 'csv';
+
+function openImport(){
+  // Populate year selector with all existing years + surrounding range
+  const data  = mergedMap();
+  const years = new Set([...Object.keys(data).map(m=>+m.slice(0,4))]);
+  const cur   = new Date().getFullYear();
+  for(let y=2019;y<=cur+1;y++) years.add(y);
+  const sel = document.getElementById('gridYear');
+  sel.innerHTML = [...years].sort((a,b)=>b-a).map(y=>`<option value="${y}">${y}</option>`).join('');
+  sel.value = selYear;
+  renderYearGrid();
+  switchImportTab(importTab);
+  document.getElementById('csvText').value = '';
+  document.getElementById('importOverlay').classList.remove('hidden');
+}
+function closeImport(){
+  document.getElementById('importOverlay').classList.add('hidden');
+}
+function switchImportTab(tab){
+  importTab = tab;
+  document.getElementById('paneCSV').classList.toggle('hidden',  tab!=='csv');
+  document.getElementById('paneGrid').classList.toggle('hidden', tab!=='grid');
+  document.getElementById('tabCSV').classList.toggle('on',  tab==='csv');
+  document.getElementById('tabGrid').classList.toggle('on', tab==='grid');
+  document.getElementById('importConfirmBtn').textContent = tab==='csv' ? 'Import CSV' : 'Save Year Data';
+}
+
+/* ── File drag/drop ── */
+function onFileDrop(e){
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if(file) readFileIntoTextarea(file);
+}
+function onFileSelect(input){
+  if(input.files[0]) readFileIntoTextarea(input.files[0]);
+  input.value='';
+}
+function readFileIntoTextarea(file){
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('csvText').value = e.target.result; };
+  reader.readAsText(file);
+}
+
+/* ── CSV parser ── */
+function parseCSV(text){
+  const lines = text.trim().split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length) return [];
+  // Detect header: first cell not matching YYYY-MM
+  let start = 0;
+  if(!/^\d{4}-\d{2}/.test(lines[0].split(',')[0].trim())) start = 1;
+
+  // Map column indices from header (if present) or use positional defaults
+  // Expected positional (without calc cols): Month,inTime,inCalls,outTime,emails,disp,fte,workMin
+  // Full export: Month,inTime,inCalls,caseTime*,outTime,emails,emailTime*,disp,dispTime*,fte,workMin,...
+  const hdr = start ? lines[0].toLowerCase().split(',').map(h=>h.trim()) : null;
+  const idx = {};
+  if(hdr){
+    const map = {
+      'month':0,'period':0,
+      'in time':1,'in time (min)':1,'intime':1,
+      'in calls':2,'incalls':2,
+      // col 3 = case time (calculated) — skip
+      'out time':4,'out time (min)':4,'outtime':4,
+      'emails':5,
+      // col 6 = email time (calculated) — skip
+      'dispositions':7,'disp':7,'dispositions':7,
+      // col 8 = disp time (calculated) — skip
+      'fte':9,'avg fte':9,
+      'working hours':10,'working hours (min)':10,'workhours':10,'workhours (min)':10,
+    };
+    hdr.forEach((h,i)=>{ if(map[h]!==undefined) idx[map[h]]=i; });
+    // fallback: if only 8 cols without calc columns, remap 3→4,4→5,5→7,6→9,7→10
+    if(hdr.length<=8){
+      idx[1]=idx[1]??1; idx[2]=idx[2]??2; idx[4]=idx[4]??3; idx[5]=idx[5]??4;
+      idx[7]=idx[7]??5; idx[9]=idx[9]??6; idx[10]=idx[10]??7;
+    }
+  } else {
+    // positional: decide by column count
+    const cols = lines[start]?.split(',').length || 0;
+    if(cols >= 11){
+      // full export format (with calc cols)
+      [0,1,2,4,5,7,9,10].forEach((v,i)=>idx[v]=i===0?0:[1,2,4,5,7,9,10][i-1]??i);
+      // actually just direct mapping for full format
+      Object.assign(idx,{0:0,1:1,2:2,4:4,5:5,7:7,9:9,10:10});
+    } else {
+      // 8-col raw input
+      Object.assign(idx,{0:0,1:1,2:2,4:3,5:4,7:5,9:6,10:7});
+    }
+  }
+
+  const rows=[];
+  for(let i=start;i<lines.length;i++){
+    const c = lines[i].split(',').map(v=>v.trim());
+    const mo = (c[idx[0]||0]||'').trim();
+    if(!/^\d{4}-\d{2}$/.test(mo)) continue;
+    const n = (ci,fi) => { const v=c[idx[ci]??fi]?.replace(/[^0-9.\-]/g,''); return v?+v:null; };
+    rows.push({
+      month:   mo,
+      inTime:  n(1,1),
+      inCalls: n(2,2),
+      outTime: n(4,3),
+      emails:  n(5,4),
+      disp:    n(7,5),
+      fte:     n(9,6),
+      workMin: n(10,7),
+    });
+  }
+  return rows;
+}
+
+/* ── Year grid ── */
+const GRID_FIELDS = ['inTime','inCalls','outTime','emails','disp','fte','workMin'];
+
+function renderYearGrid(){
+  const yr   = +document.getElementById('gridYear').value;
+  const data = mergedMap();
+  document.getElementById('gridBody').innerHTML = Array.from({length:12},(_,i)=>{
+    const mo = `${yr}-${String(i+1).padStart(2,'0')}`;
+    const r  = data[mo] || {};
+    const inp = (f) => `<input class="gi" type="number" id="gi-${mo}-${f}" placeholder="—" value="${r[f]??''}">`;
+    return `<tr>
+      <td>${MON_S[i]}</td>
+      <td>${inp('inTime')}</td><td>${inp('inCalls')}</td>
+      <td>${inp('outTime')}</td><td>${inp('emails')}</td>
+      <td>${inp('disp')}</td><td>${inp('fte')}</td>
+      <td>${inp('workMin')}</td>
+    </tr>`;
+  }).join('');
+}
+
+function clearYearGrid(){
+  const yr = +document.getElementById('gridYear').value;
+  GRID_FIELDS.forEach(f=>{
+    Array.from({length:12},(_,i)=>{
+      const mo = `${yr}-${String(i+1).padStart(2,'0')}`;
+      const el = document.getElementById(`gi-${mo}-${f}`);
+      if(el) el.value='';
+    });
+  });
+}
+
+/* ── Run import ── */
+function runImport(){
+  if(importTab==='csv') runCSVImport();
+  else runGridImport();
+}
+
+function runCSVImport(){
+  const text = document.getElementById('csvText').value.trim();
+  if(!text){ showToast('Nothing to import','err'); return; }
+  const rows = parseCSV(text);
+  if(!rows.length){ showToast('No valid rows found — check CSV format','err'); return; }
+  let count=0;
+  rows.forEach(row=>{
+    const {month,...rest} = row;
+    if(!customData[month]) customData[month]={};
+    Object.entries(rest).forEach(([k,v])=>{ if(v!==null) customData[month][k]=v; });
+    count++;
+  });
+  saveStore();
+  // navigate to first imported year
+  const years = [...new Set(rows.map(r=>+r.month.slice(0,4)))].sort();
+  if(years.length){ selYear=years[0]; }
+  closeImport();
+  render();
+  showToast(`Imported ${count} month${count!==1?'s':''}!`,'ok');
+}
+
+function runGridImport(){
+  const yr = +document.getElementById('gridYear').value;
+  let count=0;
+  Array.from({length:12},(_,i)=>{
+    const mo = `${yr}-${String(i+1).padStart(2,'0')}`;
+    const vals={};
+    GRID_FIELDS.forEach(f=>{
+      const el=document.getElementById(`gi-${mo}-${f}`);
+      if(el && el.value.trim()!=='') vals[f]=+el.value;
+    });
+    if(Object.keys(vals).length){
+      if(!customData[mo]) customData[mo]={};
+      Object.assign(customData[mo], vals);
+      count++;
+    }
+  });
+  if(!count){ showToast('No data entered','err'); return; }
+  saveStore();
+  selYear = yr;
+  closeImport();
+  render();
+  showToast(`Saved ${count} month${count!==1?'s':''}!`,'ok');
+}
+
+/* close on Escape */
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeImport(); });
 
 /* ══════════════════════════════════════════════════════════════
    BOOT
