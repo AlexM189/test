@@ -17,6 +17,8 @@
   --remote:#0891b2;--remote-light:#cffafe;
   --shadow:0 1px 3px rgba(0,0,0,.08);--shadow-lg:0 10px 25px rgba(0,0,0,.12);--radius:8px;
   --transition:background .2s,color .2s,border-color .2s;
+  /* chart series — CVD-validated categorical set (day/eve/night/wknd) */
+  --ch-day:#2a78d6;--ch-eve:#eda100;--ch-night:#4a3aa7;--ch-wknd:#e87ba4;
 }
 [data-theme="dark"]{
   --bg:#0f172a;--surface:#1e293b;--surface-2:#243347;--border:#334155;
@@ -28,6 +30,7 @@
   --remote:#22d3ee;--remote-light:#0c4a6e;
   --shadow:0 1px 3px rgba(0,0,0,.3);--shadow-lg:0 10px 25px rgba(0,0,0,.5);
   color-scheme:dark;
+  --ch-day:#3987e5;--ch-eve:#c98500;--ch-night:#9085e9;--ch-wknd:#d55181;
 }
 [data-theme="dark"] input,[data-theme="dark"] select,[data-theme="dark"] textarea{background:var(--surface-2);color:var(--text);border-color:var(--border)}
 [data-theme="dark"] input::placeholder,[data-theme="dark"] textarea::placeholder{color:var(--text-muted)}
@@ -159,6 +162,18 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 /* report */
 .rpt-controls{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
 .rpt-controls label.field{margin:0}
+.chart-frame{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:14px 10px 6px;overflow-x:auto}
+.hl-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:0;padding:0;list-style:none}
+.hl-list li{display:flex;gap:10px;align-items:flex-start;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:13px}
+.hl-list .hl-ic{font-size:16px;line-height:1.3;flex-shrink:0}
+.hl-list b{font-weight:600}
+.rpt-meter{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.rpt-meter .mv{min-width:36px;font-variant-numeric:tabular-nums;font-size:12px}
+.rpt-meter .mt{width:52px;height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden;flex-shrink:0}
+.rpt-meter .mt>i{display:block;height:100%;border-radius:3px;background:var(--primary)}
+tr.rpt-wknd td{background:var(--surface-2)}
+tr.rpt-today td{background:var(--primary-light)}
+tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
 /* slides */
 .slide{background:#fff;border:1px solid var(--border);border-radius:var(--radius);padding:36px;margin-bottom:18px;min-height:400px;break-inside:avoid;box-shadow:var(--shadow)}
 .slide h1{margin:0 0 6px;font-size:24px}.slide .sub{color:var(--text-muted);margin-bottom:20px;font-size:14px}
@@ -344,7 +359,7 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
 <section class="panel" id="panel-reports">
   <div class="card">
     <h2>Reports &amp; Exports</h2>
-    <div class="sub">Generate weekly, monthly, quarterly or yearly reports</div>
+    <div class="sub">The preview updates live as you change the period — export to Excel or open as presentation slides</div>
     <div class="rpt-controls">
       <label class="field" style="flex:0 0 130px"><span>Report Type</span>
         <select id="rptType">
@@ -369,9 +384,9 @@ th{background:var(--surface-2);font-weight:600;font-size:11px;color:var(--text-m
       </div>
       <label class="field" id="rptYearPick" style="display:none;margin:0;flex:0 0 100px"><span>Year</span><input type="number" id="rptYear" min="2024" max="2035"></label>
       <div style="display:flex;gap:8px;align-items:flex-end">
-        <button class="btn" id="genRpt">Preview</button>
+        <button class="btn sec" id="genRpt">↻ Refresh</button>
         <button class="btn sec" id="exportXls">📊 Excel</button>
-        <button class="btn sec" id="exportPpt">🎬 Presentation</button>
+        <button class="btn" id="exportPpt">🎬 Presentation</button>
       </div>
     </div>
     <div id="rptRangeLbl" style="padding:9px 13px;background:var(--primary-light);color:var(--primary);border-radius:6px;font-size:13px;margin-bottom:16px"></div>
@@ -1264,6 +1279,17 @@ function updateRptLabel(){
   else if(t==='quarter'){ lbl=`Q${document.getElementById('rptQtr').value} ${document.getElementById('rptQtrYear').value}`; }
   else{ lbl=`Year ${document.getElementById('rptYear').value}`; }
   document.getElementById('rptRangeLbl').textContent=lbl;
+  refreshRptPreview();
+}
+
+let _rptTimer=null;
+function refreshRptPreview(){
+  // debounce — controls can fire several changes in a row
+  clearTimeout(_rptTimer);
+  _rptTimer=setTimeout(()=>{
+    const t=document.getElementById('rptType').value;
+    document.getElementById('rptPreview').innerHTML=buildRptPreview(t,getRptRef());
+  },120);
 }
 
 document.getElementById('rptType').addEventListener('change',()=>{ updateRptPickers(); updateRptLabel(); });
@@ -1290,11 +1316,7 @@ function getRptRef(){
   return document.getElementById('rptYear').value+'-01-01';
 }
 
-document.getElementById('genRpt').addEventListener('click',()=>{
-  const t=document.getElementById('rptType').value;
-  const ref=getRptRef();
-  document.getElementById('rptPreview').innerHTML=buildRptPreview(t,ref);
-});
+document.getElementById('genRpt').addEventListener('click',refreshRptPreview);
 
 document.getElementById('exportXls').addEventListener('click',()=>{
   const t=document.getElementById('rptType').value; const ref=getRptRef();
@@ -1323,340 +1345,439 @@ function getDaysForPeriod(t,ref){
   const days=[]; for(let x=new Date(y,0,1);x.getFullYear()===y;x.setDate(x.getDate()+1)) days.push(new Date(x)); return days;
 }
 
+/* Shift series definition. mode 'app' → theme-aware CSS vars; 'slide' → fixed light hex */
+function shiftSeriesDef(mode){
+  const c = mode==='slide'
+    ? {day:'#2a78d6',evening:'#eda100',night:'#4a3aa7',weekend:'#e87ba4'}
+    : {day:'var(--ch-day)',evening:'var(--ch-eve)',night:'var(--ch-night)',weekend:'var(--ch-wknd)'};
+  return [
+    {key:'day',    label:'Day 09–18',     color:c.day},
+    {key:'evening',label:'Evening 16–24', color:c.evening},
+    {key:'night',  label:'Night 23–07',   color:c.night},
+    {key:'weekend',label:'Weekend 19–03', color:c.weekend},
+  ];
+}
+
+/* One pass over the period → everything the report needs */
+function computePeriodStats(days){
+  const dCap=capacity('desks'), pCap=capacity('parking');
+  let totalDesk=0, totalPark=0;
+  const attendees=new Set();
+  let peak=null, quiet=null, emptyDays=0;
+  const shiftAgg={};   // sh -> {d,p,n}
+  SHIFT_KEYS.forEach(sh=>shiftAgg[sh]={d:0,p:0,n:0});
+  days.forEach(d=>{
+    const ds=ymd(d);
+    let dayDesk=0, dayPark=0;
+    activeShifts(d).forEach(sh=>{
+      const db=countBooked(ds,sh,'desks'), pb=countBooked(ds,sh,'parking');
+      dayDesk+=db; dayPark+=pb;
+      shiftAgg[sh].d+=db; shiftAgg[sh].p+=pb; shiftAgg[sh].n++;
+      Object.values(shiftData(ds,sh).desks||{}).forEach(id=>attendees.add(id));
+    });
+    totalDesk+=dayDesk; totalPark+=dayPark;
+    if(dayDesk===0) emptyDays++;
+    if(!peak||dayDesk>peak.count) peak={d,count:dayDesk};
+    if(!isWeekend(d)&&(!quiet||dayDesk<quiet.count)) quiet={d,count:dayDesk};
+  });
+  const n=days.length||1;
+  const avgD=Math.round(totalDesk/n), avgP=Math.round(totalPark/n);
+  // busiest shift by avg desk %
+  let busiest=null;
+  SHIFT_KEYS.forEach(sh=>{
+    const a=shiftAgg[sh]; if(!a.n) return;
+    const p=pct(a.d/a.n,dCap);
+    if(!busiest||p>busiest.p) busiest={sh,p,avg:(a.d/a.n)};
+  });
+  return {dCap,pCap,totalDesk,totalPark,avgD,avgP,pctD:pct(avgD,dCap),pctP:pct(avgP,pCap),
+          attendees:attendees.size,peak,quiet,emptyDays,shiftAgg,busiest};
+}
+
+function fmtDay(d){ return `${DOW_S[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}`; }
+
+function buildHighlights(days,S){
+  const items=[];
+  if(S.totalDesk===0) return '';
+  if(S.peak&&S.peak.count>0)
+    items.push({ic:'📈',txt:`Busiest day: <b>${fmtDay(S.peak.d)}</b> — ${S.peak.count} desk booking${S.peak.count!==1?'s':''} (${pct(S.peak.count,S.dCap*(isWeekend(S.peak.d)?1:3))}% of day capacity)`});
+  if(S.busiest)
+    items.push({ic:'⏰',txt:`Busiest shift: <b>${SHIFT_META[S.busiest.sh].label}</b> — avg ${S.busiest.avg.toFixed(1)} desks/day (${S.busiest.p}%)`});
+  if(S.quiet&&days.length>7)
+    items.push({ic:'📉',txt:`Quietest weekday: <b>${fmtDay(S.quiet.d)}</b> — ${S.quiet.count} desk booking${S.quiet.count!==1?'s':''}`});
+  items.push({ic:'👥',txt:`<b>${S.attendees}</b> unique ${S.attendees===1?'person':'people'} reserved a desk in this period`});
+  if(S.pctP>S.pctD+10)
+    items.push({ic:'🚗',txt:`Parking is under more pressure than desks (<b>${S.pctP}%</b> vs ${S.pctD}%) — consider carpooling comms`});
+  if(S.emptyDays>0&&days.length<=31)
+    items.push({ic:'🗓️',txt:`<b>${S.emptyDays}</b> day${S.emptyDays!==1?'s':''} with no desk bookings at all`});
+  if(!items.length) return '';
+  return `<div class="card"><h2>✨ Highlights</h2><ul class="hl-list">${
+    items.map(i=>`<li><span class="hl-ic">${i.ic}</span><span>${i.txt}</span></li>`).join('')}</ul></div>`;
+}
+
 function buildRptPreview(t,ref){
   const days=getDaysForPeriod(t,ref);
-  const dCap=capacity('desks'), pCap=capacity('parking');
-  // summary stats
-  let totalDesk=0, totalPark=0, activeDays=0;
-  days.forEach(d=>{
-    const ds=ymd(d); const shifts=activeShifts(d);
-    shifts.forEach(sh=>{
-      totalDesk+=countBooked(ds,sh,'desks'); totalPark+=countBooked(ds,sh,'parking');
-    });
-    activeDays++;
-  });
-  const avgD=activeDays?Math.round(totalDesk/activeDays):0;
-  const avgP=activeDays?Math.round(totalPark/activeDays):0;
-  const pctD=pct(avgD,dCap), pctP=pct(avgP,pCap);
+  const S=computePeriodStats(days);
+  const {dCap,pCap}=S;
+  const granularity=days.length<=7?'day':days.length<=31?'week':'month';
+
+  // Empty state
+  if(S.totalDesk===0&&S.totalPark===0){
+    return `<div class="card"><div class="empty-state"><div class="es-icon">📭</div>
+      <p><strong>No reservations in this period</strong></p>
+      <p>Once people start booking desks and parking, charts and stats will appear here.</p></div></div>`;
+  }
 
   let html=`<div class="card"><h2>Summary</h2>
     <div class="stat-grid">
-      <div class="stat"><div class="lbl">Period days</div><div class="val">${activeDays}</div></div>
-      <div class="stat"><div class="lbl">Total desk bookings</div><div class="val">${totalDesk}</div></div>
-      <div class="stat"><div class="lbl">Avg desk util/day</div><div class="val">${pctD}%</div><div class="sub2">${avgD} of ${dCap}</div></div>
-      <div class="stat"><div class="lbl">Avg parking util/day</div><div class="val">${pctP}%</div><div class="sub2">${avgP} of ${pCap}</div></div>
+      <div class="stat"><div class="lbl">Period days</div><div class="val">${days.length}</div><div class="sub2">${days.filter(d=>!isWeekend(d)).length} weekdays</div></div>
+      <div class="stat"><div class="lbl">Desk bookings</div><div class="val">${S.totalDesk}</div><div class="sub2">avg ${S.avgD}/day</div></div>
+      <div class="stat"><div class="lbl">Avg desk utilization</div><div class="val">${S.pctD}%</div><div class="sub2">of ${dCap} desks</div></div>
+      <div class="stat"><div class="lbl">Parking bookings</div><div class="val">${S.totalPark}</div><div class="sub2">avg ${S.avgP}/day</div></div>
+      <div class="stat"><div class="lbl">Avg parking utilization</div><div class="val">${S.pctP}%</div><div class="sub2">of ${pCap} spots</div></div>
+      <div class="stat"><div class="lbl">Unique attendees</div><div class="val">${S.attendees}</div><div class="sub2">of ${state.employees.length} employees</div></div>
     </div>
   </div>`;
 
-  // utilization charts
-  const _rBuckets=buildChartData(days,'desks',dCap);
-  const _pBuckets=buildChartData(days,'parking',pCap);
-  const _cLabels=_rBuckets.map(b=>b.label);
-  const _allSeries=[
-    {label:'Day (09–18)',    color:'#3b82f6',key:'day'},
-    {label:'Evening (16–24)',color:'#8b5cf6',key:'evening'},
-    {label:'Night (23–07)', color:'#334155',key:'night'},
-    {label:'Weekend (19–03)',color:'#ec4899',key:'weekend'},
-  ];
-  const _actS=_allSeries.filter(s=>_rBuckets.some(b=>b[s.key]!==null));
-  const _dSeries=_actS.map(s=>({...s,values:_rBuckets.map(b=>b[s.key]??null)}));
-  const _pSeries=_actS.map(s=>({...s,values:_pBuckets.map(b=>b[s.key]??null)}));
+  html+=buildHighlights(days,S);
+
+  // utilization charts — theme-aware, hover tooltips, validated palette
+  const dBk=buildChartData(days,'desks',dCap);
+  const pBk=buildChartData(days,'parking',pCap);
+  const labels=dBk.map(b=>b.label);
+  const defs=shiftSeriesDef('app').filter(s=>dBk.some(b=>b[s.key]!==null));
+  const mkSeries=(bk,cap)=>defs.map(s=>({...s,
+    values:bk.map(b=>b[s.key]??null),
+    tips:bk.map(b=>b[s.key]===null?'':`${b.label} · ${s.label}: ${b[s.key]}% (avg ${b.cnt[s.key]} of ${cap})`)
+  }));
+  const inkApp={grid:'var(--border)',axis:'var(--text-muted)',base:'var(--border)',label:'var(--text)'};
   html+=`<div class="card">
-    <h2>📊 Desk Utilization — by Shift</h2>
-    <div class="sub">Average desk utilization % per ${days.length<=7?'day':days.length<=31?'week':'month'}</div>
-    ${makeLegendHtml(_dSeries)}
-    <div style="overflow-x:auto">${makeSvgChart(_cLabels,_dSeries,760,260)}</div>
+    <h2>Desk utilization by shift</h2>
+    <div class="sub">Average % of ${dCap} desks reserved, per ${granularity} — hover a group for exact values</div>
+    ${makeLegendHtml(defs,'var(--text-muted)')}
+    <div class="chart-frame">${makeSvgChart(labels,mkSeries(dBk,dCap),{w:760,h:250,ink:inkApp})}</div>
   </div>`;
   html+=`<div class="card">
-    <h2>🚗 Parking Utilization — by Shift</h2>
-    <div class="sub">Average parking utilization % per ${days.length<=7?'day':days.length<=31?'week':'month'}</div>
-    ${makeLegendHtml(_pSeries)}
-    <div style="overflow-x:auto">${makeSvgChart(_cLabels,_pSeries,760,260)}</div>
+    <h2>Parking utilization by shift</h2>
+    <div class="sub">Average % of ${pCap} spots reserved, per ${granularity}</div>
+    ${makeLegendHtml(defs,'var(--text-muted)')}
+    <div class="chart-frame">${makeSvgChart(labels,mkSeries(pBk,pCap),{w:760,h:250,ink:inkApp})}</div>
   </div>`;
 
-  // daily breakdown (first 60 days max for preview)
-  html+=`<div class="card"><h2>Daily Breakdown</h2><div style="overflow-x:auto"><table>
-    <thead><tr><th>Date</th><th>Day</th><th>Day 🪑</th><th>Day 🚗</th><th>Eve 🪑</th><th>Eve 🚗</th><th>Night 🪑</th><th>Night 🚗</th><th>Wknd 🪑</th><th>Wknd 🚗</th></tr></thead><tbody>`;
+  // daily breakdown with inline meters
+  const todayStr=ymd(new Date());
+  const meter=(v)=>v===null
+    ?`<td style="color:var(--text-muted);text-align:center">—</td>`
+    :`<td><div class="rpt-meter"><span class="mv">${v}%</span><span class="mt"><i style="width:${v}%"></i></span></div></td>`;
+  html+=`<div class="card"><h2>Daily breakdown</h2>
+    <div class="sub">Desk 🪑 and parking 🚗 utilization per shift, per day${days.length>60?' (first 60 days — download Excel for all)':''}</div>
+    <div style="overflow-x:auto"><table>
+    <thead><tr><th>Date</th><th>Day 🪑</th><th>Day 🚗</th><th>Eve 🪑</th><th>Eve 🚗</th><th>Night 🪑</th><th>Night 🚗</th><th>Wknd 🪑</th><th>Wknd 🚗</th></tr></thead><tbody>`;
   days.slice(0,60).forEach(d=>{
     const ds=ymd(d); const wknd=isWeekend(d);
-    html+=`<tr><td>${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}</td><td>${DOW_S[d.getDay()]}</td>`;
-    ['day','evening','night','weekend'].forEach(sh=>{
-      const db=wknd&&sh!=='weekend'?null:countBooked(ds,sh,'desks');
-      const pb=wknd&&sh!=='weekend'?null:countBooked(ds,sh,'parking');
-      html+=db===null?'<td>—</td><td>—</td>':`<td>${db}/${dCap} (${pct(db,dCap)}%)</td><td>${pb}/${pCap} (${pct(pb,pCap)}%)</td>`;
+    const rowCls=ds===todayStr?' class="rpt-today"':wknd?' class="rpt-wknd"':'';
+    html+=`<tr${rowCls}><td style="white-space:nowrap"><strong>${DOW_S[d.getDay()]}</strong> ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}${ds===todayStr?' <span class="pill day" style="font-size:9px">today</span>':''}</td>`;
+    SHIFT_KEYS.forEach(sh=>{
+      const inactive=wknd?sh!=='weekend':sh==='weekend';
+      html+=inactive?meter(null)+meter(null)
+        :meter(pct(countBooked(ds,sh,'desks'),dCap))+meter(pct(countBooked(ds,sh,'parking'),pCap));
     });
     html+='</tr>';
   });
-  if(days.length>60) html+=`<tr><td colspan="10" style="text-align:center;color:var(--text-muted)">… and ${days.length-60} more days. Download Excel for full data.</td></tr>`;
   html+=`</tbody></table></div></div>`;
 
   return html;
 }
 
 /* ---- SVG grouped bar chart ----------------------------------------
-   series: [{label, color, values:[0-100]}]
-   labels: string[] (x-axis)
-   chartW, chartH: SVG dimensions
+   series: [{label, color, values:[0-100|null], tips:[string]}]
+   opts:   {w, h, ink:{grid,axis,base,label}}
+   Marks per dataviz spec: bars ≤20px w/ 4px rounded data-end, square
+   baseline, 2px surface gap, hairline solid grid, hover reveals values.
 ------------------------------------------------------------------- */
-function makeSvgChart(labels, series, chartW=780, chartH=280){
-  if(!labels.length) return '<p style="color:#64748b">No data for this period.</p>';
-  // Limit to 31 labels max to keep readable
-  const maxL=31;
-  const lbls = labels.length>maxL ? labels.filter((_,i)=>i%Math.ceil(labels.length/maxL)===0) : labels;
-  const filteredIdxs = new Set(labels.map((l,i)=>lbls.includes(l)?i:-1).filter(i=>i>=0));
+function barPathTop(x,yTop,w,hgt,r){
+  r=Math.min(r,w/2,hgt);
+  const x2=x+w;
+  return `M${x.toFixed(1)} ${(yTop+hgt).toFixed(1)}V${(yTop+r).toFixed(1)}Q${x.toFixed(1)} ${yTop.toFixed(1)} ${(x+r).toFixed(1)} ${yTop.toFixed(1)}H${(x2-r).toFixed(1)}Q${x2.toFixed(1)} ${yTop.toFixed(1)} ${x2.toFixed(1)} ${(yTop+r).toFixed(1)}V${(yTop+hgt).toFixed(1)}Z`;
+}
 
-  const padL=42, padR=14, padT=20, padB=52;
+function makeSvgChart(labels, series, opts={}){
+  if(!labels.length||!series.length) return '<p style="color:var(--text-muted);text-align:center;padding:20px">No data for this period.</p>';
+  const chartW=opts.w||760, chartH=opts.h||250;
+  const ink=opts.ink||{grid:'#e7e6e1',axis:'#898781',base:'#c3c2b7',label:'#0b0b0b'};
+  const padL=40, padR=10, padT=20, padB=40;
   const gW=chartW-padL-padR, gH=chartH-padT-padB;
-  const nGrps=lbls.length, nSeries=series.length;
-  const grpW=gW/nGrps, barW=Math.max(4, Math.min(18, (grpW-6)/nSeries));
-  const grpGap=(grpW - barW*nSeries)/2;
+  const n=labels.length, nS=series.length;
+  const grpW=gW/n;
+  const barW=Math.max(4, Math.min(20, (grpW-8-2*(nS-1))/nS));   // ≤20px, 2px gaps
+  const innerW=barW*nS+2*(nS-1);
+  const grpPad=(grpW-innerW)/2;
+  const labelEvery=Math.max(1, Math.ceil(n/16));
 
-  // Y grid lines at 0,25,50,75,100
-  let svg=`<svg xmlns="http://www.w3.org/2000/svg" width="${chartW}" height="${chartH}" style="font-family:system-ui,sans-serif">`;
-  // background
-  svg+=`<rect width="${chartW}" height="${chartH}" fill="#f8fafc" rx="8"/>`;
-  // grid
+  let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${chartW} ${chartH}" width="${chartW}" height="${chartH}" style="font-family:system-ui,-apple-system,'Segoe UI',sans-serif;max-width:100%;height:auto;display:block;margin:0 auto">`;
+  svg+=`<style>.cg .band{opacity:0}.cg:hover .band{opacity:.06}.cg .cv{opacity:0;transition:opacity .12s}.cg:hover .cv{opacity:1}</style>`;
+  // hairline solid grid + axis ticks (tabular figures)
   [0,25,50,75,100].forEach(v=>{
     const y=padT+gH*(1-v/100);
-    svg+=`<line x1="${padL}" y1="${y}" x2="${padL+gW}" y2="${y}" stroke="#e2e8f0" stroke-width="1"/>`;
-    svg+=`<text x="${padL-5}" y="${y+4}" text-anchor="end" font-size="10" fill="#94a3b8">${v}%</text>`;
+    svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+gW}" y2="${y.toFixed(1)}" stroke="${ink.grid}" stroke-width="1"/>`;
+    svg+=`<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="${ink.axis}" style="font-variant-numeric:tabular-nums">${v}</text>`;
   });
-  // bars
-  lbls.forEach((lbl,gi)=>{
-    const x0=padL+gi*grpW+grpGap;
+  svg+=`<text x="${padL-6}" y="${(padT-8).toFixed(1)}" text-anchor="end" font-size="9" fill="${ink.axis}">%</text>`;
+
+  labels.forEach((lbl,gi)=>{
+    const gx=padL+gi*grpW;
+    svg+=`<g class="cg">`;
+    // full-height hover band (also the hit target)
+    svg+=`<rect class="band" x="${gx.toFixed(1)}" y="${padT}" width="${grpW.toFixed(1)}" height="${gH.toFixed(1)}" fill="${ink.label}"/>`;
     series.forEach((s,si)=>{
       const val=s.values[gi];
-      if(val===null||val===undefined) return; // skip — shift not active this day
-      const v=Math.max(0,val);
+      if(val===null||val===undefined) return;
+      const v=Math.max(0,Math.min(100,val));
       const bh=Math.max(v>0?2:0,(v/100)*gH);
       if(!bh) return;
-      const bx=x0+si*barW;
+      const bx=gx+grpPad+si*(barW+2);
       const by=padT+gH-bh;
-      svg+=`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${barW-1}" height="${bh.toFixed(1)}" fill="${s.color}" rx="2" opacity="0.88"/>`;
-      if(v>0 && barW>12) svg+=`<text x="${(bx+barW/2-0.5).toFixed(1)}" y="${(by-3).toFixed(1)}" text-anchor="middle" font-size="8" fill="${s.color}" font-weight="600">${v}%</text>`;
+      const tip=(s.tips&&s.tips[gi])||`${s.label}: ${v}%`;
+      svg+=`<path d="${barPathTop(bx,by,barW,bh,4)}" fill="${s.color}"><title>${h(tip)}</title></path>`;
+      // value revealed on group hover — selective labeling, tooltip carries detail
+      if(barW>=9) svg+=`<text class="cv" x="${(bx+barW/2).toFixed(1)}" y="${(by-4).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${ink.label}" style="font-variant-numeric:tabular-nums">${v}</text>`;
     });
-    // x label
-    const lx=padL+gi*grpW+grpW/2;
-    svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+16).toFixed(1)}" text-anchor="middle" font-size="10" fill="#475569">${lbl}</text>`;
+    svg+=`</g>`;
+    if(gi%labelEvery===0){
+      const lx=gx+grpW/2;
+      svg+=`<text x="${lx.toFixed(1)}" y="${(padT+gH+16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${ink.axis}">${h(lbl)}</text>`;
+    }
   });
-  // axes
-  svg+=`<line x1="${padL}" y1="${padT}" x2="${padL}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
-  svg+=`<line x1="${padL}" y1="${padT+gH}" x2="${padL+gW}" y2="${padT+gH}" stroke="#cbd5e1" stroke-width="1.5"/>`;
+  // baseline only (recessive chrome — no left spine)
+  svg+=`<line x1="${padL}" y1="${(padT+gH).toFixed(1)}" x2="${padL+gW}" y2="${(padT+gH).toFixed(1)}" stroke="${ink.base}" stroke-width="1"/>`;
   svg+=`</svg>`;
   return svg;
 }
 
-function makeLegendHtml(series){
-  return `<div style="display:flex;gap:18px;flex-wrap:wrap;margin-bottom:12px">`+
-    series.map(s=>`<span style="display:flex;align-items:center;gap:6px;font-size:12px;color:#475569">
-      <span style="width:14px;height:14px;border-radius:3px;background:${s.color};display:inline-block"></span>${s.label}</span>`).join('')+
+function makeLegendHtml(series, textColor){
+  const tc=textColor||'#52514e';
+  return `<div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:10px">`+
+    series.map(s=>`<span style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:${tc}">
+      <span style="width:10px;height:10px;border-radius:3px;background:${s.color};display:inline-block;flex-shrink:0"></span>${s.label}</span>`).join('')+
     `</div>`;
 }
 
-/* Aggregate daily shift data into displayable buckets based on period */
+/* Aggregate daily data into buckets: daily (≤7d), calendar weeks (≤31d), calendar months.
+   Each bucket: {label, day|evening|night|weekend: pct|null, cnt:{sh: avgCount}} */
 function buildChartData(days, kind, cap){
-  // For weekly: show each day.  For monthly: group by week.  For quarter/year: group by month.
-  const bucketLen = days.length<=7?1 : days.length<=31?7 : 31;
-  const buckets=[];
-  for(let i=0;i<days.length;i+=bucketLen){
-    const slice=days.slice(i,i+bucketLen);
-    const label = bucketLen===1
-      ? `${DOW_S[slice[0].getDay()]} ${slice[0].getDate()}/${slice[0].getMonth()+1}`
-      : bucketLen===7
-        ? `${slice[0].getDate()}/${slice[0].getMonth()+1}`
-        : MONTHS[slice[0].getMonth()].slice(0,3)+' '+slice[0].getFullYear();
-    // per shift: avg utilization across days in bucket
-    const shiftTotals={day:0,evening:0,night:0,weekend:0};
-    const shiftCounts={day:0,evening:0,night:0,weekend:0};
-    slice.forEach(d=>{
-      const ds=ymd(d);
-      activeShifts(d).forEach(sh=>{
-        shiftTotals[sh]+=countBooked(ds,sh,kind);
-        shiftCounts[sh]++;
-      });
+  const groups=[];
+  if(days.length<=7){
+    days.forEach(d=>groups.push({label:`${DOW_S[d.getDay()]} ${d.getDate()}`, days:[d]}));
+  } else if(days.length<=31){
+    let cur=null;
+    days.forEach(d=>{
+      const wk=ymd(startOfWeek(d));
+      if(!cur||cur.key!==wk){ cur={key:wk,days:[]}; groups.push(cur); }
+      cur.days.push(d);
     });
-    buckets.push({
-      label,
-      day:    shiftCounts.day    ? Math.round(pct(shiftTotals.day/shiftCounts.day,     cap)):null,
-      evening:shiftCounts.evening? Math.round(pct(shiftTotals.evening/shiftCounts.evening,cap)):null,
-      night:  shiftCounts.night  ? Math.round(pct(shiftTotals.night/shiftCounts.night,  cap)):null,
-      weekend:shiftCounts.weekend? Math.round(pct(shiftTotals.weekend/shiftCounts.weekend,cap)):null,
+    groups.forEach(g=>{
+      const a=g.days[0], b=g.days[g.days.length-1];
+      g.label=a.getDate()===b.getDate()?`${a.getDate()} ${MONTHS[a.getMonth()].slice(0,3)}`
+        :`${a.getDate()}–${b.getDate()} ${MONTHS[b.getMonth()].slice(0,3)}`;
+    });
+  } else {
+    let cur=null;
+    days.forEach(d=>{
+      const mk=`${d.getFullYear()}-${d.getMonth()}`;
+      if(!cur||cur.key!==mk){ cur={key:mk,label:MONTHS[d.getMonth()].slice(0,3),days:[]}; groups.push(cur); }
+      cur.days.push(d);
     });
   }
-  return buckets;
+  return groups.map(g=>{
+    const tot={day:0,evening:0,night:0,weekend:0}, num={day:0,evening:0,night:0,weekend:0};
+    g.days.forEach(d=>{
+      const ds=ymd(d);
+      activeShifts(d).forEach(sh=>{ tot[sh]+=countBooked(ds,sh,kind); num[sh]++; });
+    });
+    const out={label:g.label, cnt:{}};
+    SHIFT_KEYS.forEach(sh=>{
+      out[sh]=num[sh]?Math.round(pct(tot[sh]/num[sh],cap)):null;
+      out.cnt[sh]=num[sh]?+(tot[sh]/num[sh]).toFixed(1):null;
+    });
+    return out;
+  });
 }
 
 function openPresentation(t,ref){
   const days=getDaysForPeriod(t,ref);
-  const dCap=capacity('desks'), pCap=capacity('parking');
-  let totalDesk=0, totalPark=0;
-  days.forEach(d=>{
-    const ds=ymd(d);
-    activeShifts(d).forEach(sh=>{ totalDesk+=countBooked(ds,sh,'desks'); totalPark+=countBooked(ds,sh,'parking'); });
-  });
-  const avgD=days.length?Math.round(totalDesk/days.length):0;
-  const avgP=days.length?Math.round(totalPark/days.length):0;
+  const S=computePeriodStats(days);
+  const {dCap,pCap}=S;
+  const granularity=days.length<=7?'day':days.length<=31?'week':'month';
 
-  // Build per-shift chart data
   const deskBuckets=buildChartData(days,'desks',dCap);
   const parkBuckets=buildChartData(days,'parking',pCap);
   const chartLabels=deskBuckets.map(b=>b.label);
+  const defs=shiftSeriesDef('slide').filter(s=>deskBuckets.some(b=>b[s.key]!==null));
+  const mkSeries=(bk,cap)=>defs.map(s=>({...s,
+    values:bk.map(b=>b[s.key]??null),
+    tips:bk.map(b=>b[s.key]===null?'':`${b.label} · ${s.label}: ${b[s.key]}% (avg ${b.cnt[s.key]} of ${cap})`)
+  }));
+  const inkSlide={grid:'#e7e6e1',axis:'#898781',base:'#c3c2b7',label:'#0b0b0b'};
+  const chartOpts={w:860,h:290,ink:inkSlide};
 
-  const shiftSeries=[
-    {label:'Day (09–18)',    color:'#3b82f6', key:'day'},
-    {label:'Evening (16–24)',color:'#8b5cf6', key:'evening'},
-    {label:'Night (23–07)', color:'#334155', key:'night'},
-    {label:'Weekend (19–03)',color:'#ec4899', key:'weekend'},
-  ];
-  // Only include series that have at least one non-null value
-  const activeSeries=shiftSeries.filter(s=>deskBuckets.some(b=>b[s.key]!==null));
+  // Per-shift summary rows (avg booked, capacity, util) for a kind
+  const summaryRows=(kind,cap2)=>defs.map(s=>{
+    const a=S.shiftAgg[s.key]; if(!a.n) return '';
+    const avg=(kind==='desks'?a.d:a.p)/a.n, p=pct(avg,cap2);
+    return `<tr><td><span class="sw" style="background:${s.color}"></span>${s.label}</td>
+      <td class="num">${avg.toFixed(1)}</td><td class="num">${cap2}</td>
+      <td class="num"><div class="meter"><i style="width:${Math.min(100,p)}%"></i></div><b>${p}%</b></td>
+      <td class="num">${a.n}</td></tr>`;
+  }).join('');
 
-  // keep null for days where the shift is not active — chart skips null bars
-  const deskSeries=activeSeries.map(s=>({...s, values:deskBuckets.map(b=>b[s.key]??null)}));
-  const parkSeries=activeSeries.map(s=>({...s, values:parkBuckets.map(b=>b[s.key]??null)}));
+  // Highlights bullets (plain-text version of the preview highlights)
+  const hl=[];
+  if(S.peak&&S.peak.count>0) hl.push(`Busiest day was <b>${fmtDay(S.peak.d)}</b> with ${S.peak.count} desk bookings.`);
+  if(S.busiest) hl.push(`<b>${SHIFT_META[S.busiest.sh].label}</b> was the most used shift — avg ${S.busiest.avg.toFixed(1)} desks/day (${S.busiest.p}% of capacity).`);
+  hl.push(`<b>${S.attendees}</b> unique ${S.attendees===1?'person':'people'} reserved a desk out of ${state.employees.length} employees.`);
+  if(S.pctP>S.pctD+10) hl.push(`Parking utilization (<b>${S.pctP}%</b>) ran ahead of desk utilization (${S.pctD}%) — parking is the tighter constraint.`);
+  else if(S.pctD>S.pctP+10) hl.push(`Desks (<b>${S.pctD}%</b>) were under more pressure than parking (${S.pctP}%).`);
+  if(S.quiet&&days.length>7) hl.push(`Quietest weekday: <b>${fmtDay(S.quiet.d)}</b> (${S.quiet.count} desk bookings) — a good candidate for team days.`);
 
-  // Shift summary table: avg util per shift across whole period — purely from countBooked
-  function shiftSummaryRows(kind,cap2){
-    return shiftSeries.map(s=>{
-      let tot=0,cnt=0;
-      days.forEach(d=>{ if(activeShifts(d).includes(s.key)){ tot+=countBooked(ymd(d),s.key,kind); cnt++; } });
-      if(!cnt) return '';
-      const avg=Math.round(tot/cnt), p=pct(avg,cap2);
-      const col=p>=80?'#10b981':p>=50?'#f59e0b':'#4f46e5';
-      return `<tr><td><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:${s.color};vertical-align:middle;margin-right:6px"></span>${s.label}</td><td>${avg}</td><td>${cap2}</td><td style="font-weight:700;color:${col}">${p}%</td><td>${cnt}</td></tr>`;
-    }).join('');
-  }
-
-  // Presence summary — shifts column shows what was ACTUALLY booked, not assignment
-  const presRows=state.employees.slice(0,40).map((emp,i)=>{
+  // Presence, sorted by days present (most present first)
+  const presData=state.employees.map(emp=>{
     const present=days.filter(d=>userHasDesk(emp.id,ymd(d))).length;
     const target=emp.targetDays??state.config.targetDays;
-    const isRemote=target===0;
-    const actualShifts=[...new Set(days.flatMap(d=>empShiftsBookedOnDay(emp.id,ymd(d))))];
-    const shiftsLabel=actualShifts.length?actualShifts.join(', '):'—';
-    if(isRemote){
-      return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${shiftsLabel}</td><td>${present}</td><td style="color:#64748b">Remote</td><td style="color:#64748b">—</td></tr>`;
+    const actual=[...new Set(days.flatMap(d=>empShiftsBookedOnDay(emp.id,ymd(d))))];
+    return {emp,present,target,actual};
+  }).sort((a,b)=>b.present-a.present);
+  const weeks=Math.max(1,days.length/7);
+  const presRows=presData.slice(0,40).map((r,i)=>{
+    const shiftsLabel=r.actual.length?r.actual.map(s=>SHIFT_META[s].label.replace(' Shift','')).join(', '):'—';
+    if(r.target===0){
+      return `<tr><td class="num">${i+1}</td><td>${h(r.emp.name)}</td><td>${shiftsLabel}</td><td class="num">${r.present}</td><td class="muted">Remote</td><td class="muted">—</td></tr>`;
     }
-    const weeks=Math.max(1,days.length/7);
-    const targetTotal=Math.round(target*weeks);
-    const p=pct(present,targetTotal);
-    const col=present>=targetTotal?'#10b981':present>=targetTotal*0.5?'#f59e0b':'#ef4444';
-    return `<tr><td>${i+1}</td><td>${h(emp.name)}</td><td>${shiftsLabel}</td><td>${present}</td><td>${targetTotal}</td><td style="font-weight:700;color:${col}">${p}%</td></tr>`;
+    const targetTotal=Math.round(r.target*weeks)||1;
+    const p=pct(r.present,targetTotal);
+    const col=r.present>=targetTotal?'#0ca30c':r.present>=targetTotal*0.5?'#c98500':'#d03b3b';
+    return `<tr><td class="num">${i+1}</td><td>${h(r.emp.name)}</td><td>${shiftsLabel}</td>
+      <td class="num">${r.present}</td><td class="num">${targetTotal}</td>
+      <td class="num" style="font-weight:700;color:${col}">${p}%</td></tr>`;
   }).join('');
 
   const periodLabel = t==='week'?`Week of ${weekLabel(parseYmd(ref))}`
     :t==='month'?`${MONTHS[parseYmd(ref).getMonth()]} ${parseYmd(ref).getFullYear()}`
     :t==='quarter'?`Q${Math.ceil((parseYmd(ref).getMonth()+1)/3)} ${parseYmd(ref).getFullYear()}`
     :`Year ${parseYmd(ref).getFullYear()}`;
+  const genDate=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  const footer=(n)=>`<div class="foot"><span>Iași Office · Reservations report</span><span>${periodLabel}</span><span>${n}</span></div>`;
+  const bucketTable=(bk)=>`<table class="dtab">
+    <thead><tr><th>Period</th>${defs.map(s=>`<th class="num"><span class="sw" style="background:${s.color}"></span>${s.label}</th>`).join('')}</tr></thead>
+    <tbody>${bk.map(b=>`<tr><td>${b.label}</td>${defs.map(s=>`<td class="num">${b[s.key]!==null?b[s.key]+'%':'—'}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
 
-  const html=`<!DOCTYPE html><html lang="en"><head><title>Office Report — ${periodLabel}</title>
+  const html=`<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><title>Office Report — ${periodLabel}</title>
 <style>
 *{box-sizing:border-box}
-body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#0f172a;color:#1e293b}
-.slide{background:#fff;margin:18px auto;padding:48px 52px;max-width:960px;border-radius:14px;page-break-after:always;box-shadow:0 8px 32px rgba(0,0,0,.25)}
-h1{font-size:34px;font-weight:800;margin:0 0 6px;color:#1e293b}
-h2{font-size:22px;font-weight:700;margin:0 0 6px;color:#4f46e5}
-.period{color:#4f46e5;font-size:15px;font-weight:600;margin-bottom:6px}
-.sub{color:#64748b;font-size:15px;margin-bottom:24px}
-.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
-.stat{background:#f8fafc;padding:20px;border-radius:10px;border:1px solid #e2e8f0}
-.stat .v{font-size:34px;font-weight:800;color:#4f46e5;line-height:1}
-.stat .l{font-size:12px;color:#64748b;margin-top:6px;text-transform:uppercase;letter-spacing:.04em}
+body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#0d0d0d;color:#0b0b0b;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.slide{position:relative;background:#fcfcfb;margin:22px auto;padding:52px 58px 64px;max-width:980px;min-height:560px;border-radius:14px;page-break-after:always;box-shadow:0 12px 40px rgba(0,0,0,.35)}
+.eyebrow{color:#4f46e5;font-size:13px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px}
+h1{font-size:40px;font-weight:800;margin:0 0 8px;letter-spacing:-.02em}
+h2{font-size:24px;font-weight:750;margin:0 0 4px;letter-spacing:-.01em}
+.sub{color:#52514e;font-size:14px;margin-bottom:22px}
+.meta{color:#898781;font-size:13px;margin-bottom:34px}
+.hero-row{display:flex;align-items:flex-end;gap:44px;margin-bottom:34px;flex-wrap:wrap}
+.hero .hv{font-size:74px;font-weight:800;line-height:.95;letter-spacing:-.03em}
+.hero .hl{font-size:13px;color:#52514e;margin-top:8px}
+.kpis{display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:12px;flex:1;min-width:340px}
+.kpi{background:#f4f3f0;border:1px solid #e7e6e1;border-radius:10px;padding:14px 16px}
+.kpi .v{font-size:26px;font-weight:750;line-height:1.1}
+.kpi .l{font-size:11px;color:#52514e;margin-top:4px}
 table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#eef2ff;color:#4f46e5;padding:9px 12px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
-td{padding:8px 12px;border-bottom:1px solid #f1f5f9}
+th{color:#52514e;padding:8px 10px;text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.05em;border-bottom:1.5px solid #c3c2b7}
+td{padding:7px 10px;border-bottom:1px solid #eceae4}
 tr:last-child td{border-bottom:none}
-tr:nth-child(even) td{background:#f8fafc}
-.legend{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
-.legend span{display:flex;align-items:center;gap:6px;font-size:12px;color:#475569}
-.swatch{width:13px;height:13px;border-radius:3px;display:inline-block}
-.chart-wrap{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:16px;margin-bottom:20px}
-.chart-title{font-size:13px;font-weight:700;color:#475569;margin-bottom:10px;text-transform:uppercase;letter-spacing:.04em}
-.print-btn{position:fixed;top:18px;right:18px;background:#4f46e5;color:#fff;border:none;padding:11px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;z-index:99;box-shadow:0 4px 14px rgba(79,70,229,.4)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.muted{color:#898781}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:7px;vertical-align:baseline}
+.meter{display:inline-block;width:64px;height:5px;border-radius:3px;background:#e7e6e1;overflow:hidden;vertical-align:middle;margin-right:8px}
+.meter i{display:block;height:100%;background:#4f46e5;border-radius:3px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.chart-wrap{background:#f8f7f4;border:1px solid #e7e6e1;border-radius:12px;padding:18px 14px 8px;margin-bottom:18px}
+.hl-ul{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:14px}
+.hl-ul li{display:flex;gap:14px;font-size:16px;line-height:1.55;align-items:flex-start}
+.hl-ul .dot{width:9px;height:9px;border-radius:50%;background:#4f46e5;margin-top:8px;flex-shrink:0}
+.foot{position:absolute;left:58px;right:58px;bottom:22px;display:flex;justify-content:space-between;font-size:10.5px;color:#898781;border-top:1px solid #eceae4;padding-top:10px}
+.print-btn{position:fixed;top:18px;right:18px;background:#4f46e5;color:#fff;border:none;padding:11px 20px;border-radius:8px;cursor:pointer;font-size:14px;font-weight:700;z-index:99;box-shadow:0 4px 14px rgba(79,70,229,.45)}
 .print-btn:hover{background:#4338ca}
-.slide-num{position:absolute;bottom:24px;right:40px;font-size:11px;color:#94a3b8}
+.dtab{margin-top:14px}
 @media print{
   .print-btn{display:none}
   body{background:#fff}
-  .slide{margin:0;border-radius:0;box-shadow:none;padding:36px 44px;page-break-after:always}
+  .slide{margin:0 auto;border-radius:0;box-shadow:none;max-width:none;min-height:auto;padding:40px 48px 58px}
 }
 </style></head><body>
 <button class="print-btn" onclick="window.print()">🖨 Print / Save PDF</button>
 
-<!-- SLIDE 1: Title & Summary -->
-<div class="slide" style="position:relative">
-  <div class="period">${periodLabel}</div>
-  <h1>Office Reservations Report</h1>
-  <div class="sub">Generated ${new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'})} &nbsp;·&nbsp; ${days.length} calendar days &nbsp;·&nbsp; ${dCap} desks · ${pCap} parking spots</div>
-  <div class="stat-row">
-    <div class="stat"><div class="v">${totalDesk}</div><div class="l">Total desk bookings</div></div>
-    <div class="stat"><div class="v">${pct(avgD,dCap)}%</div><div class="l">Avg desk utilization / day</div></div>
-    <div class="stat"><div class="v">${totalPark}</div><div class="l">Total parking bookings</div></div>
-    <div class="stat"><div class="v">${pct(avgP,pCap)}%</div><div class="l">Avg parking utilization / day</div></div>
+<!-- SLIDE 1 · Cover -->
+<div class="slide">
+  <div class="eyebrow">Iași Office · Reservations</div>
+  <h1>${periodLabel}</h1>
+  <div class="meta">Generated ${genDate} · ${days.length} calendar days · ${dCap} desks · ${pCap} parking spots · ${state.employees.length} employees</div>
+  <div class="hero-row">
+    <div class="hero">
+      <div class="hv">${S.pctD}%</div>
+      <div class="hl">Average desk utilization per day</div>
+    </div>
+    <div class="kpis">
+      <div class="kpi"><div class="v">${S.totalDesk}</div><div class="l">Desk bookings</div></div>
+      <div class="kpi"><div class="v">${S.totalPark}</div><div class="l">Parking bookings</div></div>
+      <div class="kpi"><div class="v">${S.pctP}%</div><div class="l">Avg parking utilization</div></div>
+      <div class="kpi"><div class="v">${S.attendees}</div><div class="l">Unique attendees</div></div>
+      <div class="kpi"><div class="v">${S.peak?S.peak.count:0}</div><div class="l">Peak-day desk bookings</div></div>
+      <div class="kpi"><div class="v">${S.avgD}</div><div class="l">Avg desks booked / day</div></div>
+    </div>
   </div>
   <table>
-    <thead><tr><th>Shift</th><th>Avg desks booked</th><th>Capacity</th><th>Desk util %</th><th>Active days</th></tr></thead>
-    <tbody>${shiftSummaryRows('desks',dCap)}</tbody>
+    <thead><tr><th>Shift</th><th class="num">Avg desks/day</th><th class="num">Capacity</th><th class="num">Utilization</th><th class="num">Active days</th></tr></thead>
+    <tbody>${summaryRows('desks',dCap)}</tbody>
   </table>
-  <span class="slide-num">1</span>
+  ${footer(1)}
 </div>
 
-<!-- SLIDE 2: Desk Utilization Chart by Shift -->
-<div class="slide" style="position:relative">
-  <h2>Desk Utilization — by Shift</h2>
-  <div class="sub">${periodLabel} &nbsp;·&nbsp; Capacity: ${dCap} desks</div>
-  ${makeLegendHtml(deskSeries)}
-  <div class="chart-wrap">
-    <div class="chart-title">Avg desk utilization % per time slot</div>
-    ${makeSvgChart(chartLabels, deskSeries, 840, 300)}
-  </div>
-  <table style="margin-top:16px">
-    <thead><tr><th>Period</th>${activeSeries.map(s=>`<th>${s.label}</th>`).join('')}</tr></thead>
-    <tbody>${deskBuckets.map(b=>`<tr><td>${b.label}</td>${activeSeries.map(s=>`<td>${b[s.key]!==null?b[s.key]+'%':'—'}</td>`).join('')}</tr>`).join('')}</tbody>
-  </table>
-  <span class="slide-num">2</span>
+<!-- SLIDE 2 · Desk utilization -->
+<div class="slide">
+  <h2>Desk utilization by shift</h2>
+  <div class="sub">Average % of ${dCap} desks reserved, per ${granularity}</div>
+  ${makeLegendHtml(defs)}
+  <div class="chart-wrap">${makeSvgChart(chartLabels, mkSeries(deskBuckets,dCap), chartOpts)}</div>
+  ${bucketTable(deskBuckets)}
+  ${footer(2)}
 </div>
 
-<!-- SLIDE 3: Parking Utilization Chart by Shift -->
-<div class="slide" style="position:relative">
-  <h2>Parking Utilization — by Shift</h2>
-  <div class="sub">${periodLabel} &nbsp;·&nbsp; Capacity: ${pCap} parking spots</div>
-  ${makeLegendHtml(parkSeries)}
-  <div class="chart-wrap">
-    <div class="chart-title">Avg parking utilization % per time slot</div>
-    ${makeSvgChart(chartLabels, parkSeries, 840, 300)}
-  </div>
-  <table style="margin-top:16px">
-    <thead><tr><th>Period</th>${activeSeries.map(s=>`<th>${s.label}</th>`).join('')}</tr></thead>
-    <tbody>${parkBuckets.map(b=>`<tr><td>${b.label}</td>${activeSeries.map(s=>`<td>${b[s.key]!==null?b[s.key]+'%':'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+<!-- SLIDE 3 · Parking utilization -->
+<div class="slide">
+  <h2>Parking utilization by shift</h2>
+  <div class="sub">Average % of ${pCap} parking spots reserved, per ${granularity}</div>
+  ${makeLegendHtml(defs)}
+  <div class="chart-wrap">${makeSvgChart(chartLabels, mkSeries(parkBuckets,pCap), chartOpts)}</div>
+  <table class="dtab">
+    <thead><tr><th>Shift</th><th class="num">Avg spots/day</th><th class="num">Capacity</th><th class="num">Utilization</th><th class="num">Active days</th></tr></thead>
+    <tbody>${summaryRows('parking',pCap)}</tbody>
   </table>
-  <table style="margin-top:16px">
-    <thead><tr><th>Shift</th><th>Avg parking booked</th><th>Capacity</th><th>Parking util %</th><th>Active days</th></tr></thead>
-    <tbody>${shiftSummaryRows('parking',pCap)}</tbody>
-  </table>
-  <span class="slide-num">3</span>
+  ${footer(3)}
 </div>
 
-<!-- SLIDE 4: Employee Presence -->
-<div class="slide" style="position:relative">
-  <h2>Employee Presence vs Target</h2>
-  <div class="sub">${periodLabel} &nbsp;·&nbsp; Target: ${state.config.targetDays} days/week &nbsp;·&nbsp; Showing ${Math.min(40,state.employees.length)} of ${state.employees.length} employees<br><span style="font-size:12px;color:#64748b">Shifts shown = shifts actually used in reservations during this period</span></div>
+<!-- SLIDE 4 · Highlights -->
+<div class="slide">
+  <h2>Highlights</h2>
+  <div class="sub">${periodLabel}</div>
+  <ul class="hl-ul">${hl.map(x=>`<li><span class="dot"></span><span>${x}</span></li>`).join('')}</ul>
+  ${footer(4)}
+</div>
+
+<!-- SLIDE 5 · Presence -->
+<div class="slide">
+  <h2>Employee presence vs target</h2>
+  <div class="sub">Sorted by days present · target ${state.config.targetDays} days/week (per-person overrides apply) · showing ${Math.min(40,state.employees.length)} of ${state.employees.length} · shifts shown are those actually reserved</div>
   <table>
-    <thead><tr><th>#</th><th>Employee</th><th>Shifts worked</th><th>Days present</th><th>Target</th><th>Rate</th></tr></thead>
+    <thead><tr><th class="num">#</th><th>Employee</th><th>Shifts worked</th><th class="num">Days present</th><th class="num">Target</th><th class="num">Rate</th></tr></thead>
     <tbody>${presRows}</tbody>
   </table>
-  <span class="slide-num">4</span>
-</div>
-
-<!-- SLIDE 5: Roster -->
-<div class="slide" style="position:relative">
-  <h2>Employee Roster</h2>
-  <div class="sub">${state.employees.length} employees &nbsp;·&nbsp; Default target: ${state.config.targetDays} days/week</div>
-  <table>
-    <thead><tr><th>#</th><th>Name</th><th>Default Shift</th><th>Department</th><th>Target days/wk</th></tr></thead>
-    <tbody>${state.employees.map((e,i)=>`<tr><td>${i+1}</td><td>${h(e.name)}</td><td>${e.shift}</td><td>${h(e.department||'—')}</td><td>${e.targetDays}</td></tr>`).join('')}</tbody>
-  </table>
-  <span class="slide-num">5</span>
+  ${footer(5)}
 </div>
 
 </body></html>`;
