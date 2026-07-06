@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1e4d2b">
+<title>GardenDoc</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+<style>
+  :root {
+    --green-dark: #1e4d2b;
+    --green: #2e7d43;
+    --green-light: #e8f3ec;
+    --amber: #b7791f;
+    --red: #b3372f;
+    --ink: #22301f;
+    --muted: #6b7a66;
+    --card: #ffffff;
+    --bg: #f3f6f1;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  header {
+    background: var(--green-dark);
+    color: #fff;
+    padding: calc(14px + env(safe-area-inset-top)) 18px 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  header svg { width: 28px; height: 28px; flex: none; }
+  header h1 { font-size: 1.15rem; margin: 0; font-weight: 650; }
+  header .sub { font-size: .72rem; opacity: .75; display: block; margin-top: 1px; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+
+  .card {
+    background: var(--card);
+    border-radius: var(--radius);
+    box-shadow: 0 1px 4px rgba(20,40,20,.08);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chip {
+    border: 1.5px solid #cfdccf;
+    background: #fff;
+    color: var(--ink);
+    border-radius: 999px;
+    padding: 7px 15px;
+    font-size: .88rem;
+    cursor: pointer;
+  }
+  .chip.active { background: var(--green); border-color: var(--green); color: #fff; }
+
+  .capture-zone {
+    border: 2px dashed #b9ccb9;
+    border-radius: var(--radius);
+    padding: 26px 14px;
+    text-align: center;
+    color: var(--muted);
+    cursor: pointer;
+    transition: background .15s;
+  }
+  .capture-zone:active { background: var(--green-light); }
+  .capture-zone svg { width: 42px; height: 42px; margin-bottom: 6px; color: var(--green); }
+  .capture-zone p { margin: 4px 0 0; font-size: .9rem; }
+  #preview-wrap { display: none; position: relative; }
+  #preview { width: 100%; border-radius: var(--radius); display: block; max-height: 55vh; object-fit: cover; }
+  #retake {
+    position: absolute; top: 10px; right: 10px;
+    background: rgba(0,0,0,.55); color: #fff; border: 0;
+    border-radius: 999px; padding: 7px 14px; font-size: .82rem; cursor: pointer;
+  }
+  textarea {
+    width: 100%; border: 1.5px solid #d5e0d5; border-radius: 10px;
+    padding: 10px 12px; font: inherit; font-size: .9rem; resize: vertical;
+    min-height: 54px; margin-top: 12px; background: #fff; color: var(--ink);
+  }
+  textarea:focus { outline: 2px solid var(--green); border-color: transparent; }
+
+  .btn {
+    width: 100%; border: 0; border-radius: 12px; padding: 15px;
+    font-size: 1rem; font-weight: 650; cursor: pointer; margin-top: 12px;
+    background: var(--green); color: #fff;
+  }
+  .btn:disabled { opacity: .45; }
+
+  /* Result */
+  #result { display: none; }
+  .verdict { display: flex; align-items: center; gap: 12px; }
+  .health-badge {
+    flex: none; width: 58px; height: 58px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; background: var(--green-light);
+  }
+  .verdict h2 { margin: 0 0 2px; font-size: 1.05rem; }
+  .verdict .sci { font-style: italic; color: var(--muted); font-size: .82rem; }
+  .status-line { font-size: .85rem; margin-top: 2px; font-weight: 600; }
+  .status-healthy { color: var(--green); }
+  .status-minor_issues { color: #7a8a1f; }
+  .status-moderate_issues { color: var(--amber); }
+  .status-severe_issues, .status-dying_or_dead { color: var(--red); }
+  .summary { margin: 12px 0 0; font-size: .95rem; line-height: 1.5; }
+
+  .water-flag {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-top: 10px; padding: 6px 12px; border-radius: 999px;
+    font-size: .82rem; font-weight: 600; background: var(--green-light);
+  }
+  .water-flag.bad { background: #fdecea; color: var(--red); }
+
+  h3.section { font-size: .8rem; text-transform: uppercase; letter-spacing: .06em;
+    color: var(--muted); margin: 0 0 10px; }
+
+  .issue { border-left: 4px solid var(--amber); background: #fbf7ef;
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .issue.high { border-color: var(--red); background: #fdf0ef; }
+  .issue.low { border-color: #8aa86f; background: #f2f7ee; }
+  .issue b { font-size: .92rem; }
+  .issue .tag { font-size: .68rem; text-transform: uppercase; font-weight: 700;
+    letter-spacing: .04em; padding: 2px 7px; border-radius: 5px; background: rgba(0,0,0,.07);
+    margin-left: 6px; }
+  .issue p { margin: 5px 0 0; font-size: .85rem; color: #4c5947; line-height: 1.45; }
+
+  ol.actions, ul.plain { margin: 0; padding-left: 20px; }
+  ol.actions li, ul.plain li { font-size: .9rem; line-height: 1.5; margin-bottom: 8px; }
+
+  .note { font-size: .82rem; color: var(--muted); background: var(--green-light);
+    border-radius: 8px; padding: 9px 12px; margin-top: 4px; }
+
+  .spinner-wrap { display: none; text-align: center; padding: 34px 10px; }
+  .spinner { width: 42px; height: 42px; border: 4px solid #d8e5d8; border-top-color: var(--green);
+    border-radius: 50%; margin: 0 auto 14px; animation: spin .9s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .spinner-wrap p { color: var(--muted); font-size: .9rem; margin: 0; }
+
+  .error-box { display: none; background: #fdecea; color: var(--red);
+    border-radius: 10px; padding: 12px 14px; font-size: .9rem; margin-bottom: 14px; }
+
+  /* History */
+  .hist-item { display: flex; gap: 12px; align-items: center; padding: 9px 0;
+    border-bottom: 1px solid #edf2ed; cursor: pointer; }
+  .hist-item:last-child { border-bottom: 0; }
+  .hist-item img { width: 52px; height: 52px; border-radius: 9px; object-fit: cover; flex: none; }
+  .hist-item .t { font-size: .88rem; font-weight: 600; }
+  .hist-item .d { font-size: .75rem; color: var(--muted); }
+  #history-card { display: none; }
+</style>
+</head>
+<body>
+<header>
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 22c5-2 8-6.5 8-12V5l-8-3-8 3v5c0 5.5 3 10 8 12z" opacity=".35"/>
+    <path d="M12 16c0-4 2-6 5-7-1 4-2 6.2-5 7zM12 16c0-3-1.5-4.5-4-5.4.8 3.2 1.7 4.8 4 5.4zM12 16v4"/>
+  </svg>
+  <h1>GardenDoc
+    <span class="sub">Point, shoot, and fix your plants, lawn &amp; trees</span>
+  </h1>
+</header>
+
+<main>
+  <div class="error-box" id="error-box"></div>
+
+  <div class="card" id="capture-card">
+    <div class="chips" id="chips">
+      <button class="chip active" data-cat="auto">🔍 Auto-detect</button>
+      <button class="chip" data-cat="plant">🪴 Plant</button>
+      <button class="chip" data-cat="lawn">🌱 Lawn</button>
+      <button class="chip" data-cat="tree">🌳 Tree</button>
+    </div>
+
+    <div class="capture-zone" id="capture-zone">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+        <circle cx="12" cy="13" r="4"/>
+      </svg>
+      <p><b>Tap to take a photo</b></p>
+      <p>or choose one from your gallery</p>
+    </div>
+    <input type="file" id="file-input" accept="image/*" capture="environment" hidden>
+    <input type="file" id="gallery-input" accept="image/*" hidden>
+
+    <div id="preview-wrap">
+      <img id="preview" alt="Your photo">
+      <button id="retake">↻ Retake</button>
+    </div>
+
+    <textarea id="notes" placeholder="Optional notes: when did it start, watering habits, recent weather, fertilizer used…"></textarea>
+
+    <button class="btn" id="analyze" disabled>Diagnose</button>
+  </div>
+
+  <div class="card spinner-wrap" id="spinner">
+    <div class="spinner"></div>
+    <p>Examining your photo…<br>identifying species and symptoms</p>
+  </div>
+
+  <div class="card" id="result"></div>
+
+  <div class="card" id="history-card">
+    <h3 class="section">Recent scans</h3>
+    <div id="history"></div>
+  </div>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let imageDataUrl = null;
+let category = "auto";
+
+/* Category chips */
+$("chips").addEventListener("click", (e) => {
+  const chip = e.target.closest(".chip");
+  if (!chip) return;
+  document.querySelectorAll(".chip").forEach(c => c.classList.remove("active"));
+  chip.classList.add("active");
+  category = chip.dataset.cat;
+});
+
+/* Capture: tap zone -> camera; long options via gallery on second tap of preview */
+$("capture-zone").addEventListener("click", () => $("file-input").click());
+$("retake").addEventListener("click", (e) => { e.stopPropagation(); resetPhoto(); });
+
+for (const inputId of ["file-input", "gallery-input"]) {
+  $(inputId).addEventListener("change", (e) => {
+    const file = e.target.files[0];
+    if (file) loadPhoto(file);
+    e.target.value = "";
+  });
+}
+
+function resetPhoto() {
+  imageDataUrl = null;
+  $("preview-wrap").style.display = "none";
+  $("capture-zone").style.display = "block";
+  $("analyze").disabled = true;
+}
+
+/* Downscale to max 1568px on the long edge — plenty for diagnosis, keeps upload + token cost sane */
+function loadPhoto(file) {
+  const img = new Image();
+  img.onload = () => {
+    const MAX = 1568;
+    let { width: w, height: h } = img;
+    const scale = Math.min(1, MAX / Math.max(w, h));
+    w = Math.round(w * scale); h = Math.round(h * scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+    imageDataUrl = canvas.toDataURL("image/jpeg", 0.88);
+    URL.revokeObjectURL(img.src);
+    $("preview").src = imageDataUrl;
+    $("capture-zone").style.display = "none";
+    $("preview-wrap").style.display = "block";
+    $("analyze").disabled = false;
+    $("result").style.display = "none";
+    hideError();
+  };
+  img.onerror = () => showError("Couldn't read that image — try another photo.");
+  img.src = URL.createObjectURL(file);
+}
+
+/* Diagnose */
+$("analyze").addEventListener("click", async () => {
+  if (!imageDataUrl) return;
+  hideError();
+  $("result").style.display = "none";
+  $("spinner").style.display = "block";
+  $("analyze").disabled = true;
+  try {
+    const res = await fetch("/api/diagnose", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ image: imageDataUrl, category, notes: $("notes").value }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `Server error (${res.status})`);
+    renderDiagnosis(body.diagnosis);
+    saveHistory(body.diagnosis);
+  } catch (err) {
+    showError(err.message || "Something went wrong. Check your connection and try again.");
+  } finally {
+    $("spinner").style.display = "none";
+    $("analyze").disabled = false;
+  }
+});
+
+const STATUS_LABEL = {
+  healthy: "Healthy", minor_issues: "Minor issues",
+  moderate_issues: "Needs attention", severe_issues: "Serious problems",
+  dying_or_dead: "Critical condition",
+};
+const STATUS_EMOJI = {
+  healthy: "🌿", minor_issues: "🌱", moderate_issues: "⚠️",
+  severe_issues: "🚨", dying_or_dead: "💀",
+};
+const WATER_LABEL = {
+  too_much_water: ["💧 Too much water — cut back", true],
+  too_little_water: ["🏜️ Needs more water", true],
+  watering_ok: ["💧 Watering looks OK", false],
+  cannot_tell: null,
+};
+const TYPE_EMOJI = { plant: "🪴", lawn: "🌱", tree: "🌳", unknown: "🔍" };
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, c =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+function renderDiagnosis(d) {
+  const idc = d.identification || {};
+  let html = `
+    <div class="verdict">
+      <div class="health-badge">${STATUS_EMOJI[d.health_status] || "🌿"}</div>
+      <div>
+        <h2>${TYPE_EMOJI[d.subject_type] || ""} ${esc(idc.common_name || "Unidentified")}</h2>
+        <div class="sci">${esc(idc.scientific_name || "")}${idc.confidence ? ` · ${esc(idc.confidence)} confidence` : ""}</div>
+        <div class="status-line status-${esc(d.health_status)}">${STATUS_LABEL[d.health_status] || esc(d.health_status)}</div>
+      </div>
+    </div>
+    <p class="summary">${esc(d.summary)}</p>`;
+
+  const wf = WATER_LABEL[d.watering_verdict];
+  if (wf) html += `<div class="water-flag${wf[1] ? " bad" : ""}">${wf[0]}</div>`;
+
+  if (d.issues && d.issues.length) {
+    html += `<h3 class="section" style="margin-top:18px">Problems found</h3>`;
+    for (const i of d.issues) {
+      const nutrient = i.nutrient ? ` — ${esc(i.nutrient)}` : "";
+      html += `
+        <div class="issue ${esc(i.severity)}">
+          <b>${esc(i.name)}${nutrient}</b><span class="tag">${esc(i.severity)}</span>
+          <p>${esc(i.evidence)}</p>
+        </div>`;
+    }
+  }
+  if (d.immediate_actions && d.immediate_actions.length) {
+    html += `<h3 class="section" style="margin-top:18px">Do this now</h3><ol class="actions">`;
+    for (const a of d.immediate_actions) html += `<li>${esc(a)}</li>`;
+    html += `</ol>`;
+  }
+  if (d.ongoing_care && d.ongoing_care.length) {
+    html += `<h3 class="section" style="margin-top:18px">Ongoing care</h3><ul class="plain">`;
+    for (const a of d.ongoing_care) html += `<li>${esc(a)}</li>`;
+    html += `</ul>`;
+  }
+  if (d.prevention_tips && d.prevention_tips.length) {
+    html += `<h3 class="section" style="margin-top:18px">Prevention</h3><ul class="plain">`;
+    for (const t of d.prevention_tips) html += `<li>${esc(t)}</li>`;
+    html += `</ul>`;
+  }
+  if (d.photo_quality_note) {
+    html += `<div class="note" style="margin-top:14px">📸 ${esc(d.photo_quality_note)}</div>`;
+  }
+  $("result").innerHTML = html;
+  $("result").style.display = "block";
+  $("result").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+/* History (localStorage, thumbnails downscaled hard) */
+function thumb(dataUrl, cb) {
+  const img = new Image();
+  img.onload = () => {
+    const c = document.createElement("canvas");
+    const s = 104 / Math.max(img.width, img.height);
+    c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    cb(c.toDataURL("image/jpeg", 0.6));
+  };
+  img.src = dataUrl;
+}
+
+function saveHistory(d) {
+  thumb(imageDataUrl, (t) => {
+    const hist = JSON.parse(localStorage.getItem("gd_history") || "[]");
+    hist.unshift({ when: Date.now(), thumb: t, diagnosis: d });
+    localStorage.setItem("gd_history", JSON.stringify(hist.slice(0, 12)));
+    renderHistory();
+  });
+}
+
+function renderHistory() {
+  const hist = JSON.parse(localStorage.getItem("gd_history") || "[]");
+  if (!hist.length) { $("history-card").style.display = "none"; return; }
+  $("history-card").style.display = "block";
+  $("history").innerHTML = hist.map((h, i) => `
+    <div class="hist-item" data-i="${i}">
+      <img src="${h.thumb}" alt="">
+      <div>
+        <div class="t">${esc(h.diagnosis?.identification?.common_name || "Scan")}
+          — ${STATUS_LABEL[h.diagnosis?.health_status] || ""}</div>
+        <div class="d">${new Date(h.when).toLocaleString()}</div>
+      </div>
+    </div>`).join("");
+}
+
+$("history").addEventListener("click", (e) => {
+  const item = e.target.closest(".hist-item");
+  if (!item) return;
+  const hist = JSON.parse(localStorage.getItem("gd_history") || "[]");
+  const h = hist[+item.dataset.i];
+  if (h) { renderDiagnosis(h.diagnosis); }
+});
+
+function showError(msg) { const b = $("error-box"); b.textContent = msg; b.style.display = "block"; }
+function hideError() { $("error-box").style.display = "none"; }
+
+renderHistory();
+
+/* PWA */
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
+</script>
+</body>
+</html>
