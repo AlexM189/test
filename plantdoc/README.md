@@ -25,7 +25,23 @@ does the analysis using Claude's vision API.
    - Ongoing care routine and prevention tips
 4. Your last 12 scans are saved on the device (nothing stored on the server).
 
-## Quick start
+## Quick start — no server (recommended for now)
+
+Just open **`gardendoc.html`** in any browser (double-click it, or open it on
+your phone). Then:
+
+1. Paste your Anthropic API key at the top and hit **Save** (it's stored only
+   in your browser's localStorage).
+2. Click the drop zone (or drag & drop) to **add one or more photos** of
+   plants, lawn patches, or trees.
+3. Add optional notes per photo and hit **Diagnose** (or **Diagnose all photos**).
+4. Each photo gets its feedback card: identification, health status, watering
+   verdict, problems found with severity + evidence, immediate actions,
+   ongoing care, and prevention tips.
+
+The page calls the Claude API directly from the browser — no server to run.
+
+## Quick start — phone PWA (Flask server)
 
 ```bash
 cd plantdoc
