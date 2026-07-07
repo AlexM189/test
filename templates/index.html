@@ -1370,14 +1370,18 @@ function shiftSeriesDef(mode){
 function computePeriodStats(days){
   const dCap=capacity('desks'), pCap=capacity('parking');
   let totalDesk=0, totalPark=0;
+  let slotCapD=0, slotCapP=0;          // total capacity across all shift-slots in the period
   const attendees=new Set();
   let peak=null, quiet=null, emptyDays=0;
   const shiftAgg={};   // sh -> {d,p,n}
   SHIFT_KEYS.forEach(sh=>shiftAgg[sh]={d:0,p:0,n:0});
   days.forEach(d=>{
     const ds=ymd(d);
+    const shs=activeShifts(d);
+    const dayCapD=dCap*shs.length, dayCapP=pCap*shs.length;
+    slotCapD+=dayCapD; slotCapP+=dayCapP;
     let dayDesk=0, dayPark=0;
-    activeShifts(d).forEach(sh=>{
+    shs.forEach(sh=>{
       const db=countBooked(ds,sh,'desks'), pb=countBooked(ds,sh,'parking');
       dayDesk+=db; dayPark+=pb;
       shiftAgg[sh].d+=db; shiftAgg[sh].p+=pb; shiftAgg[sh].n++;
@@ -1385,33 +1389,45 @@ function computePeriodStats(days){
     });
     totalDesk+=dayDesk; totalPark+=dayPark;
     if(dayDesk===0) emptyDays++;
-    if(!peak||dayDesk>peak.count) peak={d,count:dayDesk};
-    if(!isWeekend(d)&&(!quiet||dayDesk<quiet.count)) quiet={d,count:dayDesk};
+    if(!peak||dayDesk>peak.count) peak={d,count:dayDesk,cap:dayCapD};
+    if(!isWeekend(d)&&(!quiet||dayDesk<quiet.count)) quiet={d,count:dayDesk,cap:dayCapD};
   });
   const n=days.length||1;
   const avgD=Math.round(totalDesk/n), avgP=Math.round(totalPark/n);
-  // busiest shift by avg desk %
+  // % of shift-slot capacity actually used (honest utilization — a full weekday = 100%, not 300%)
+  const pctD=pct(totalDesk,slotCapD), pctP=pct(totalPark,slotCapP);
+  // per-shift utilization: avg bookings per active day vs per-shift capacity
+  const shiftPct={};
   let busiest=null;
   SHIFT_KEYS.forEach(sh=>{
-    const a=shiftAgg[sh]; if(!a.n) return;
+    const a=shiftAgg[sh]; if(!a.n){ shiftPct[sh]=null; return; }
     const p=pct(a.d/a.n,dCap);
+    shiftPct[sh]=p;
     if(!busiest||p>busiest.p) busiest={sh,p,avg:(a.d/a.n)};
   });
-  return {dCap,pCap,totalDesk,totalPark,avgD,avgP,pctD:pct(avgD,dCap),pctP:pct(avgP,pCap),
-          attendees:attendees.size,peak,quiet,emptyDays,shiftAgg,busiest};
+  return {dCap,pCap,totalDesk,totalPark,avgD,avgP,pctD,pctP,
+          attendees:attendees.size,peak,quiet,emptyDays,shiftAgg,shiftPct,busiest};
 }
 
 function fmtDay(d){ return `${DOW_S[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}`; }
 
+/* "Day 34% · Evening 12% · …" — desk utilization per shift capacity */
+function shiftPctLine(S){
+  return SHIFT_KEYS.filter(sh=>S.shiftPct[sh]!==null)
+    .map(sh=>`${SHIFT_META[sh].label.replace(' Shift','')} <b>${S.shiftPct[sh]}%</b>`).join(' · ');
+}
+
 function buildHighlights(days,S){
   const items=[];
   if(S.totalDesk===0) return '';
+  items.push({ic:'🎯',txt:`Per-shift desk capacity used (of ${S.dCap} desks/shift): ${shiftPctLine(S)}`});
+  items.push({ic:'📅',txt:`Per-day capacity: on average <b>${S.pctD}%</b> of all desk-slots used${S.peak&&S.peak.count>0?`; peak day reached <b>${pct(S.peak.count,S.peak.cap)}%</b>`:''}`});
   if(S.peak&&S.peak.count>0)
-    items.push({ic:'📈',txt:`Busiest day: <b>${fmtDay(S.peak.d)}</b> — ${S.peak.count} desk booking${S.peak.count!==1?'s':''} (${pct(S.peak.count,S.dCap*(isWeekend(S.peak.d)?1:3))}% of day capacity)`});
+    items.push({ic:'📈',txt:`Busiest day: <b>${fmtDay(S.peak.d)}</b> — ${S.peak.count} desk booking${S.peak.count!==1?'s':''} = <b>${pct(S.peak.count,S.peak.cap)}%</b> of that day's capacity (${S.peak.cap} desk-slots)`});
   if(S.busiest)
-    items.push({ic:'⏰',txt:`Busiest shift: <b>${SHIFT_META[S.busiest.sh].label}</b> — avg ${S.busiest.avg.toFixed(1)} desks/day (${S.busiest.p}%)`});
+    items.push({ic:'⏰',txt:`Busiest shift: <b>${SHIFT_META[S.busiest.sh].label}</b> — avg ${S.busiest.avg.toFixed(1)} desks/day = <b>${S.busiest.p}%</b> of shift capacity`});
   if(S.quiet&&days.length>7)
-    items.push({ic:'📉',txt:`Quietest weekday: <b>${fmtDay(S.quiet.d)}</b> — ${S.quiet.count} desk booking${S.quiet.count!==1?'s':''}`});
+    items.push({ic:'📉',txt:`Quietest weekday: <b>${fmtDay(S.quiet.d)}</b> — ${S.quiet.count} desk booking${S.quiet.count!==1?'s':''} (<b>${pct(S.quiet.count,S.quiet.cap)}%</b> of day capacity)`});
   items.push({ic:'👥',txt:`<b>${S.attendees}</b> unique ${S.attendees===1?'person':'people'} reserved a desk in this period`});
   if(S.pctP>S.pctD+10)
     items.push({ic:'🚗',txt:`Parking is under more pressure than desks (<b>${S.pctP}%</b> vs ${S.pctD}%) — consider carpooling comms`});
@@ -1439,9 +1455,9 @@ function buildRptPreview(t,ref){
     <div class="stat-grid">
       <div class="stat"><div class="lbl">Period days</div><div class="val">${days.length}</div><div class="sub2">${days.filter(d=>!isWeekend(d)).length} weekdays</div></div>
       <div class="stat"><div class="lbl">Desk bookings</div><div class="val">${S.totalDesk}</div><div class="sub2">avg ${S.avgD}/day</div></div>
-      <div class="stat"><div class="lbl">Avg desk utilization</div><div class="val">${S.pctD}%</div><div class="sub2">of ${dCap} desks</div></div>
-      <div class="stat"><div class="lbl">Parking bookings</div><div class="val">${S.totalPark}</div><div class="sub2">avg ${S.avgP}/day</div></div>
-      <div class="stat"><div class="lbl">Avg parking utilization</div><div class="val">${S.pctP}%</div><div class="sub2">of ${pCap} spots</div></div>
+      <div class="stat"><div class="lbl">Desk utilization</div><div class="val">${S.pctD}%</div><div class="sub2">of shift capacity (${dCap}/shift)</div></div>
+      <div class="stat"><div class="lbl">Peak day</div><div class="val">${S.peak?pct(S.peak.count,S.peak.cap):0}%</div><div class="sub2">${S.peak?`of day capacity · ${fmtDay(S.peak.d)}`:'—'}</div></div>
+      <div class="stat"><div class="lbl">Parking utilization</div><div class="val">${S.pctP}%</div><div class="sub2">of shift capacity (${pCap}/shift)</div></div>
       <div class="stat"><div class="lbl">Unique attendees</div><div class="val">${S.attendees}</div><div class="sub2">of ${state.employees.length} employees</div></div>
     </div>
   </div>`;
@@ -1527,9 +1543,8 @@ function makeSvgChart(labels, series, opts={}){
   [0,25,50,75,100].forEach(v=>{
     const y=padT+gH*(1-v/100);
     svg+=`<line x1="${padL}" y1="${y.toFixed(1)}" x2="${padL+gW}" y2="${y.toFixed(1)}" stroke="${ink.grid}" stroke-width="1"/>`;
-    svg+=`<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="${ink.axis}" style="font-variant-numeric:tabular-nums">${v}</text>`;
+    svg+=`<text x="${padL-6}" y="${(y+3.5).toFixed(1)}" text-anchor="end" font-size="10" fill="${ink.axis}" style="font-variant-numeric:tabular-nums">${v}%</text>`;
   });
-  svg+=`<text x="${padL-6}" y="${(padT-8).toFixed(1)}" text-anchor="end" font-size="9" fill="${ink.axis}">%</text>`;
 
   labels.forEach((lbl,gi)=>{
     const gx=padL+gi*grpW;
@@ -1547,7 +1562,7 @@ function makeSvgChart(labels, series, opts={}){
       const tip=(s.tips&&s.tips[gi])||`${s.label}: ${v}%`;
       svg+=`<path d="${barPathTop(bx,by,barW,bh,4)}" fill="${s.color}"><title>${h(tip)}</title></path>`;
       // value revealed on group hover — selective labeling, tooltip carries detail
-      if(barW>=9) svg+=`<text class="cv" x="${(bx+barW/2).toFixed(1)}" y="${(by-4).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${ink.label}" style="font-variant-numeric:tabular-nums">${v}</text>`;
+      if(barW>=9) svg+=`<text class="cv" x="${(bx+barW/2).toFixed(1)}" y="${(by-4).toFixed(1)}" text-anchor="middle" font-size="9" font-weight="600" fill="${ink.label}" style="font-variant-numeric:tabular-nums">${v}%</text>`;
     });
     svg+=`</g>`;
     if(gi%labelEvery===0){
@@ -1639,8 +1654,10 @@ function openPresentation(t,ref){
 
   // Highlights bullets (plain-text version of the preview highlights)
   const hl=[];
-  if(S.peak&&S.peak.count>0) hl.push(`Busiest day was <b>${fmtDay(S.peak.d)}</b> with ${S.peak.count} desk bookings.`);
-  if(S.busiest) hl.push(`<b>${SHIFT_META[S.busiest.sh].label}</b> was the most used shift — avg ${S.busiest.avg.toFixed(1)} desks/day (${S.busiest.p}% of capacity).`);
+  hl.push(`Per-shift desk capacity used (of ${dCap} desks per shift): ${shiftPctLine(S)}.`);
+  hl.push(`Per-day capacity: on average <b>${S.pctD}%</b> of all desk-slots were used${S.peak&&S.peak.count>0?`; the peak day reached <b>${pct(S.peak.count,S.peak.cap)}%</b>`:''}.`);
+  if(S.peak&&S.peak.count>0) hl.push(`Busiest day was <b>${fmtDay(S.peak.d)}</b> with ${S.peak.count} desk bookings — <b>${pct(S.peak.count,S.peak.cap)}%</b> of that day's ${S.peak.cap} desk-slots.`);
+  if(S.busiest) hl.push(`<b>${SHIFT_META[S.busiest.sh].label}</b> was the most used shift — avg ${S.busiest.avg.toFixed(1)} desks/day (<b>${S.busiest.p}%</b> of shift capacity).`);
   hl.push(`<b>${S.attendees}</b> unique ${S.attendees===1?'person':'people'} reserved a desk out of ${state.employees.length} employees.`);
   if(S.pctP>S.pctD+10) hl.push(`Parking utilization (<b>${S.pctP}%</b>) ran ahead of desk utilization (${S.pctD}%) — parking is the tighter constraint.`);
   else if(S.pctD>S.pctP+10) hl.push(`Desks (<b>${S.pctD}%</b>) were under more pressure than parking (${S.pctP}%).`);
@@ -1728,14 +1745,14 @@ td.muted{color:#898781}
   <div class="hero-row">
     <div class="hero">
       <div class="hv">${S.pctD}%</div>
-      <div class="hl">Average desk utilization per day</div>
+      <div class="hl">Average desk utilization — % of shift capacity</div>
     </div>
     <div class="kpis">
       <div class="kpi"><div class="v">${S.totalDesk}</div><div class="l">Desk bookings</div></div>
       <div class="kpi"><div class="v">${S.totalPark}</div><div class="l">Parking bookings</div></div>
-      <div class="kpi"><div class="v">${S.pctP}%</div><div class="l">Avg parking utilization</div></div>
+      <div class="kpi"><div class="v">${S.pctP}%</div><div class="l">Parking — % of shift capacity</div></div>
       <div class="kpi"><div class="v">${S.attendees}</div><div class="l">Unique attendees</div></div>
-      <div class="kpi"><div class="v">${S.peak?S.peak.count:0}</div><div class="l">Peak-day desk bookings</div></div>
+      <div class="kpi"><div class="v">${S.peak?pct(S.peak.count,S.peak.cap):0}%</div><div class="l">Peak day — % of day capacity (${S.peak?S.peak.count:0} bookings)</div></div>
       <div class="kpi"><div class="v">${S.avgD}</div><div class="l">Avg desks booked / day</div></div>
     </div>
   </div>
