@@ -1372,7 +1372,7 @@ function computePeriodStats(days){
   let totalDesk=0, totalPark=0;
   let slotCapD=0, slotCapP=0;          // total capacity across all shift-slots in the period
   const attendees=new Set();
-  let peak=null, quiet=null, emptyDays=0;
+  let peak=null, peakP=null, quiet=null, emptyDays=0;
   const shiftAgg={};   // sh -> {d,p,n}
   SHIFT_KEYS.forEach(sh=>shiftAgg[sh]={d:0,p:0,n:0});
   days.forEach(d=>{
@@ -1390,6 +1390,7 @@ function computePeriodStats(days){
     totalDesk+=dayDesk; totalPark+=dayPark;
     if(dayDesk===0) emptyDays++;
     if(!peak||dayDesk>peak.count) peak={d,count:dayDesk,cap:dayCapD};
+    if(!peakP||dayPark>peakP.count) peakP={d,count:dayPark,cap:dayCapP};
     if(!isWeekend(d)&&(!quiet||dayDesk<quiet.count)) quiet={d,count:dayDesk,cap:dayCapD};
   });
   const n=days.length||1;
@@ -1397,31 +1398,42 @@ function computePeriodStats(days){
   // % of shift-slot capacity actually used (honest utilization — a full weekday = 100%, not 300%)
   const pctD=pct(totalDesk,slotCapD), pctP=pct(totalPark,slotCapP);
   // per-shift utilization: avg bookings per active day vs per-shift capacity
-  const shiftPct={};
-  let busiest=null;
+  const shiftPct={}, shiftPctP={};
+  let busiest=null, busiestP=null;
   SHIFT_KEYS.forEach(sh=>{
-    const a=shiftAgg[sh]; if(!a.n){ shiftPct[sh]=null; return; }
+    const a=shiftAgg[sh];
+    if(!a.n){ shiftPct[sh]=null; shiftPctP[sh]=null; return; }
     const p=pct(a.d/a.n,dCap);
     shiftPct[sh]=p;
     if(!busiest||p>busiest.p) busiest={sh,p,avg:(a.d/a.n)};
+    const pp=pct(a.p/a.n,pCap);
+    shiftPctP[sh]=pp;
+    if(!busiestP||pp>busiestP.p) busiestP={sh,p:pp,avg:(a.p/a.n)};
   });
   return {dCap,pCap,totalDesk,totalPark,avgD,avgP,pctD,pctP,
-          attendees:attendees.size,peak,quiet,emptyDays,shiftAgg,shiftPct,busiest};
+          attendees:attendees.size,peak,peakP,quiet,emptyDays,
+          shiftAgg,shiftPct,shiftPctP,busiest,busiestP};
 }
 
 function fmtDay(d){ return `${DOW_S[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}`; }
 
-/* "Day 34% · Evening 12% · …" — desk utilization per shift capacity */
-function shiftPctLine(S){
-  return SHIFT_KEYS.filter(sh=>S.shiftPct[sh]!==null)
-    .map(sh=>`${SHIFT_META[sh].label.replace(' Shift','')} <b>${S.shiftPct[sh]}%</b>`).join(' · ');
+/* "Day 34% · Evening 12% · …" — utilization per shift capacity (desks or parking) */
+function shiftPctLine(S,kind){
+  const src=kind==='parking'?S.shiftPctP:S.shiftPct;
+  return SHIFT_KEYS.filter(sh=>src[sh]!==null)
+    .map(sh=>`${SHIFT_META[sh].label.replace(' Shift','')} <b>${src[sh]}%</b>`).join(' · ');
 }
 
 function buildHighlights(days,S){
   const items=[];
   if(S.totalDesk===0) return '';
-  items.push({ic:'🎯',txt:`Per-shift desk capacity used (of ${S.dCap} desks/shift): ${shiftPctLine(S)}`});
-  items.push({ic:'📅',txt:`Per-day capacity: on average <b>${S.pctD}%</b> of all desk-slots used${S.peak&&S.peak.count>0?`; peak day reached <b>${pct(S.peak.count,S.peak.cap)}%</b>`:''}`});
+  items.push({ic:'🎯',txt:`Per-shift desk capacity used (of ${S.dCap} desks/shift): ${shiftPctLine(S,'desks')}`});
+  items.push({ic:'📅',txt:`Per-day desk capacity: on average <b>${S.pctD}%</b> of all desk-slots used${S.peak&&S.peak.count>0?`; peak day reached <b>${pct(S.peak.count,S.peak.cap)}%</b>`:''}`});
+  if(S.totalPark>0){
+    items.push({ic:'🅿️',txt:`Per-shift parking capacity used (of ${S.pCap} spots/shift): ${shiftPctLine(S,'parking')}`});
+    items.push({ic:'🚙',txt:`Per-day parking capacity: on average <b>${S.pctP}%</b> of all spot-slots used${S.peakP&&S.peakP.count>0?`; peak day <b>${fmtDay(S.peakP.d)}</b> reached <b>${pct(S.peakP.count,S.peakP.cap)}%</b> (${S.peakP.count} of ${S.peakP.cap})`:''}`});
+    if(S.busiestP) items.push({ic:'⏱️',txt:`Busiest parking shift: <b>${SHIFT_META[S.busiestP.sh].label}</b> — avg ${S.busiestP.avg.toFixed(1)} spots/day = <b>${S.busiestP.p}%</b> of shift capacity`});
+  }
   if(S.peak&&S.peak.count>0)
     items.push({ic:'📈',txt:`Busiest day: <b>${fmtDay(S.peak.d)}</b> — ${S.peak.count} desk booking${S.peak.count!==1?'s':''} = <b>${pct(S.peak.count,S.peak.cap)}%</b> of that day's capacity (${S.peak.cap} desk-slots)`});
   if(S.busiest)
@@ -1457,7 +1469,7 @@ function buildRptPreview(t,ref){
       <div class="stat"><div class="lbl">Desk bookings</div><div class="val">${S.totalDesk}</div><div class="sub2">avg ${S.avgD}/day</div></div>
       <div class="stat"><div class="lbl">Desk utilization</div><div class="val">${S.pctD}%</div><div class="sub2">of shift capacity (${dCap}/shift)</div></div>
       <div class="stat"><div class="lbl">Peak day</div><div class="val">${S.peak?pct(S.peak.count,S.peak.cap):0}%</div><div class="sub2">${S.peak?`of day capacity · ${fmtDay(S.peak.d)}`:'—'}</div></div>
-      <div class="stat"><div class="lbl">Parking utilization</div><div class="val">${S.pctP}%</div><div class="sub2">of shift capacity (${pCap}/shift)</div></div>
+      <div class="stat"><div class="lbl">Parking utilization</div><div class="val">${S.pctP}%</div><div class="sub2">of shift capacity (${pCap}/shift)${S.peakP&&S.peakP.count>0?` · peak day ${pct(S.peakP.count,S.peakP.cap)}%`:''}</div></div>
       <div class="stat"><div class="lbl">Unique attendees</div><div class="val">${S.attendees}</div><div class="sub2">of ${state.employees.length} employees</div></div>
     </div>
   </div>`;
@@ -1654,8 +1666,13 @@ function openPresentation(t,ref){
 
   // Highlights bullets (plain-text version of the preview highlights)
   const hl=[];
-  hl.push(`Per-shift desk capacity used (of ${dCap} desks per shift): ${shiftPctLine(S)}.`);
-  hl.push(`Per-day capacity: on average <b>${S.pctD}%</b> of all desk-slots were used${S.peak&&S.peak.count>0?`; the peak day reached <b>${pct(S.peak.count,S.peak.cap)}%</b>`:''}.`);
+  hl.push(`Per-shift desk capacity used (of ${dCap} desks per shift): ${shiftPctLine(S,'desks')}.`);
+  hl.push(`Per-day desk capacity: on average <b>${S.pctD}%</b> of all desk-slots were used${S.peak&&S.peak.count>0?`; the peak day reached <b>${pct(S.peak.count,S.peak.cap)}%</b>`:''}.`);
+  if(S.totalPark>0){
+    hl.push(`Per-shift parking capacity used (of ${pCap} spots per shift): ${shiftPctLine(S,'parking')}.`);
+    hl.push(`Per-day parking capacity: on average <b>${S.pctP}%</b> of all spot-slots were used${S.peakP&&S.peakP.count>0?`; peak day <b>${fmtDay(S.peakP.d)}</b> reached <b>${pct(S.peakP.count,S.peakP.cap)}%</b> (${S.peakP.count} of ${S.peakP.cap} spot-slots)`:''}.`);
+    if(S.busiestP) hl.push(`Busiest parking shift: <b>${SHIFT_META[S.busiestP.sh].label}</b> — avg ${S.busiestP.avg.toFixed(1)} spots/day (<b>${S.busiestP.p}%</b> of shift capacity).`);
+  }
   if(S.peak&&S.peak.count>0) hl.push(`Busiest day was <b>${fmtDay(S.peak.d)}</b> with ${S.peak.count} desk bookings — <b>${pct(S.peak.count,S.peak.cap)}%</b> of that day's ${S.peak.cap} desk-slots.`);
   if(S.busiest) hl.push(`<b>${SHIFT_META[S.busiest.sh].label}</b> was the most used shift — avg ${S.busiest.avg.toFixed(1)} desks/day (<b>${S.busiest.p}%</b> of shift capacity).`);
   hl.push(`<b>${S.attendees}</b> unique ${S.attendees===1?'person':'people'} reserved a desk out of ${state.employees.length} employees.`);
