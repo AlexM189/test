@@ -619,6 +619,12 @@ function activeShifts(d){ return isWeekend(d) ? ['weekend'] : ['day','evening','
 function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function empById(id){ return state.employees.find(e=>e.id===id); }
 function empName(id){ const e=empById(id); return e?e.name:'?'; }
+/* Privacy: real names only for admin or for your own bookings; everyone else sees "Employee N" */
+function dispName(id){
+  if(isAdmin||id===currentUser) return empName(id);
+  const i=state.employees.findIndex(e=>e.id===id);
+  return i>=0?`Employee ${i+1}`:'Reserved';
+}
 function isUnavail(kind,n){ const l=kind==='desks'?state.config.unavailableDesks:state.config.unavailableParking; return Array.isArray(l)&&l.includes(+n); }
 function capacity(kind){ const tot=kind==='desks'?state.config.desks:state.config.parking; const u=(kind==='desks'?state.config.unavailableDesks:state.config.unavailableParking)||[]; return tot-u.filter(n=>n>=1&&n<=tot).length; }
 function startOfWeek(d){ const x=new Date(d); const day=x.getDay(); x.setDate(x.getDate()-(day===0?6:day-1)); x.setHours(0,0,0,0); return x; }
@@ -738,6 +744,8 @@ function setUser(id){
   syncUserInput();
   closeDrop();
   renderCalendar();
+  if(activePanel==='today') renderToday();
+  if(modalDate) renderBookingModal();
 }
 
 function syncUserInput(){
@@ -930,10 +938,10 @@ function _fpDeskCell(n, sh){
   const taken=!!owner&&!mine;
   let cls='fp-cell'+(unavail?' na':mine?' mine':taken?' taken':'');
   const numHtml=`<span class="fp-num">${n}</span>`;
-  const nmHtml=unavail?`<span class="fp-nm">N/A</span>`:owner?`<span class="fp-nm">${h(empName(owner))}</span>`:'';
+  const nmHtml=unavail?`<span class="fp-nm">N/A</span>`:owner?`<span class="fp-nm">${h(dispName(owner))}</span>`:'';
   if(unavail) return `<div class="${cls}" title="Out of service">${numHtml}${nmHtml}</div>`;
   if(taken){
-    const clickAttr=isAdmin?` onclick="handleSlot('${sh}','desks',${n})" style="cursor:pointer" title="Remove ${h(empName(owner))}'s booking"`:` title="${h(empName(owner))}"`;
+    const clickAttr=isAdmin?` onclick="handleSlot('${sh}','desks',${n})" style="cursor:pointer" title="Remove ${h(empName(owner))}'s booking"`:` title="${h(dispName(owner))}"`;
     return `<div class="${cls}"${clickAttr}>${numHtml}${nmHtml}</div>`;
   }
   return `<div class="${cls}" onclick="handleSlot('${sh}','desks',${n})" title="${mine?'Cancel booking':'Book desk '+n}">${numHtml}${nmHtml}</div>`;
@@ -983,12 +991,12 @@ function buildParkingLayout(sh){
     let cls='fp-cell fp-park'+(isAccess?' access':'')+(unavail?' na':mine?' mine':taken?' taken':'');
     const label=pk.pos?`${pk.code}<br><span style="font-size:8px">(${pk.pos})</span>`:pk.code;
     const numHtml=`<span class="fp-num">${isAccess?ACCESS_ICON:''}<span style="font-size:9px">${label}</span></span>`;
-    const nmHtml=owner?`<span class="fp-nm">${h(empName(owner))}</span>`:'';
+    const nmHtml=owner?`<span class="fp-nm">${h(dispName(owner))}</span>`:'';
     let cell;
     if(unavail){
       cell=`<div class="${cls}" title="Out of service">${numHtml}${nmHtml}</div>`;
     } else if(taken){
-      const clickAttr=isAdmin?` onclick="handleSlot('${sh}','parking',${n})" style="cursor:pointer" title="Remove ${h(empName(owner))}'s parking"`:` title="${h(empName(owner))}"`;
+      const clickAttr=isAdmin?` onclick="handleSlot('${sh}','parking',${n})" style="cursor:pointer" title="Remove ${h(empName(owner))}'s parking"`:` title="${h(dispName(owner))}"`;
       cell=`<div class="${cls}"${clickAttr}>${numHtml}${nmHtml}</div>`;
     } else {
       cell=`<div class="${cls}" onclick="handleSlot('${sh}','parking',${n})" title="${mine?'Cancel booking':pk.code+(pk.pos?' ('+pk.pos+')':'')+(isAccess?' · Accessible':'')}">${numHtml}${nmHtml}</div>`;
@@ -1013,7 +1021,7 @@ async function handleSlot(sh,kind,n){
     return;
   }
   if(!currentUser){ toast('Select yourself first','err'); return; }
-  if(owner && owner!==currentUser){ toast('Already taken by '+empName(owner),'err'); return; }
+  if(owner && owner!==currentUser){ toast('Already taken by '+dispName(owner),'err'); return; }
   const mine=owner===currentUser;
   if(!mine){
     const alreadyHas=Object.values(sd[kind]||{}).includes(currentUser);
@@ -1072,7 +1080,7 @@ function renderToday(){
         const parkNum=Object.entries(sd.parking||{}).find(([k,v])=>v===uid)?.[0]||'—';
         const emp=empById(uid);
         const remoteBadge=emp?.remote?'<span style="font-size:10px;background:var(--remote-light);color:var(--remote);border-radius:8px;padding:1px 6px;margin-left:4px">Remote</span>':'';
-        html+=`<tr><td>${h(empName(uid))}${remoteBadge}</td><td>${deskNum}</td><td>${parkNum}</td></tr>`;
+        html+=`<tr><td>${h(dispName(uid))}${remoteBadge}</td><td>${deskNum}</td><td>${parkNum}</td></tr>`;
       });
       html+='</tbody></table>';
     }
@@ -2043,8 +2051,10 @@ function setAdminUI(admin){
     document.querySelector('nav button[data-panel="calendar"]').click();
   }
   if(activePanel==='calendar')  renderCalendar();
+  if(activePanel==='today')     renderToday();
   if(activePanel==='employees') renderEmployees();
   if(activePanel==='feedback')  renderFeedbackPanel();
+  if(modalDate) renderBookingModal();   // swap names in an open booking modal
 }
 
 document.getElementById('adminLoginBtn').addEventListener('click',()=>{
