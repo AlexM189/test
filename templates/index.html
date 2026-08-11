@@ -201,6 +201,27 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
 /* theme button */
 .theme-btn{background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:5px 8px;font-size:15px;line-height:1;color:var(--text-muted);transition:var(--transition)}
 .theme-btn:hover{background:var(--surface-2)}
+/* multi-add day picker */
+#multiAddModal .modal{max-width:660px}
+.md-sec{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px}
+.md-sec-hdr{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.md-sec-hdr h4{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.md-quick{display:flex;gap:5px;flex-wrap:wrap}
+.md-quick button{padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:5px;background:var(--surface);color:var(--text-muted);cursor:pointer;font-family:inherit;white-space:nowrap}
+.md-quick button:hover{border-color:var(--primary);color:var(--primary)}
+.md-dow{display:grid;grid-template-columns:auto repeat(7,1fr);gap:3px;font-size:10px;color:var(--text-muted);font-weight:600;text-align:center;margin-bottom:3px}
+.md-week{display:grid;grid-template-columns:auto repeat(7,1fr);gap:3px;margin-bottom:3px;align-items:center}
+.md-wk-lbl{font-size:10px;color:var(--text-muted);padding-right:4px;white-space:nowrap;min-width:30px}
+.md-day{border:1px solid var(--border);background:var(--surface);border-radius:5px;padding:4px 2px;font-size:11px;cursor:pointer;font-family:inherit;color:var(--text);line-height:1.25;text-align:center}
+.md-day:hover:not(:disabled){border-color:var(--primary);background:var(--primary-light)}
+.md-day .md-mon{display:block;font-size:8px;color:var(--text-muted)}
+.md-day.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:700}
+.md-day.on .md-mon{color:rgba(255,255,255,.8)}
+.md-day:disabled{background:var(--surface-2);color:var(--border);cursor:not-allowed;border-color:transparent}
+.md-day.today{box-shadow:inset 0 0 0 2px var(--warning)}
+.md-res{max-height:200px;overflow-y:auto;font-size:12px;border:1px solid var(--border);border-radius:8px}
+.md-res div{padding:6px 10px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:10px}
+.md-res div:last-child{border-bottom:none}
 /* empty-state helper */
 .empty-state{text-align:center;padding:40px 20px;color:var(--text-muted)}
 .empty-state .es-icon{font-size:40px;margin-bottom:10px}
@@ -541,13 +562,42 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
     <div class="mhdr"><h2 id="multiAddTitle">Add people to shift</h2><button class="mclose" id="closeMultiAdd">×</button></div>
     <div class="mbody">
       <div class="sub" id="multiAddSub" style="margin-bottom:12px"></div>
-      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
-        <input type="text" id="multiAddSearch" placeholder="Search name or department…" style="flex:1;min-width:150px">
-        <button class="btn sec sm" id="multiAddAll">Select all</button>
-        <button class="btn sec sm" id="multiAddNone">Clear</button>
+
+      <!-- DAYS -->
+      <div class="md-sec" id="multiAddDaysSec">
+        <div class="md-sec-hdr">
+          <h4>📅 Days <span id="mdDayCount" style="text-transform:none;letter-spacing:0;font-weight:400"></span></h4>
+          <div class="md-quick">
+            <button data-q="only">Just this day</button>
+            <button data-q="weekday">Same weekday ×4</button>
+            <button data-q="week">Whole week</button>
+            <button data-q="clear">Clear</button>
+          </div>
+        </div>
+        <div class="md-dow"><span></span><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+        <div id="multiAddDayGrid"></div>
+        <div style="display:flex;justify-content:center;gap:8px;margin-top:6px">
+          <button class="btn sec sm" id="mdPrevWeeks">◀ earlier</button>
+          <button class="btn sec sm" id="mdNextWeeks">later ▶</button>
+        </div>
       </div>
-      <div id="multiAddList" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
-      <div style="margin-top:12px;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+
+      <!-- PEOPLE -->
+      <div class="md-sec">
+        <div class="md-sec-hdr">
+          <h4>👥 People</h4>
+          <div class="md-quick">
+            <button id="multiAddAll">Select all</button>
+            <button id="multiAddNone">Clear</button>
+          </div>
+        </div>
+        <input type="text" id="multiAddSearch" placeholder="Search name or department…" style="margin-bottom:8px">
+        <div id="multiAddList" style="max-height:230px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+      </div>
+
+      <div id="multiAddResults" style="display:none;margin-bottom:12px"></div>
+
+      <div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
         <span id="multiAddCount" style="font-size:12px;color:var(--text-muted)"></span>
         <span style="display:flex;gap:8px">
           <button class="btn sec" id="cancelMultiAdd">Cancel</button>
@@ -1057,32 +1107,34 @@ function slotHeldBy(empId,kind,sh,ds){
    into local state. Without this, a loop of bookings keeps reading pre-booking
    state and every iteration picks the same "free" slot. Returns the status so
    callers can distinguish a 409 conflict from a real failure. */
-async function writeSlot(kind,sh,n,userId,unbook=false){
+async function writeSlot(kind,sh,n,userId,unbook=false,ds){
+  const date=ds||modalDate;
   try{
     const r=await fetch(unbook?'/api/unbook':'/api/book',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({date:modalDate,shift:sh,kind,slot:n,userId})});
+      body:JSON.stringify({date,shift:sh,kind,slot:n,userId})});
     const data=await r.json();
-    if(r.ok&&data.day) state.bookings[modalDate]=data.day;   // keep local state fresh
+    if(r.ok&&data.day) state.bookings[date]=data.day;   // keep local state fresh
     return {ok:r.ok,status:r.status,error:data.error};
   }catch(e){ return {ok:false,status:0,error:'Network error'}; }
 }
 
 /* Book a desk and, for drivers, grab a parking spot in the same shift.
    Returns {desk, parking, parkingFull} — or {error, conflict} when the desk failed. */
-async function bookDeskFor(empId,sh,deskNum){
-  const res=await writeSlot('desks',sh,deskNum,empId);
+async function bookDeskFor(empId,sh,deskNum,ds){
+  const date=ds||modalDate;
+  const res=await writeSlot('desks',sh,deskNum,empId,false,date);
   if(!res.ok) return {error:res.error||'Could not book desk',conflict:res.status===409};
   const out={desk:deskNum,parking:null,parkingFull:false};
   const emp=empById(empId);
-  if(emp&&emp.hasCar&&slotHeldBy(empId,'parking',sh)===null){
-    let spot=firstFreeSlot('parking',sh);
+  if(emp&&emp.hasCar&&slotHeldBy(empId,'parking',sh,date)===null){
+    let spot=firstFreeSlot('parking',sh,date);
     // retry on conflict — another device may have taken the spot in between
     for(let attempt=0;attempt<3&&spot!==null;attempt++){
-      const pr=await writeSlot('parking',sh,spot,empId);
+      const pr=await writeSlot('parking',sh,spot,empId,false,date);
       if(pr.ok){ out.parking=spot; break; }
       if(pr.status!==409) break;
-      spot=firstFreeSlot('parking',sh);
+      spot=firstFreeSlot('parking',sh,date);
     }
     if(out.parking===null) out.parkingFull=true;
   }
@@ -1090,14 +1142,15 @@ async function bookDeskFor(empId,sh,deskNum){
 }
 
 /* Cancel a desk; for drivers also release the parking spot paired with it */
-async function unbookDeskFor(empId,sh,deskNum){
+async function unbookDeskFor(empId,sh,deskNum,ds){
+  const date=ds||modalDate;
   const emp=empById(empId);
   let freedParking=null;
   if(emp&&emp.hasCar){
-    const held=slotHeldBy(empId,'parking',sh);
-    if(held!==null&&(await writeSlot('parking',sh,held,empId,true)).ok) freedParking=held;
+    const held=slotHeldBy(empId,'parking',sh,date);
+    if(held!==null&&(await writeSlot('parking',sh,held,empId,true,date)).ok) freedParking=held;
   }
-  await writeSlot('desks',sh,deskNum,empId,true);
+  await writeSlot('desks',sh,deskNum,empId,true,date);
   return freedParking;
 }
 
@@ -1153,20 +1206,89 @@ async function handleSlot(sh,kind,n){
 /* ====================================================================
    MULTI-ADD PEOPLE
    ==================================================================== */
-let multiAddShift=null, multiAddSel=new Set();
+let multiAddShift=null, multiAddSel=new Set(), multiAddDays=new Set(), mdWeekStart=null;
+const MD_WEEKS=4;   // weeks visible in the day grid at a time
+
+/* Is this shift bookable on that date? (weekend shift only Sat/Sun, others Mon–Fri) */
+function shiftRunsOn(sh,ds){ return activeShifts(parseYmd(ds)).includes(sh); }
 
 function openMultiAdd(sh){
-  multiAddShift=sh; multiAddSel=new Set();
+  multiAddShift=sh; multiAddSel=new Set(); multiAddDays=new Set([modalDate]);
+  mdWeekStart=startOfWeek(parseYmd(modalDate));
   document.getElementById('multiAddSearch').value='';
-  const d=parseYmd(modalDate);
+  document.getElementById('multiAddResults').style.display='none';
   document.getElementById('multiAddTitle').textContent=`Add people — ${SHIFT_META[sh].label}`;
   document.getElementById('multiAddSub').innerHTML=
-    `${DOW_L[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} · each person gets the next free desk`+
+    `Pick the days and the people — each person gets the next free desk on every day selected.`+
     `<br><span style="font-size:12px">🚗 drivers are given a parking spot automatically</span>`;
+  renderMultiAddDays();
   renderMultiAddList();
   document.getElementById('multiAddModal').classList.add('open');
   setTimeout(()=>document.getElementById('multiAddSearch').focus(),50);
 }
+
+function renderMultiAddDays(){
+  const grid=document.getElementById('multiAddDayGrid');
+  const todayStr=ymd(new Date());
+  let html='';
+  for(let w=0;w<MD_WEEKS;w++){
+    const ws=new Date(mdWeekStart); ws.setDate(ws.getDate()+w*7);
+    html+='<div class="md-week">';
+    html+=`<span class="md-wk-lbl">${ws.getDate()} ${MONTHS[ws.getMonth()].slice(0,3)}</span>`;
+    for(let i=0;i<7;i++){
+      const d=new Date(ws); d.setDate(d.getDate()+i);
+      const ds=ymd(d);
+      const usable=shiftRunsOn(multiAddShift,ds);
+      const cls=['md-day'];
+      if(multiAddDays.has(ds)) cls.push('on');
+      if(ds===todayStr) cls.push('today');
+      html+=`<button class="${cls.join(' ')}" data-ds="${ds}" ${usable?'':'disabled'} title="${usable?DOW_L[d.getDay()]+' '+d.getDate()+' '+MONTHS[d.getMonth()]:SHIFT_META[multiAddShift].label+' does not run on this day'}">${d.getDate()}<span class="md-mon">${MONTHS[d.getMonth()].slice(0,3)}</span></button>`;
+    }
+    html+='</div>';
+  }
+  grid.innerHTML=html;
+  grid.querySelectorAll('.md-day:not(:disabled)').forEach(b=>{
+    b.addEventListener('click',()=>{
+      const ds=b.dataset.ds;
+      multiAddDays.has(ds)?multiAddDays.delete(ds):multiAddDays.add(ds);
+      renderMultiAddDays(); renderMultiAddList();
+    });
+  });
+  const n=multiAddDays.size;
+  document.getElementById('mdDayCount').textContent=n?`— ${n} day${n!==1?'s':''} selected`:'— none selected';
+}
+
+document.getElementById('mdPrevWeeks').addEventListener('click',()=>{
+  mdWeekStart.setDate(mdWeekStart.getDate()-MD_WEEKS*7); renderMultiAddDays();
+});
+document.getElementById('mdNextWeeks').addEventListener('click',()=>{
+  mdWeekStart.setDate(mdWeekStart.getDate()+MD_WEEKS*7); renderMultiAddDays();
+});
+
+document.querySelectorAll('#multiAddDaysSec .md-quick button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    const q=b.dataset.q;
+    const anchor=parseYmd(modalDate);
+    if(q==='clear') multiAddDays.clear();
+    else if(q==='only'){ multiAddDays=new Set(shiftRunsOn(multiAddShift,modalDate)?[modalDate]:[]); }
+    else if(q==='weekday'){
+      // same weekday as the anchor day, for 4 consecutive weeks
+      multiAddDays.clear();
+      for(let w=0;w<4;w++){
+        const d=new Date(anchor); d.setDate(d.getDate()+w*7);
+        const ds=ymd(d);
+        if(shiftRunsOn(multiAddShift,ds)) multiAddDays.add(ds);
+      }
+      mdWeekStart=startOfWeek(anchor);
+    } else if(q==='week'){
+      // every day of the anchor's week this shift actually runs
+      multiAddDays.clear();
+      weekDays(anchor).forEach(d=>{ const ds=ymd(d); if(shiftRunsOn(multiAddShift,ds)) multiAddDays.add(ds); });
+      mdWeekStart=startOfWeek(anchor);
+    }
+    renderMultiAddDays(); renderMultiAddList();
+  });
+});
 
 function multiAddCandidates(){
   const q=document.getElementById('multiAddSearch').value.toLowerCase().trim();
@@ -1175,20 +1297,29 @@ function multiAddCandidates(){
     .filter(e=>!q||e.name.toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));
 }
 
+/* How many of the selected days this person already holds a desk on */
+function daysAlreadyBooked(empId){
+  return [...multiAddDays].filter(ds=>slotHeldBy(empId,'desks',multiAddShift,ds)!==null).length;
+}
+
 function renderMultiAddList(){
   const list=document.getElementById('multiAddList');
   const cands=multiAddCandidates();
+  const nDays=multiAddDays.size;
   if(!cands.length){
     list.innerHTML=`<div class="empty-state" style="padding:24px"><p>No employees assigned to this shift${document.getElementById('multiAddSearch').value?' match your search':''}.</p></div>`;
   } else {
     list.innerHTML=cands.map(e=>{
-      const booked=slotHeldBy(e.id,'desks',multiAddShift)!==null;
+      const have=daysAlreadyBooked(e.id);
+      const full=nDays>0&&have===nDays;          // nothing left to book for them
       const checked=multiAddSel.has(e.id);
-      return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:${booked?'default':'pointer'};opacity:${booked?'.55':'1'}">
-        <input type="checkbox" data-id="${e.id}" ${checked?'checked':''} ${booked?'disabled':''} style="width:auto;margin:0">
+      const badge=full?'<span class="pill ok" style="font-size:10px">booked</span>'
+        :have>0?`<span class="pill warn" style="font-size:10px">${have}/${nDays}</span>`:'';
+      return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:${full?'default':'pointer'};opacity:${full?'.55':'1'}">
+        <input type="checkbox" data-id="${e.id}" ${checked?'checked':''} ${full?'disabled':''} style="width:auto;margin:0">
         <span style="flex:1">${h(e.name)}${e.department?` <span style="font-size:11px;color:var(--text-muted)">${h(e.department)}</span>`:''}</span>
         ${e.hasCar?'<span title="Drives — parking auto-assigned" style="font-size:12px">🚗</span>':''}
-        ${booked?'<span class="pill ok" style="font-size:10px">booked</span>':''}
+        ${badge}
       </label>`;
     }).join('');
     list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
@@ -1201,21 +1332,39 @@ function renderMultiAddList(){
   updateMultiAddCount();
 }
 
+/* Free desks on the tightest of the selected days */
+function tightestFreeDesks(){
+  if(!multiAddDays.size) return 0;
+  const cap=state.config.desks;
+  return Math.min(...[...multiAddDays].map(ds=>{
+    const slots=shiftData(ds,multiAddShift).desks||{};
+    let c=0; for(let i=1;i<=cap;i++) if(!slots[String(i)]&&!isUnavail('desks',i)) c++;
+    return c;
+  }));
+}
+
 function updateMultiAddCount(){
-  const n=multiAddSel.size;
+  const nP=multiAddSel.size, nD=multiAddDays.size;
   const drivers=[...multiAddSel].filter(id=>empById(id)?.hasCar).length;
-  const freeDesks=(()=>{ let c=0; const cap=state.config.desks;
-    const slots=shiftData(modalDate,multiAddShift).desks||{};
-    for(let i=1;i<=cap;i++) if(!slots[String(i)]&&!isUnavail('desks',i)) c++; return c; })();
   const el=document.getElementById('multiAddCount');
-  const warn=n>freeDesks?` <span style="color:var(--danger)">— only ${freeDesks} desk${freeDesks!==1?'s':''} free</span>`:'';
-  el.innerHTML=n?`${n} selected${drivers?` · ${drivers} 🚗`:''}${warn}`:`${freeDesks} desk${freeDesks!==1?'s':''} available`;
-  document.getElementById('applyMultiAdd').disabled=!n;
+  const btn=document.getElementById('applyMultiAdd');
+  if(!nD){
+    el.innerHTML='<span style="color:var(--danger)">Select at least one day</span>';
+    btn.disabled=true; btn.textContent='Book desks'; return;
+  }
+  const free=tightestFreeDesks();
+  const warn=nP>free?` <span style="color:var(--danger)">— only ${free} desk${free!==1?'s':''} free on the busiest day</span>`:'';
+  el.innerHTML=nP
+    ?`${nP} ${nP===1?'person':'people'} × ${nD} day${nD!==1?'s':''}${drivers?` · ${drivers} 🚗`:''}${warn}`
+    :`${nD} day${nD!==1?'s':''} selected · ${free} desk${free!==1?'s':''} free`;
+  btn.disabled=!nP;
+  btn.textContent=nP&&nD>1?`Book ${nP*nD} desks`:'Book desks';
 }
 
 document.getElementById('multiAddSearch').addEventListener('input',renderMultiAddList);
 document.getElementById('multiAddAll').addEventListener('click',()=>{
-  multiAddCandidates().forEach(e=>{ if(slotHeldBy(e.id,'desks',multiAddShift)===null) multiAddSel.add(e.id); });
+  const nDays=multiAddDays.size;
+  multiAddCandidates().forEach(e=>{ if(daysAlreadyBooked(e.id)<nDays||!nDays) multiAddSel.add(e.id); });
   renderMultiAddList();
 });
 document.getElementById('multiAddNone').addEventListener('click',()=>{ multiAddSel.clear(); renderMultiAddList(); });
@@ -1227,37 +1376,69 @@ document.getElementById('multiAddModal').addEventListener('click',e=>{
 
 document.getElementById('applyMultiAdd').addEventListener('click',async()=>{
   const ids=[...multiAddSel];
-  if(!ids.length) return;
+  const days=[...multiAddDays].sort();
+  if(!ids.length||!days.length) return;
+  const total=ids.length*days.length;
+  if(total>150&&!confirm(`This will place up to ${total} bookings (${ids.length} people × ${days.length} days). Continue?`)) return;
+
   const btn=document.getElementById('applyMultiAdd');
-  btn.disabled=true; btn.textContent='Booking…';
-  let desks=0, parks=0, noDesk=0, noPark=0;
-  for(const id of ids){
-    if(slotHeldBy(id,'desks',multiAddShift)!==null) continue;
-    let done=false;
-    for(let attempt=0;attempt<4&&!done;attempt++){
-      const free=firstFreeSlot('desks',multiAddShift);
-      if(free===null){ noDesk++; done=true; break; }         // genuinely out of desks
-      const r=await bookDeskFor(id,multiAddShift,free);
-      if(r.error){
-        if(r.conflict) continue;                             // someone grabbed it — take the next desk
-        noDesk++; done=true; break;
+  const origLabel=btn.textContent;
+  btn.disabled=true;
+  let done=0, desks=0, parks=0, noDesk=0, noPark=0;
+  const perDay=[];
+
+  for(const ds of days){
+    let dDesks=0, dParks=0, dNoDesk=0, dNoPark=0;
+    for(const id of ids){
+      btn.textContent=`Booking… ${++done}/${total}`;
+      if(slotHeldBy(id,'desks',multiAddShift,ds)!==null) continue;   // already has one that day
+      let placed=false;
+      for(let attempt=0;attempt<4&&!placed;attempt++){
+        const free=firstFreeSlot('desks',multiAddShift,ds);
+        if(free===null){ dNoDesk++; placed=true; break; }            // genuinely out of desks
+        const r=await bookDeskFor(id,multiAddShift,free,ds);
+        if(r.error){
+          if(r.conflict) continue;                                   // someone grabbed it — next desk
+          dNoDesk++; placed=true; break;
+        }
+        dDesks++;
+        if(r.parking!==null) dParks++;
+        if(r.parkingFull) dNoPark++;
+        placed=true;
       }
-      desks++;
-      if(r.parking!==null) parks++;
-      if(r.parkingFull) noPark++;
-      done=true;
+      if(!placed) dNoDesk++;                                         // retries exhausted
     }
-    if(!done) noDesk++;                                      // retries exhausted
+    desks+=dDesks; parks+=dParks; noDesk+=dNoDesk; noPark+=dNoPark;
+    perDay.push({ds,dDesks,dParks,dNoDesk,dNoPark});
   }
-  btn.disabled=false; btn.textContent='Book desks';
-  document.getElementById('multiAddModal').classList.remove('open');
+
+  btn.disabled=false; btn.textContent=origLabel;
   renderBookingModal(); renderCalendar();
+
   let msg=`Booked ${desks} desk${desks!==1?'s':''}`;
   if(parks) msg+=` + ${parks} parking`;
-  const problems=[];
-  if(noDesk) problems.push(`${noDesk} left out (no desks free)`);
-  if(noPark) problems.push(`${noPark} without parking`);
-  toast(problems.length?`${msg} · ${problems.join(', ')}`:msg, problems.length?'err':'ok');
+  if(days.length>1) msg+=` across ${days.length} days`;
+
+  if(noDesk||noPark){
+    // Keep the picker open and show exactly what happened, day by day
+    const res=document.getElementById('multiAddResults');
+    res.style.display='block';
+    res.innerHTML=`<div class="md-sec-hdr"><h4>Result</h4></div><div class="md-res">`+
+      perDay.map(p=>{
+        const d=parseYmd(p.ds);
+        const issues=[];
+        if(p.dNoDesk) issues.push(`${p.dNoDesk} no desk`);
+        if(p.dNoPark) issues.push(`${p.dNoPark} no parking`);
+        return `<div><span>${DOW_S[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()].slice(0,3)}</span>
+          <span>${p.dDesks} desk${p.dDesks!==1?'s':''}${p.dParks?` + ${p.dParks} 🚗`:''}
+          ${issues.length?`<span style="color:var(--danger)"> · ${issues.join(', ')}</span>`:''}</span></div>`;
+      }).join('')+`</div>`;
+    renderMultiAddDays(); renderMultiAddList();
+    toast(`${msg} — some could not be placed`,'err');
+  } else {
+    document.getElementById('multiAddModal').classList.remove('open');
+    toast(msg,'ok');
+  }
 });
 
 /* ====================================================================
