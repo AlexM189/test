@@ -196,6 +196,8 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
 .stog.on-night{background:var(--night-light);border-color:var(--night);color:var(--night);font-weight:600}
 .stog.on-weekend{background:var(--weekend-light);border-color:var(--weekend);color:var(--weekend);font-weight:600}
 .stog.on-remote{background:var(--remote-light);border-color:var(--remote);color:var(--remote);font-weight:600}
+.stog.on-car{background:var(--warning-light);border-color:var(--warning);color:#92400e;font-weight:600}
+[data-theme="dark"] .stog.on-car{color:var(--warning)}
 /* theme button */
 .theme-btn{background:none;border:1px solid var(--border);border-radius:6px;cursor:pointer;padding:5px 8px;font-size:15px;line-height:1;color:var(--text-muted);transition:var(--transition)}
 .theme-btn:hover{background:var(--surface-2)}
@@ -422,7 +424,7 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
 <section class="panel" id="panel-employees">
   <div class="card">
     <h2>Employee Roster <span id="empCnt" style="font-size:13px;font-weight:400;color:var(--text-muted)"></span></h2>
-    <div class="sub">Add people, paste a name list, or import from Excel. Changes are live for all connected users.</div>
+    <div class="sub">Add people, paste a name list, or import from Excel. Tag 🚗 <strong>Car</strong> and a parking spot is assigned automatically whenever that person books a desk. Changes are live for all connected users.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
       <div id="empAdminBtns" style="display:none;gap:8px;flex-wrap:wrap">
         <button class="btn" id="addEmpBtn">+ Add Employee</button>
@@ -530,6 +532,29 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
       <button class="mclose" id="closeBook">×</button>
     </div>
     <div class="mbody" id="bookModalBody"></div>
+  </div>
+</div>
+
+<!-- MULTI-ADD PEOPLE MODAL -->
+<div class="mbdrop" id="multiAddModal">
+  <div class="modal narrow">
+    <div class="mhdr"><h2 id="multiAddTitle">Add people to shift</h2><button class="mclose" id="closeMultiAdd">×</button></div>
+    <div class="mbody">
+      <div class="sub" id="multiAddSub" style="margin-bottom:12px"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+        <input type="text" id="multiAddSearch" placeholder="Search name or department…" style="flex:1;min-width:150px">
+        <button class="btn sec sm" id="multiAddAll">Select all</button>
+        <button class="btn sec sm" id="multiAddNone">Clear</button>
+      </div>
+      <div id="multiAddList" style="max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:8px"></div>
+      <div style="margin-top:12px;display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">
+        <span id="multiAddCount" style="font-size:12px;color:var(--text-muted)"></span>
+        <span style="display:flex;gap:8px">
+          <button class="btn sec" id="cancelMultiAdd">Cancel</button>
+          <button class="btn" id="applyMultiAdd">Book desks</button>
+        </span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -920,7 +945,7 @@ function renderBookingModal(){
           <h4>🚗 Parking (${pCap} spots)</h4>
           ${buildParkingLayout(sh)}
         </div>
-        ${currentUser?`<div style="margin-top:10px"><button class="btn sec sm" onclick="bulkBookShift('${sh}','desks')">Add all ${meta.label} employees (desks)</button></div>`:''}
+        ${(isAdmin||currentUser)?`<div style="margin-top:10px"><button class="btn sec sm" onclick="openMultiAdd('${sh}')">👥 Add multiple people…</button></div>`:''}
       </div>
     </div>`;
   });
@@ -1011,45 +1036,196 @@ function buildParkingLayout(sh){
 
 function toggleShift(sh){ shiftOpen[sh]=!shiftOpen[sh]; renderBookingModal(); }
 
+/* ---- shared booking helpers ---------------------------------------- */
+
+/* First free slot of `kind` in this shift, or null when full */
+function firstFreeSlot(kind,sh,ds){
+  const slots=shiftData(ds||modalDate,sh)[kind]||{};
+  const cap=kind==='desks'?state.config.desks:state.config.parking;
+  for(let n=1;n<=cap;n++) if(!slots[String(n)]&&!isUnavail(kind,n)) return n;
+  return null;
+}
+
+/* Slot number this person holds for `kind` in this shift, or null */
+function slotHeldBy(empId,kind,sh,ds){
+  const slots=shiftData(ds||modalDate,sh)[kind]||{};
+  const hit=Object.entries(slots).find(([,v])=>v===empId);
+  return hit?hit[0]:null;
+}
+
+/* Book a desk and, for drivers, grab a parking spot in the same shift.
+   Returns {desk, parking, parkingFull} so callers can report accurately. */
+async function bookDeskFor(empId,sh,deskNum){
+  const res=await api('/api/book','POST',{date:modalDate,shift:sh,kind:'desks',slot:deskNum,userId:empId});
+  if(!res) return null;
+  const out={desk:deskNum,parking:null,parkingFull:false};
+  const emp=empById(empId);
+  if(emp&&emp.hasCar&&!slotHeldBy(empId,'parking',sh)){
+    const spot=firstFreeSlot('parking',sh);
+    if(spot===null) out.parkingFull=true;
+    else if(await api('/api/book','POST',{date:modalDate,shift:sh,kind:'parking',slot:spot,userId:empId})) out.parking=spot;
+  }
+  return out;
+}
+
+/* Cancel a desk; for drivers also release the parking spot paired with it */
+async function unbookDeskFor(empId,sh,deskNum){
+  const emp=empById(empId);
+  let freedParking=null;
+  if(emp&&emp.hasCar){
+    const held=slotHeldBy(empId,'parking',sh);
+    if(held!==null&&await api('/api/unbook','POST',{date:modalDate,shift:sh,kind:'parking',slot:held,userId:empId})) freedParking=held;
+  }
+  await api('/api/unbook','POST',{date:modalDate,shift:sh,kind:'desks',slot:deskNum,userId:empId});
+  return freedParking;
+}
+
+function parkingLabel(n){
+  const pk=PARKING_CODES[n-1];
+  return pk?pk.code+(pk.pos?` (${pk.pos})`:''):`spot ${n}`;
+}
+
 async function handleSlot(sh,kind,n){
   const sd=shiftData(modalDate,sh);
   const owner=(sd[kind]||{})[String(n)];
   // Admin removing someone else's booking
   if(isAdmin && owner && owner!==currentUser){
-    if(!confirm(`Remove ${empName(owner)}'s booking?`)) return;
-    await api('/api/unbook','POST',{date:modalDate,shift:sh,kind,slot:n,userId:owner});
+    const oEmp=empById(owner);
+    const pairs=kind==='desks'&&oEmp&&oEmp.hasCar&&slotHeldBy(owner,'parking',sh)!==null;
+    if(!confirm(`Remove ${empName(owner)}'s ${kind==='desks'?'desk':'parking'} booking?`+(pairs?'\nTheir parking spot will be released too.':''))) return;
+    if(kind==='desks'){
+      const freed=await unbookDeskFor(owner,sh,n);
+      toast(freed!==null?`Removed desk ${n} and ${parkingLabel(+freed)}`:`Removed desk ${n}`,'ok');
+    } else {
+      await api('/api/unbook','POST',{date:modalDate,shift:sh,kind,slot:n,userId:owner});
+    }
     return;
   }
   if(!currentUser){ toast('Select yourself first','err'); return; }
   if(owner && owner!==currentUser){ toast('Already taken by '+dispName(owner),'err'); return; }
   const mine=owner===currentUser;
-  if(!mine){
-    const alreadyHas=Object.values(sd[kind]||{}).includes(currentUser);
-    if(alreadyHas){ toast('You already have a '+(kind==='desks'?'desk':'parking spot')+' booked for this shift','err'); return; }
+
+  if(kind==='desks'){
+    if(mine){
+      const freed=await unbookDeskFor(currentUser,sh,n);
+      if(freed!==null) toast(`Desk released — parking ${parkingLabel(+freed)} freed too`);
+      return;
+    }
+    if(slotHeldBy(currentUser,'desks',sh)!==null){ toast('You already have a desk booked for this shift','err'); return; }
+    const r=await bookDeskFor(currentUser,sh,n);
+    if(!r) return;
+    if(r.parking!==null) toast(`Desk ${n} booked — parking ${parkingLabel(r.parking)} assigned 🚗`,'ok');
+    else if(r.parkingFull) toast(`Desk ${n} booked — no parking spots left`,'err');
+    return;
   }
-  const endpoint=mine?'/api/unbook':'/api/book';
-  await api(endpoint,'POST',{date:modalDate,shift:sh,kind,slot:n,userId:currentUser});
+
+  // parking
+  if(!mine && slotHeldBy(currentUser,'parking',sh)!==null){
+    toast('You already have a parking spot booked for this shift','err'); return;
+  }
+  await api(mine?'/api/unbook':'/api/book','POST',{date:modalDate,shift:sh,kind,slot:n,userId:currentUser});
 }
 
-async function bulkBookShift(sh,kind){
-  if(!currentUser){ toast('Select yourself first','err'); return; }
-  const shiftEmps=state.employees.filter(e=>(e.shifts||[e.shift]).includes(sh));
-  if(!shiftEmps.length){ toast('No employees with this shift','err'); return; }
-  let count=0;
-  for(const emp of shiftEmps){
-    const sd=shiftData(modalDate,sh);
-    const slots=sd[kind]||{};
-    const alreadyBooked=Object.values(slots).includes(emp.id);
-    if(alreadyBooked) continue;
-    const cap=capacity(kind);
-    let free=null;
-    for(let n=1;n<=cap;n++){ if(!slots[String(n)]&&!isUnavail(kind,n)){ free=n; break; } }
-    if(free===null) break;
-    await api('/api/book','POST',{date:modalDate,shift:sh,kind,slot:free,userId:emp.id});
-    count++;
-  }
-  toast(`Booked ${count} employee${count!==1?'s':''}`,'ok');
+/* ====================================================================
+   MULTI-ADD PEOPLE
+   ==================================================================== */
+let multiAddShift=null, multiAddSel=new Set();
+
+function openMultiAdd(sh){
+  multiAddShift=sh; multiAddSel=new Set();
+  document.getElementById('multiAddSearch').value='';
+  const d=parseYmd(modalDate);
+  document.getElementById('multiAddTitle').textContent=`Add people — ${SHIFT_META[sh].label}`;
+  document.getElementById('multiAddSub').innerHTML=
+    `${DOW_L[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]} · each person gets the next free desk`+
+    `<br><span style="font-size:12px">🚗 drivers are given a parking spot automatically</span>`;
+  renderMultiAddList();
+  document.getElementById('multiAddModal').classList.add('open');
+  setTimeout(()=>document.getElementById('multiAddSearch').focus(),50);
 }
+
+function multiAddCandidates(){
+  const q=document.getElementById('multiAddSearch').value.toLowerCase().trim();
+  return state.employees
+    .filter(e=>(e.shifts||[e.shift||'day']).includes(multiAddShift))
+    .filter(e=>!q||e.name.toLowerCase().includes(q)||(e.department||'').toLowerCase().includes(q));
+}
+
+function renderMultiAddList(){
+  const list=document.getElementById('multiAddList');
+  const cands=multiAddCandidates();
+  if(!cands.length){
+    list.innerHTML=`<div class="empty-state" style="padding:24px"><p>No employees assigned to this shift${document.getElementById('multiAddSearch').value?' match your search':''}.</p></div>`;
+  } else {
+    list.innerHTML=cands.map(e=>{
+      const booked=slotHeldBy(e.id,'desks',multiAddShift)!==null;
+      const checked=multiAddSel.has(e.id);
+      return `<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);cursor:${booked?'default':'pointer'};opacity:${booked?'.55':'1'}">
+        <input type="checkbox" data-id="${e.id}" ${checked?'checked':''} ${booked?'disabled':''} style="width:auto;margin:0">
+        <span style="flex:1">${h(e.name)}${e.department?` <span style="font-size:11px;color:var(--text-muted)">${h(e.department)}</span>`:''}</span>
+        ${e.hasCar?'<span title="Drives — parking auto-assigned" style="font-size:12px">🚗</span>':''}
+        ${booked?'<span class="pill ok" style="font-size:10px">booked</span>':''}
+      </label>`;
+    }).join('');
+    list.querySelectorAll('input[type=checkbox]').forEach(cb=>{
+      cb.addEventListener('change',()=>{
+        cb.checked?multiAddSel.add(cb.dataset.id):multiAddSel.delete(cb.dataset.id);
+        updateMultiAddCount();
+      });
+    });
+  }
+  updateMultiAddCount();
+}
+
+function updateMultiAddCount(){
+  const n=multiAddSel.size;
+  const drivers=[...multiAddSel].filter(id=>empById(id)?.hasCar).length;
+  const freeDesks=(()=>{ let c=0; const cap=state.config.desks;
+    const slots=shiftData(modalDate,multiAddShift).desks||{};
+    for(let i=1;i<=cap;i++) if(!slots[String(i)]&&!isUnavail('desks',i)) c++; return c; })();
+  const el=document.getElementById('multiAddCount');
+  const warn=n>freeDesks?` <span style="color:var(--danger)">— only ${freeDesks} desk${freeDesks!==1?'s':''} free</span>`:'';
+  el.innerHTML=n?`${n} selected${drivers?` · ${drivers} 🚗`:''}${warn}`:`${freeDesks} desk${freeDesks!==1?'s':''} available`;
+  document.getElementById('applyMultiAdd').disabled=!n;
+}
+
+document.getElementById('multiAddSearch').addEventListener('input',renderMultiAddList);
+document.getElementById('multiAddAll').addEventListener('click',()=>{
+  multiAddCandidates().forEach(e=>{ if(slotHeldBy(e.id,'desks',multiAddShift)===null) multiAddSel.add(e.id); });
+  renderMultiAddList();
+});
+document.getElementById('multiAddNone').addEventListener('click',()=>{ multiAddSel.clear(); renderMultiAddList(); });
+['closeMultiAdd','cancelMultiAdd'].forEach(id=>document.getElementById(id)
+  .addEventListener('click',()=>document.getElementById('multiAddModal').classList.remove('open')));
+document.getElementById('multiAddModal').addEventListener('click',e=>{
+  if(e.target.id==='multiAddModal') document.getElementById('multiAddModal').classList.remove('open');
+});
+
+document.getElementById('applyMultiAdd').addEventListener('click',async()=>{
+  const ids=[...multiAddSel];
+  if(!ids.length) return;
+  const btn=document.getElementById('applyMultiAdd');
+  btn.disabled=true; btn.textContent='Booking…';
+  let desks=0, parks=0, noDesk=0, noPark=0;
+  for(const id of ids){
+    if(slotHeldBy(id,'desks',multiAddShift)!==null) continue;
+    const free=firstFreeSlot('desks',multiAddShift);
+    if(free===null){ noDesk++; continue; }
+    const r=await bookDeskFor(id,multiAddShift,free);
+    if(!r) continue;
+    desks++;
+    if(r.parking!==null) parks++;
+    if(r.parkingFull) noPark++;
+  }
+  btn.disabled=false; btn.textContent='Book desks';
+  document.getElementById('multiAddModal').classList.remove('open');
+  let msg=`Booked ${desks} desk${desks!==1?'s':''}`;
+  if(parks) msg+=` + ${parks} parking`;
+  const problems=[];
+  if(noDesk) problems.push(`${noDesk} left out (no desks free)`);
+  if(noPark) problems.push(`${noPark} without parking`);
+  toast(problems.length?`${msg} · ${problems.join(', ')}`:msg, problems.length?'err':'ok');
+});
 
 /* ====================================================================
    TODAY
@@ -1877,6 +2053,7 @@ const SHIFT_TOG_CFG=[
   {key:'weekend',label:'Wknd',   cls:'weekend'},
 ];
 const REMOTE_LABEL='🏠 Remote';
+const CAR_LABEL='🚗 Car';
 
 function renderEmployees(){
   const q=document.getElementById('empSearch').value.toLowerCase();
@@ -1892,10 +2069,11 @@ function renderEmployees(){
     const shifts=emp.shifts||[emp.shift||'day'];
     const togBtns=SHIFT_TOG_CFG.map(sc=>`<button class="stog${shifts.includes(sc.key)?' on-'+sc.cls:''}" data-id="${emp.id}" data-sh="${sc.key}" title="Toggle ${sc.key} shift">${sc.label}</button>`).join('');
     const remoteBtn=`<button class="stog${emp.remote?' on-remote':''}" data-id="${emp.id}" data-remote="1" title="${emp.remote?'Mark as office worker':'Mark as remote'}">${REMOTE_LABEL}</button>`;
+    const carBtn=`<button class="stog${emp.hasCar?' on-car':''}" data-id="${emp.id}" data-car="1" title="${emp.hasCar?'Drives — a parking spot is auto-assigned with their desk':'Mark as driving to the office (auto-assign parking with desk)'}">${CAR_LABEL}</button>`;
     return `<tr>
       <td>${idx}</td>
       <td><input type="text" value="${h(emp.name)}" data-id="${emp.id}" data-field="name" class="emp-inp" style="width:100%"></td>
-      <td><div class="shift-tog" data-id="${emp.id}">${togBtns}${remoteBtn}</div></td>
+      <td><div class="shift-tog" data-id="${emp.id}">${togBtns}${remoteBtn}${carBtn}</div></td>
       <td><input type="text" value="${h(emp.department||'')}" data-id="${emp.id}" data-field="department" class="emp-inp" style="width:100%"></td>
       <td><input type="number" value="${emp.targetDays??state.config.targetDays}" data-id="${emp.id}" data-field="targetDays" class="emp-inp" min="0" max="5" style="width:70px" title="0 = remote employee"></td>
       <td>${isAdmin?`<button class="btn danger sm" onclick="deleteEmp('${emp.id}')">✕</button>`:''}</td>
@@ -1911,7 +2089,7 @@ function renderEmployees(){
   });
 
   // shift toggle buttons
-  tbody.querySelectorAll('.stog:not([data-remote])').forEach(btn=>{
+  tbody.querySelectorAll('.stog:not([data-remote]):not([data-car])').forEach(btn=>{
     btn.addEventListener('click',async()=>{
       const id=btn.dataset.id, sh=btn.dataset.sh;
       const emp=empById(id); if(!emp) return;
@@ -1936,6 +2114,16 @@ function renderEmployees(){
       const update={id, remote:newRemote};
       if(newRemote) update.targetDays=0;
       const res=await api('/api/employees/update','POST',update);
+      if(res){ state.employees=normalizeEmployees(res.employees); renderEmployees(); }
+    });
+  });
+
+  // car toggle
+  tbody.querySelectorAll('.stog[data-car]').forEach(btn=>{
+    btn.addEventListener('click',async()=>{
+      const id=btn.dataset.id;
+      const emp=empById(id); if(!emp) return;
+      const res=await api('/api/employees/update','POST',{id, hasCar:!emp.hasCar});
       if(res){ state.employees=normalizeEmployees(res.employees); renderEmployees(); }
     });
   });
@@ -1973,6 +2161,8 @@ document.getElementById('importXlsFile').addEventListener('change',async e=>{
     const deptCol=col(['department','dept','team','abteilung']);
     const shiftCol=col(['shift','tura','schicht']);
     const targetCol=col(['target','targetdays','zieldage','days/wk','days/week']);
+    const carCol=col(['hascar','car','drives','parking','masina']);
+    const isYes=v=>['yes','y','true','1','da','x'].includes(String(v||'').trim().toLowerCase());
     let added=0, skipped=0;
     for(const row of rows){
       const name=String(row[nameCol]||'').trim();
@@ -1981,7 +2171,11 @@ document.getElementById('importXlsFile').addEventListener('change',async e=>{
       const rawShift=shiftCol?String(row[shiftCol]||'').trim().toLowerCase():'day';
       const shift=Object.keys(SHIFT_META).find(k=>k.startsWith(rawShift.slice(0,3)))||'day';
       const target=targetCol?parseInt(row[targetCol])||state.config.targetDays:state.config.targetDays;
-      await api('/api/employees/add','POST',{name,department:dept,shift,shifts:[shift],targetDays:target});
+      const res=await api('/api/employees/add','POST',{name,department:dept,shift,shifts:[shift],targetDays:target});
+      if(res&&carCol&&isYes(row[carCol])){
+        const created=res.employees[res.employees.length-1];
+        if(created) await api('/api/employees/update','POST',{id:created.id,hasCar:true});
+      }
       added++;
     }
     toast(`Imported ${added} employees${skipped?' ('+skipped+' skipped)':''}`, 'ok');
@@ -1989,7 +2183,8 @@ document.getElementById('importXlsFile').addEventListener('change',async e=>{
 });
 
 document.getElementById('exportEmpBtn').addEventListener('click',()=>{
-  const rows=[['#','Name','Shift','Department','Target days/wk'],...state.employees.map((e,i)=>[i+1,e.name,e.shift,e.department||'',e.targetDays])];
+  const rows=[['#','Name','Shift','Department','Target days/wk','Has car','Remote'],
+    ...state.employees.map((e,i)=>[i+1,e.name,(e.shifts||[e.shift]).join('+'),e.department||'',e.targetDays,e.hasCar?'Yes':'No',e.remote?'Yes':'No'])];
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   download('employees.csv','text/csv',csv);
 });
@@ -2196,6 +2391,7 @@ function normalizeEmployees(emps){
   return emps.map(e=>({
     ...e,
     remote: e.remote||false,
+    hasCar: e.hasCar||false,
     shifts: Array.isArray(e.shifts) && e.shifts.length ? e.shifts : [e.shift||'day']
   }));
 }
@@ -2221,7 +2417,7 @@ async function init(){
 // Escape key closes any open modal
 document.addEventListener('keydown',e=>{
   if(e.key!=='Escape') return;
-  ['bookModal','pasteModal','adminLoginModal'].forEach(id=>{
+  ['bookModal','pasteModal','adminLoginModal','multiAddModal'].forEach(id=>{
     document.getElementById(id)?.classList.remove('open');
   });
   if(document.getElementById('bookModal').classList.contains('open')===false && modalDate){ modalDate=null; renderCalendar(); }

@@ -354,6 +354,8 @@ def api_emp_update():
                 found["shifts"] = [body["shift"]]
         if "remote" in body:
             found["remote"] = bool(body["remote"])
+        if "hasCar" in body:
+            found["hasCar"] = bool(body["hasCar"])
         if "targetDays" in body:
             try:
                 found["targetDays"] = int(body["targetDays"])
