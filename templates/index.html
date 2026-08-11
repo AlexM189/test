@@ -945,7 +945,7 @@ function renderBookingModal(){
           <h4>🚗 Parking (${pCap} spots)</h4>
           ${buildParkingLayout(sh)}
         </div>
-        ${(isAdmin||currentUser)?`<div style="margin-top:10px"><button class="btn sec sm" onclick="openMultiAdd('${sh}')">👥 Add multiple people…</button></div>`:''}
+        ${(isAdmin||currentUser)?`<div style="margin-top:10px"><button class="btn sm" onclick="openMultiAdd('${sh}')">👥 Add multiple people to ${meta.label} desks…</button></div>`:''}
       </div>
     </div>`;
   });
@@ -1053,17 +1053,38 @@ function slotHeldBy(empId,kind,sh,ds){
   return hit?hit[0]:null;
 }
 
+/* Book/unbook one slot and immediately fold the server's authoritative day back
+   into local state. Without this, a loop of bookings keeps reading pre-booking
+   state and every iteration picks the same "free" slot. Returns the status so
+   callers can distinguish a 409 conflict from a real failure. */
+async function writeSlot(kind,sh,n,userId,unbook=false){
+  try{
+    const r=await fetch(unbook?'/api/unbook':'/api/book',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({date:modalDate,shift:sh,kind,slot:n,userId})});
+    const data=await r.json();
+    if(r.ok&&data.day) state.bookings[modalDate]=data.day;   // keep local state fresh
+    return {ok:r.ok,status:r.status,error:data.error};
+  }catch(e){ return {ok:false,status:0,error:'Network error'}; }
+}
+
 /* Book a desk and, for drivers, grab a parking spot in the same shift.
-   Returns {desk, parking, parkingFull} so callers can report accurately. */
+   Returns {desk, parking, parkingFull} — or {error, conflict} when the desk failed. */
 async function bookDeskFor(empId,sh,deskNum){
-  const res=await api('/api/book','POST',{date:modalDate,shift:sh,kind:'desks',slot:deskNum,userId:empId});
-  if(!res) return null;
+  const res=await writeSlot('desks',sh,deskNum,empId);
+  if(!res.ok) return {error:res.error||'Could not book desk',conflict:res.status===409};
   const out={desk:deskNum,parking:null,parkingFull:false};
   const emp=empById(empId);
-  if(emp&&emp.hasCar&&!slotHeldBy(empId,'parking',sh)){
-    const spot=firstFreeSlot('parking',sh);
-    if(spot===null) out.parkingFull=true;
-    else if(await api('/api/book','POST',{date:modalDate,shift:sh,kind:'parking',slot:spot,userId:empId})) out.parking=spot;
+  if(emp&&emp.hasCar&&slotHeldBy(empId,'parking',sh)===null){
+    let spot=firstFreeSlot('parking',sh);
+    // retry on conflict — another device may have taken the spot in between
+    for(let attempt=0;attempt<3&&spot!==null;attempt++){
+      const pr=await writeSlot('parking',sh,spot,empId);
+      if(pr.ok){ out.parking=spot; break; }
+      if(pr.status!==409) break;
+      spot=firstFreeSlot('parking',sh);
+    }
+    if(out.parking===null) out.parkingFull=true;
   }
   return out;
 }
@@ -1074,9 +1095,9 @@ async function unbookDeskFor(empId,sh,deskNum){
   let freedParking=null;
   if(emp&&emp.hasCar){
     const held=slotHeldBy(empId,'parking',sh);
-    if(held!==null&&await api('/api/unbook','POST',{date:modalDate,shift:sh,kind:'parking',slot:held,userId:empId})) freedParking=held;
+    if(held!==null&&(await writeSlot('parking',sh,held,empId,true)).ok) freedParking=held;
   }
-  await api('/api/unbook','POST',{date:modalDate,shift:sh,kind:'desks',slot:deskNum,userId:empId});
+  await writeSlot('desks',sh,deskNum,empId,true);
   return freedParking;
 }
 
@@ -1113,9 +1134,10 @@ async function handleSlot(sh,kind,n){
     }
     if(slotHeldBy(currentUser,'desks',sh)!==null){ toast('You already have a desk booked for this shift','err'); return; }
     const r=await bookDeskFor(currentUser,sh,n);
-    if(!r) return;
+    if(r.error){ toast(r.error,'err'); renderBookingModal(); return; }
     if(r.parking!==null) toast(`Desk ${n} booked — parking ${parkingLabel(r.parking)} assigned 🚗`,'ok');
     else if(r.parkingFull) toast(`Desk ${n} booked — no parking spots left`,'err');
+    renderBookingModal();
     return;
   }
 
@@ -1123,7 +1145,9 @@ async function handleSlot(sh,kind,n){
   if(!mine && slotHeldBy(currentUser,'parking',sh)!==null){
     toast('You already have a parking spot booked for this shift','err'); return;
   }
-  await api(mine?'/api/unbook':'/api/book','POST',{date:modalDate,shift:sh,kind,slot:n,userId:currentUser});
+  const pr=await writeSlot(kind,sh,n,currentUser,mine);
+  if(!pr.ok) toast(pr.error||'Could not update booking','err');
+  renderBookingModal();
 }
 
 /* ====================================================================
@@ -1209,16 +1233,25 @@ document.getElementById('applyMultiAdd').addEventListener('click',async()=>{
   let desks=0, parks=0, noDesk=0, noPark=0;
   for(const id of ids){
     if(slotHeldBy(id,'desks',multiAddShift)!==null) continue;
-    const free=firstFreeSlot('desks',multiAddShift);
-    if(free===null){ noDesk++; continue; }
-    const r=await bookDeskFor(id,multiAddShift,free);
-    if(!r) continue;
-    desks++;
-    if(r.parking!==null) parks++;
-    if(r.parkingFull) noPark++;
+    let done=false;
+    for(let attempt=0;attempt<4&&!done;attempt++){
+      const free=firstFreeSlot('desks',multiAddShift);
+      if(free===null){ noDesk++; done=true; break; }         // genuinely out of desks
+      const r=await bookDeskFor(id,multiAddShift,free);
+      if(r.error){
+        if(r.conflict) continue;                             // someone grabbed it — take the next desk
+        noDesk++; done=true; break;
+      }
+      desks++;
+      if(r.parking!==null) parks++;
+      if(r.parkingFull) noPark++;
+      done=true;
+    }
+    if(!done) noDesk++;                                      // retries exhausted
   }
   btn.disabled=false; btn.textContent='Book desks';
   document.getElementById('multiAddModal').classList.remove('open');
+  renderBookingModal(); renderCalendar();
   let msg=`Booked ${desks} desk${desks!==1?'s':''}`;
   if(parks) msg+=` + ${parks} parking`;
   const problems=[];
