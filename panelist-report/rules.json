@@ -244,7 +244,10 @@
     "bucket_pct_threshold": 40,
     "bucket_min_abs": 5,
     "z_threshold": 2.0,
-    "min_periods_for_z": 4
+    "min_periods_for_z": 4,
+    "peak_ratio": 1.5,
+    "peak_min": 5,
+    "trend_pct": 15
   },
   "subject_rules": [
     [

@@ -29,6 +29,8 @@ const out={
   wk:r.anomaly.weekly&&r.anomaly.weekly.computable?[r.anomaly.weekly.keys.length,r.anomaly.weekly.current,r.anomaly.weekly.previous,r.anomaly.weekly.pct_change,r.anomaly.weekly.z??null]:'NC',
   mo:r.anomaly.monthly&&r.anomaly.monthly.computable?[r.anomaly.monthly.keys.length,r.anomaly.monthly.current,r.anomaly.monthly.previous,r.anomaly.monthly.pct_change,r.anomaly.monthly.z??null]:'NC',
   alerts:r.anomaly.alerts.map(a=>[a.level,a.scope,a.text]),
+  mv_m:r.movement.monthly.computable?[r.movement.monthly.keys,r.movement.monthly.totals,r.movement.monthly.stack.map(s=>[s.name,s.values]),r.movement.monthly.insights.map(i=>[i.kind,i.text]),r.movement.monthly.rows.map(x=>[x.key,x.total,x.delta,x.pct,x.top_bucket,x.top_count,x.top_pct])]:['NC',r.movement.monthly.reason],
+  mv_q:r.movement.quarterly.computable?[r.movement.quarterly.keys,r.movement.quarterly.totals,r.movement.quarterly.stack.map(s=>[s.name,s.values]),r.movement.quarterly.insights.map(i=>[i.kind,i.text]),r.movement.quarterly.rows.map(x=>[x.key,x.total,x.delta,x.pct,x.top_bucket,x.top_count,x.top_pct])]:['NC',r.movement.quarterly.reason],
   most:r.most_received?[r.most_received.label,r.most_received.count,r.most_received.top_labels.map(l=>l.label),r.most_received.origin?r.most_received.origin.label:null]:null,
 };
 console.log(JSON.stringify(out));

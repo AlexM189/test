@@ -91,6 +91,14 @@ either engine. (Requires `node`.)
   plus one rolled-up "Various topics" row. The same five appear in the exec-summary
   driver chart, the donut, the cross-tab columns and the trend lines, so no chart
   carries more series than a reader can follow.
+- **Monthly and quarterly movement.** When the export spans two or more complete
+  calendar months (or quarters), section 1 renders a stacked bar per period — bar
+  height is volume, segments are the five drivers — with generated insights above
+  it: busiest and quietest period, direction across the window, latest-period
+  change, and any driver whose peak clears `anomaly.peak_ratio` times its own
+  average. A per-period table gives the change, percent change and the largest
+  driver with its share. Partial periods at either end of the export are excluded
+  so a half-finished month cannot read as a collapse.
 - **Movement watch.** Week-over-week and month-over-month change on complete
   calendar periods only, plus per-driver moves. A move is only flagged when it
   clears both a percentage and an absolute-case threshold, so small counts cannot

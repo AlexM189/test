@@ -176,6 +176,106 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img">${p.join("")}</svg>`;
   }
 
+  /* One bar per period: height is volume, segments are the five drivers - so a
+     rise or fall and a category peak are both readable off the same chart. */
+  function svgStacked(keys, stack, totals) {
+    const W = 720, H = 340, pl = 46, pb = 40, pt = 26, pr = 12;
+    const pw = W - pl - pr, ph = H - pt - pb;
+    const n = keys.length;
+    const mx = Math.max(...totals, 1);
+    const slot = pw / Math.max(n, 1);
+    const bw = Math.min(slot * 0.66, 54);
+    const X = i => pl + slot * (i + 0.5) - bw / 2;
+    const Y = v => pt + ph - ph * v / mx;
+    const p = [];
+    for (let g = 0; g < 5; g++) {
+      const y = pt + ph * g / 4;
+      p.push(`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W - pr}" y2="${y.toFixed(1)}" ` +
+        `stroke="var(--border)" stroke-width="1"/>`);
+      p.push(`<text x="${pl - 7}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="11" ` +
+        `fill="var(--text-3)">${Math.round(mx * (4 - g) / 4)}</text>`);
+    }
+    const step = Math.max(1, Math.floor((n + 13) / 14));
+    keys.forEach((k, i) => {
+      if (i % step === 0 || i === n - 1)
+        p.push(`<text x="${(X(i) + bw / 2).toFixed(1)}" y="${H - pb + 17}" text-anchor="middle" ` +
+          `font-size="10.5" fill="var(--text-3)">${ESC(k)}</text>`);
+    });
+    for (let i = 0; i < n; i++) {
+      let acc = 0;
+      const segs = [];
+      stack.forEach((s2, si) => { if (s2.values[i] > 0) segs.push([si, s2.values[i]]); });
+      segs.forEach(([si, v], j) => {
+        const y0 = Y(acc + v), y1 = Y(acc);
+        const h = Math.max(y1 - y0 - (j < segs.length - 1 ? 2 : 0), 1);
+        const tip = ESC(keys[i] + " · " + stack[si].name + ": " + v + " cases");
+        if (j === segs.length - 1) {
+          const r = Math.min(4, h / 2, bw / 2);
+          const d = `M${X(i).toFixed(2)} ${(y0 + h).toFixed(2)} L${X(i).toFixed(2)} ` +
+            `${(y0 + r).toFixed(2)} Q${X(i).toFixed(2)} ${y0.toFixed(2)} ` +
+            `${(X(i) + r).toFixed(2)} ${y0.toFixed(2)} L${(X(i) + bw - r).toFixed(2)} ` +
+            `${y0.toFixed(2)} Q${(X(i) + bw).toFixed(2)} ${y0.toFixed(2)} ` +
+            `${(X(i) + bw).toFixed(2)} ${(y0 + r).toFixed(2)} L${(X(i) + bw).toFixed(2)} ` +
+            `${(y0 + h).toFixed(2)} Z`;
+          p.push(`<path d="${d}" fill="${cvar(si)}" data-tip="${tip}"/>`);
+        } else {
+          p.push(`<rect x="${X(i).toFixed(1)}" y="${y0.toFixed(1)}" width="${bw.toFixed(1)}" ` +
+            `height="${h.toFixed(1)}" fill="${cvar(si)}" data-tip="${tip}"/>`);
+        }
+        acc += v;
+      });
+      if (totals[i]) {
+        p.push(`<text x="${(X(i) + bw / 2).toFixed(1)}" y="${(Y(totals[i]) - 7).toFixed(1)}" ` +
+          `text-anchor="middle" font-size="11" font-weight="640" fill="var(--text-2)" ` +
+          `style="font-variant-numeric:tabular-nums">${totals[i]}</text>`);
+      }
+    }
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img">` +
+      `${p.join("")}</svg>`;
+  }
+
+  const INS_WORD = { up: "rising", down: "falling", peak: "peak", flat: "flat", range: "range" };
+
+  const insightList = insights => '<ul class="ins">' + insights.map(i =>
+    `<li><span class="k ${i.kind}">${INS_WORD[i.kind] || i.kind}</span>` +
+    `<span>${ESC(i.text)}</span></li>`).join("") + "</ul>";
+
+  function movementTable(mv) {
+    const cap = mv.label.charAt(0).toUpperCase() + mv.label.slice(1);
+    const h = [`<div class="scroll"><table><thead><tr><th>${ESC(cap)}</th>` +
+      '<th class="n">Cases</th><th class="n">Change</th><th class="n">%</th>' +
+      '<th>Largest driver</th><th class="n">Its share</th></tr></thead><tbody>'];
+    for (const r of mv.rows) {
+      const d = r.delta;
+      const cls = (d === null || d === 0) ? "" : (d > 0 ? " delta-up" : " delta-down");
+      h.push(`<tr><td><b>${ESC(r.key)}</b></td><td class="n">${r.total}</td>` +
+        `<td class="n${cls}">${d === null ? "—" : (d >= 0 ? "+" : "") + d}</td>` +
+        `<td class="n${cls}">${r.pct === null ? "—" :
+          (r.pct >= 0 ? "+" : "") + f1(r.pct) + "%"}</td>` +
+        `<td>${ESC(r.top_bucket || "—")}</td><td class="n">${r.top_pct === null ? "—" :
+          r.top_count + " (" + f1(r.top_pct) + "%)"}</td></tr>`);
+    }
+    h.push("</tbody></table></div>");
+    return h.join("");
+  }
+
+  const ADJ = { month: "Monthly", quarter: "Quarterly", week: "Weekly" };
+
+  function movementBlock(mv) {
+    if (!mv || !mv.computable) {
+      return naBlock((ADJ[mv && mv.label] || "Period") + " movement", mv || {});
+    }
+    const out = [insightList(mv.insights), svgStacked(mv.keys, mv.stack, mv.totals)];
+    out.push('<div class="legend">' + mv.stack.map((s2, i) =>
+      `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(s2.name)}</span>`)
+      .join("") + "</div>");
+    out.push(`<p class="sub">Bar height is total volume for the ${mv.label}; segments are the ` +
+      `five call drivers. Only complete calendar ${mv.label}s are shown — a partial period at ` +
+      "either end of the export is excluded so it cannot read as a collapse.</p>");
+    out.push(movementTable(mv));
+    return out.join("");
+  }
+
   function heatTable(ct) {
     const mx = Math.max(...ct.matrix.map(r => Math.max(...r, 0)), 0) || 1;
     const h = ['<div class="scroll"><table><thead><tr><th>Origin \\ Category bucket</th>'];
@@ -570,21 +670,13 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       tl.top.slice(0, 10).map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
         `<td class="n">${f1(t.pct_of_cases)}%</td></tr>`).join("") + "</tbody></table></div>");
 
-    A("<h3>Movement over time</h3>");
-    if (V.monthly.computable) {
-      const m = V.monthly;
-      const ser = DR.length ? foldSeries(m.by_bucket, DR) : Object.entries(m.by_bucket)
-        .sort((a, b) => b[1].reduce((x, y) => x + y, 0) - a[1].reduce((x, y) => x + y, 0))
-        .slice(0, MAXSERIES).map(([k, v]) => ({ name: k, values: v }));
-      A(svgLine(m.months, ser));
-      A('<div class="legend">' + ser.map((s, i) =>
-        `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(s.name)}</span>`)
-        .join("") + "</div>");
-      const first = m.total[0], last = m.total[m.total.length - 1];
-      const chg = first ? 100 * (last - first) / first : 0;
-      A(`<p class="sub">Total monthly volume moved from ${first} to ${last} across ` +
-        `${m.months.length} months (${chg >= 0 ? "+" : ""}${f1(chg)}%).</p>`);
-    } else A(naBlock("Growth / decline by category and origin", V.monthly));
+    const MV = res.movement || {};
+    A("<h3>Monthly movement</h3>");
+    A(movementBlock(MV.monthly || { label: "month", reason: "no monthly view available",
+      needs: ["a date column"] }));
+    A("<h3>Quarterly movement</h3>");
+    A(movementBlock(MV.quarterly || { label: "quarter", reason: "no quarterly view available",
+      needs: ["a date column"] }));
 
     for (const [key, ttl] of [["site", "Breakdown by office / site"], ["agent", "Breakdown by agent"]]) {
       const rec = V[key] || {};

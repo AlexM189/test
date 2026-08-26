@@ -138,3 +138,16 @@ tr.various td{color:var(--text-2)}
   padding:14px 16px;margin:14px 0 4px}
 .mr .lead{font-size:.95rem;margin-bottom:.4em}
 .mr ul{margin:.4em 0 0;padding-left:1.15em;font-size:.87rem;color:var(--text-2)}
+.ins{list-style:none;padding:0;margin:12px 0 18px;display:flex;flex-direction:column;gap:7px}
+.ins li{display:flex;gap:10px;align-items:flex-start;font-size:.89rem;color:var(--text-2)}
+.ins li b{color:var(--text)}
+.ins .k{font-size:.62rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none;min-width:56px;text-align:center;
+  margin-top:1px}
+.ins .k.up{background:var(--warn);color:#fff}
+.ins .k.down{background:var(--accent);color:#fff}
+.ins .k.peak{background:var(--s7);color:#fff}
+.ins .k.flat,.ins .k.range{background:var(--surface-2);color:var(--text-2);
+  border:1px solid var(--border-strong)}
+td.delta-up{color:var(--warn);font-weight:640}
+td.delta-down{color:var(--accent);font-weight:640}

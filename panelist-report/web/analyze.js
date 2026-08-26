@@ -465,8 +465,14 @@ export function makeEngine(RULES) {
   }
   const monthBounds = d => [Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1),
                             Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)];
-  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d) : monKey(d);
-  const pbounds = (d, freq) => freq === "W" ? weekBounds(d) : monthBounds(d);
+  const quarterBounds = d => {
+    const q = Math.floor(d.getUTCMonth() / 3);
+    return [Date.UTC(d.getUTCFullYear(), q * 3, 1), Date.UTC(d.getUTCFullYear(), q * 3 + 3, 0)];
+  };
+  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d)
+    : freq === "Q" ? qKey(d) : monKey(d);
+  const pbounds = (d, freq) => freq === "W" ? weekBounds(d)
+    : freq === "Q" ? quarterBounds(d) : monthBounds(d);
 
   function series(recs, freq) {
     const withD = recs.filter(r => r._date);
@@ -570,6 +576,87 @@ export function makeEngine(RULES) {
     return out;
   }
 
+  /* Volume and category mix per complete calendar period, with the direction and
+     any peak stated in words. Complete periods only - a half-finished month would
+     read as a collapse that never happened. */
+  function periodMovement(recs, V, freq, label, drivers) {
+    const { keys, counts } = series(recs, freq);
+    if (keys.length < 2) {
+      return { computable: false, label, periods: keys.length,
+        reason: "only " + keys.length + " complete " + label + "(s) fall inside the data " +
+          "range; 2+ are needed to show movement. Partial periods at the start and end of " +
+          "the export are excluded on purpose.",
+        needs: ["a date column covering 2+ complete " + label + "s"] };
+    }
+    const names = drivers.filter(d => !d.rolled).map(d => d.label);
+    const rolled = drivers.find(d => d.rolled);
+    const ser = bucketSeries(recs, freq, keys, V.bucket.rows.map(b => b.label));
+    const stack = names.map(nm => ({ name: nm, values: ser[nm] || keys.map(() => 0) }));
+    if (rolled) {
+      const acc = keys.map(() => 0);
+      for (const b of rolled.rolled) (ser[b] || []).forEach((v, i) => { acc[i] += v; });
+      if (acc.some(v => v)) stack.push({ name: rolled.label, values: acc });
+    }
+    const totals = keys.map(k => counts[k]);
+    const rows = keys.map((k, i) => {
+      const prev = i ? totals[i - 1] : null;
+      const delta = prev === null ? null : totals[i] - prev;
+      let top = null;
+      for (const s2 of stack) if (!top || s2.values[i] > top.values[i]) top = s2;
+      return { key: k, total: totals[i], delta,
+        pct: prev ? Math.round(1000 * delta / prev) / 10 : null,
+        top_bucket: top ? top.name : null, top_count: top ? top.values[i] : null,
+        top_pct: top && totals[i] ? pct(top.values[i], totals[i]) : null };
+    });
+
+    const ins = [];
+    let hi = 0, lo = 0;
+    totals.forEach((v, i) => { if (v > totals[hi]) hi = i; if (v < totals[lo]) lo = i; });
+    ins.push({ kind: "range", text: "Busiest " + label + " was " + keys[hi] + " at " +
+      totals[hi] + " cases; quietest was " + keys[lo] + " at " + totals[lo] + "." });
+    const first = totals[0], last = totals[totals.length - 1];
+    if (first) {
+      const move = 100 * (last - first) / first;
+      const dir = move >= ANOM.trend_pct ? "rose"
+        : move <= -ANOM.trend_pct ? "fell" : "held roughly flat";
+      ins.push({ kind: move >= ANOM.trend_pct ? "up" : move <= -ANOM.trend_pct ? "down" : "flat",
+        text: "Across " + keys.length + " " + label + "s volume " + dir +
+          (Math.abs(move) < ANOM.trend_pct ? "" : " " + Math.abs(move).toFixed(0) + "%") +
+          ", from " + first + " in " + keys[0] + " to " + last + " in " + keys[keys.length - 1] + "." });
+    }
+    const lastRow = rows[rows.length - 1];
+    if (lastRow.delta !== null && lastRow.pct !== null) {
+      ins.push({ kind: lastRow.delta > 0 ? "up" : lastRow.delta < 0 ? "down" : "flat",
+        text: "Latest " + label + " (" + keys[keys.length - 1] + ") is " +
+          (lastRow.delta >= 0 ? "+" : "") + lastRow.delta + " case(s) on " +
+          keys[keys.length - 2] + ", " + (lastRow.pct >= 0 ? "+" : "") +
+          lastRow.pct.toFixed(1) + "%." });
+    }
+    const peaks = [], moves = [];
+    for (const s2 of stack) {
+      const v = s2.values;
+      const mu = v.reduce((a, b) => a + b, 0) / v.length;
+      let pi = 0;
+      v.forEach((x, i) => { if (x > v[pi]) pi = i; });
+      if (mu && v[pi] >= ANOM.peak_min && v[pi] >= ANOM.peak_ratio * mu) {
+        peaks.push({ kind: "peak", text: s2.name + " peaked in " + keys[pi] + " at " + v[pi] +
+          " cases — " + (v[pi] / mu).toFixed(1) + "x its " + label + " average of " +
+          mu.toFixed(1) + "." });
+      }
+      if (v.length >= 2 && v[0]) {
+        const mv = 100 * (v[v.length - 1] - v[0]) / v[0];
+        if (Math.abs(mv) >= ANOM.bucket_pct_threshold &&
+            Math.abs(v[v.length - 1] - v[0]) >= ANOM.bucket_min_abs) {
+          moves.push({ kind: mv > 0 ? "up" : "down", text: s2.name + (mv > 0 ? " grew " : " shrank ") +
+            Math.abs(mv).toFixed(0) + "% across the window (" + v[0] + " in " + keys[0] + " to " +
+            v[v.length - 1] + " in " + keys[keys.length - 1] + ")." });
+        }
+      }
+    }
+    ins.push(...peaks, ...moves);
+    return { computable: true, label, keys, totals, stack, rows, insights: ins };
+  }
+
   function mostReceived(recs, V) {
     if (!V.bucket.rows.length) return null;
     const top = V.bucket.rows[0];
@@ -608,7 +695,11 @@ export function makeEngine(RULES) {
       return { volume, correlation: correlationSection(recs),
                forecast: forecastSection(volume), mapping: mappingAudit(recs),
                inference: inferenceAudit(recs), drivers: topDrivers(volume),
-               anomaly: anomalySection(recs, volume), most_received: mostReceived(recs, volume) };
+               anomaly: anomalySection(recs, volume), most_received: mostReceived(recs, volume),
+               movement: {
+                 monthly: periodMovement(recs, volume, "M", "month", topDrivers(volume)),
+                 quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
+               } };
     },
   };
 }

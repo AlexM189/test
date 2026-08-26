@@ -175,6 +175,105 @@ def svg_forecast(hist, proj):
             % (W, H, W, "".join(p)))
 
 
+def svg_stacked(keys, stack, totals):
+    """One bar per period: height is volume, segments are the five drivers - so a
+    rise or fall and a category peak are both readable off the same chart."""
+    W, H, pl, pb, pt, pr = 720, 340, 46, 40, 26, 12
+    pw, ph = W - pl - pr, H - pt - pb
+    n = len(keys)
+    mx = max(totals) or 1
+    slot = pw / max(n, 1)
+    bw = min(slot * 0.66, 54)
+    X = lambda i: pl + slot * (i + 0.5) - bw / 2
+    Y = lambda v: pt + ph - ph * v / mx
+    p = []
+    for g in range(5):
+        y = pt + ph * g / 4
+        p.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--border)" '
+                 'stroke-width="1"/>' % (pl, y, W - pr, y))
+        p.append('<text x="%d" y="%.1f" text-anchor="end" font-size="11" fill="var(--text-3)">'
+                 '%d</text>' % (pl - 7, y + 3.5, int(mx * (4 - g) / 4 + 0.5)))
+    step = max(1, (n + 13) // 14)
+    for i, k in enumerate(keys):
+        if i % step == 0 or i == n - 1:
+            p.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="10.5" '
+                     'fill="var(--text-3)">%s</text>' % (X(i) + bw / 2, H - pb + 17, ESC(k)))
+    for i in range(n):
+        acc = 0
+        segs = [(si, s["values"][i]) for si, s in enumerate(stack) if s["values"][i] > 0]
+        for j, (si, v) in enumerate(segs):
+            y0, y1 = Y(acc + v), Y(acc)
+            h = max(y1 - y0 - (2 if j < len(segs) - 1 else 0), 1)
+            top = (j == len(segs) - 1)
+            r = min(4, h / 2, bw / 2)
+            if top:
+                # rounded data-end on the top segment only; the rest stay square
+                d = ("M%.2f %.2f L%.2f %.2f Q%.2f %.2f %.2f %.2f L%.2f %.2f "
+                     "Q%.2f %.2f %.2f %.2f L%.2f %.2f Z"
+                     % (X(i), y0 + h, X(i), y0 + r, X(i), y0, X(i) + r, y0,
+                        X(i) + bw - r, y0, X(i) + bw, y0, X(i) + bw, y0 + r,
+                        X(i) + bw, y0 + h))
+                p.append('<path d="%s" fill="%s" data-tip="%s"/>'
+                         % (d, cvar(si), ESC("%s · %s: %d cases" % (keys[i], stack[si]["name"], v))))
+            else:
+                p.append('<rect x="%.1f" y="%.1f" width="%.1f" height="%.1f" fill="%s" '
+                         'data-tip="%s"/>'
+                         % (X(i), y0, bw, h, cvar(si),
+                            ESC("%s · %s: %d cases" % (keys[i], stack[si]["name"], v))))
+            acc += v
+        if totals[i]:
+            p.append('<text x="%.1f" y="%.1f" text-anchor="middle" font-size="11" '
+                     'font-weight="640" fill="var(--text-2)" '
+                     'style="font-variant-numeric:tabular-nums">%d</text>'
+                     % (X(i) + bw / 2, Y(totals[i]) - 7, totals[i]))
+    return ('<svg class="chart" viewBox="0 0 %d %d" style="max-width:%dpx" role="img">%s</svg>'
+            % (W, H, W, "".join(p)))
+
+
+def insight_list(insights):
+    return ('<ul class="ins">' + "".join(
+        '<li><span class="k %s">%s</span><span>%s</span></li>'
+        % (i["kind"], {"up": "rising", "down": "falling", "peak": "peak",
+                       "flat": "flat", "range": "range"}.get(i["kind"], i["kind"]),
+           ESC(i["text"])) for i in insights) + "</ul>")
+
+
+def movement_table(mv):
+    h = ['<div class="scroll"><table><thead><tr><th>%s</th><th class="n">Cases</th>'
+         '<th class="n">Change</th><th class="n">%%</th><th>Largest driver</th>'
+         '<th class="n">Its share</th></tr></thead><tbody>' % ESC(mv["label"].title())]
+    for r in mv["rows"]:
+        d = r["delta"]
+        cls = "" if d is None or d == 0 else (" delta-up" if d > 0 else " delta-down")
+        h.append('<tr><td><b>%s</b></td><td class="n">%d</td><td class="n%s">%s</td>'
+                 '<td class="n%s">%s</td><td>%s</td><td class="n">%s</td></tr>'
+                 % (ESC(r["key"]), r["total"], cls, "—" if d is None else "%+d" % d, cls,
+                    "—" if r["pct"] is None else "%+.1f%%" % r["pct"],
+                    ESC(r["top_bucket"] or "—"),
+                    "—" if r["top_pct"] is None else "%d (%.1f%%)" % (r["top_count"], r["top_pct"])))
+    h.append("</tbody></table></div>")
+    return "".join(h)
+
+
+ADJ = {"month": "Monthly", "quarter": "Quarterly", "week": "Weekly"}
+
+
+def movement_block(mv, drivers):
+    if not mv.get("computable"):
+        return na_block("%s movement" % ADJ.get(mv.get("label"), "Period"), mv)
+    out = [insight_list(mv["insights"]),
+           svg_stacked(mv["keys"], mv["stack"], mv["totals"])]
+    out.append('<div class="legend">' + "".join(
+        '<span><span class="swatch" style="background:%s"></span>%s</span>'
+        % (cvar(i), ESC(s["name"])) for i, s in enumerate(mv["stack"])) + "</div>")
+    out.append('<p class="sub">Bar height is total volume for the %s; segments are the five '
+               'call drivers. Only complete calendar %ss are shown — a partial period at either '
+               'end of the export is excluded so it cannot read as a collapse.</p>'
+               % (mv["label"], mv["label"]))
+    out.append(movement_table(mv))
+    return "".join(out)
+
+
 def heat_table(ct):
     origins, buckets, M = ct["origins"], ct["buckets"], ct["matrix"]
     mx = max((max(r) for r in M), default=0) or 1
@@ -617,21 +716,13 @@ def build(res, meta):
                 % (ESC(t["label"]), t["count"], t["pct_of_cases"]) for t in tl["top"][:10])
       + "</tbody></table></div>")
 
-    A("<h3>Movement over time</h3>")
-    if V["monthly"].get("computable"):
-        m = V["monthly"]
-        ser = fold_series(m["by_bucket"], DRV) if DRV else \
-            [{"name": k, "values": v} for k, v in
-             sorted(m["by_bucket"].items(), key=lambda kv: -sum(kv[1]))[:MAXSERIES]]
-        A(svg_line(m["months"], ser))
-        A('<div class="legend">' + "".join(
-            '<span><span class="swatch" style="background:%s"></span>%s</span>' % (cvar(i), ESC(s["name"]))
-            for i, s in enumerate(ser)) + "</div>")
-        first, last = m["total"][0], m["total"][-1]
-        A('<p class="sub">Total monthly volume moved from %d to %d across %d months (%+.1f%%).</p>'
-          % (first, last, len(m["months"]), 100.0 * (last - first) / first if first else 0))
-    else:
-        A(na_block("Growth / decline by category and origin", V["monthly"]))
+    MV = res.get("movement") or {}
+    A("<h3>Monthly movement</h3>")
+    A(movement_block(MV.get("monthly", {"label": "month", "reason":
+        "no monthly view available", "needs": ["a date column"]}), DRV))
+    A("<h3>Quarterly movement</h3>")
+    A(movement_block(MV.get("quarterly", {"label": "quarter", "reason":
+        "no quarterly view available", "needs": ["a date column"]}), DRV))
 
     for key, ttl in (("site", "Breakdown by office / site"), ("agent", "Breakdown by agent")):
         rec = V.get(key) or {}

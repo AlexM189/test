@@ -368,7 +368,7 @@ def top_drivers(V):
 
 
 def _plabel(p, freq):
-    """Readable period label: 2026-W30 for weeks, 2026-06 for months."""
+    """Readable period label: 2026-W30 weeks, 2026-06 months, 2026Q3 quarters."""
     if freq == "W":
         iso = p.start_time.isocalendar()
         return "%d-W%02d" % (iso[0], iso[1])
@@ -478,6 +478,85 @@ def anomaly_section(df, V):
     return out
 
 
+def period_movement(df, V, freq, label, drivers):
+    """Volume and category mix per complete calendar period, with the direction
+    and any peak stated in words. Complete periods only - a half-finished month
+    would read as a collapse that never happened."""
+    keys, counts = _series(df, freq)
+    if len(keys) < 2:
+        return {"computable": False, "label": label, "periods": len(keys),
+                "reason": ("only %d complete %s(s) fall inside the data range; 2+ are needed "
+                           "to show movement. Partial periods at the start and end of the "
+                           "export are excluded on purpose." % (len(keys), label)),
+                "needs": ["a date column covering 2+ complete %ss" % label]}
+
+    names = [d["label"] for d in drivers if not d.get("rolled")]
+    rolled = next((d for d in drivers if d.get("rolled")), None)
+    ser = _bucket_series(df, freq, keys, [b["label"] for b in V["bucket"]["rows"]])
+    stack = [{"name": nm, "values": ser.get(nm, [0] * len(keys))} for nm in names]
+    if rolled:
+        acc = [0] * len(keys)
+        for b in rolled["rolled"]:
+            for i, v in enumerate(ser.get(b, [])):
+                acc[i] += v
+        if any(acc):
+            stack.append({"name": rolled["label"], "values": acc})
+
+    totals = [counts[k] for k in keys]
+    rows = []
+    for i, k in enumerate(keys):
+        prev = totals[i - 1] if i else None
+        delta = (totals[i] - prev) if prev is not None else None
+        top = max(stack, key=lambda s: s["values"][i]) if stack else None
+        rows.append({"key": k, "total": totals[i], "delta": delta,
+                     "pct": (round(100.0 * delta / prev, 1) if prev else None),
+                     "top_bucket": top["name"] if top else None,
+                     "top_count": top["values"][i] if top else None,
+                     "top_pct": pct(top["values"][i], totals[i]) if top and totals[i] else None})
+
+    ins = []
+    hi = max(range(len(totals)), key=lambda i: totals[i])
+    lo = min(range(len(totals)), key=lambda i: totals[i])
+    ins.append({"kind": "range",
+                "text": "Busiest %s was %s at %d cases; quietest was %s at %d."
+                        % (label, keys[hi], totals[hi], keys[lo], totals[lo])})
+    first, last = totals[0], totals[-1]
+    if first:
+        move = 100.0 * (last - first) / first
+        direction = ("rose" if move >= ANOM["trend_pct"] else
+                     "fell" if move <= -ANOM["trend_pct"] else "held roughly flat")
+        ins.append({"kind": "up" if move >= ANOM["trend_pct"] else
+                            "down" if move <= -ANOM["trend_pct"] else "flat",
+                    "text": "Across %d %ss volume %s%s, from %d in %s to %d in %s."
+                            % (len(keys), label, direction,
+                               "" if abs(move) < ANOM["trend_pct"] else " %.0f%%" % abs(move),
+                               first, keys[0], last, keys[-1])})
+    d, p = rows[-1]["delta"], rows[-1]["pct"]
+    if d is not None and p is not None:
+        ins.append({"kind": "up" if d > 0 else "down" if d < 0 else "flat",
+                    "text": "Latest %s (%s) is %+d case(s) on %s, %+.1f%%."
+                            % (label, keys[-1], d, keys[-2], p)})
+    peaks, moves = [], []
+    for s_ in stack:
+        v = s_["values"]
+        mu = sum(v) / len(v)
+        pi = max(range(len(v)), key=lambda i: v[i])
+        if mu and v[pi] >= ANOM["peak_min"] and v[pi] >= ANOM["peak_ratio"] * mu:
+            peaks.append({"kind": "peak",
+                        "text": "%s peaked in %s at %d cases — %.1fx its %s average of %.1f."
+                                % (s_["name"], keys[pi], v[pi], v[pi] / mu, label, mu)})
+        if len(v) >= 2 and v[0]:
+            mv = 100.0 * (v[-1] - v[0]) / v[0]
+            if abs(mv) >= ANOM["bucket_pct_threshold"] and abs(v[-1] - v[0]) >= ANOM["bucket_min_abs"]:
+                moves.append({"kind": "up" if mv > 0 else "down",
+                            "text": "%s %s %.0f%% across the window (%d in %s to %d in %s)."
+                                    % (s_["name"], "grew" if mv > 0 else "shrank", abs(mv),
+                                       v[0], keys[0], v[-1], keys[-1])})
+    ins.extend(peaks); ins.extend(moves)
+    return {"computable": True, "label": label, "keys": keys, "totals": totals,
+            "stack": stack, "rows": rows, "insights": ins}
+
+
 def most_received(df, V):
     """Detail on the single largest driver, for the executive summary."""
     if not V["bucket"]["rows"]:
@@ -517,5 +596,9 @@ def run(df):
             "inference": inference_audit(df),
             "drivers": top_drivers(vol),
             "anomaly": anomaly_section(df, vol),
+            "movement": {
+                "monthly": period_movement(df, vol, "M", "month", top_drivers(vol)),
+                "quarterly": period_movement(df, vol, "Q", "quarter", top_drivers(vol)),
+            },
             "most_received": most_received(df, vol),
             "buckets": BUCKETS}

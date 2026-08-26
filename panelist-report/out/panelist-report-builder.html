@@ -144,6 +144,19 @@ tr.various td{color:var(--text-2)}
   padding:14px 16px;margin:14px 0 4px}
 .mr .lead{font-size:.95rem;margin-bottom:.4em}
 .mr ul{margin:.4em 0 0;padding-left:1.15em;font-size:.87rem;color:var(--text-2)}
+.ins{list-style:none;padding:0;margin:12px 0 18px;display:flex;flex-direction:column;gap:7px}
+.ins li{display:flex;gap:10px;align-items:flex-start;font-size:.89rem;color:var(--text-2)}
+.ins li b{color:var(--text)}
+.ins .k{font-size:.62rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none;min-width:56px;text-align:center;
+  margin-top:1px}
+.ins .k.up{background:var(--warn);color:#fff}
+.ins .k.down{background:var(--accent);color:#fff}
+.ins .k.peak{background:var(--s7);color:#fff}
+.ins .k.flat,.ins .k.range{background:var(--surface-2);color:var(--text-2);
+  border:1px solid var(--border-strong)}
+td.delta-up{color:var(--warn);font-weight:640}
+td.delta-down{color:var(--accent);font-weight:640}
 </style>
 <style>/* Chrome for the upload tool itself - the report body brings its own styles. */
 .tool{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
@@ -232,8 +245,8 @@ tr.various td{color:var(--text-2)}
 
 <script type="module">
 /* --- shared configuration (rules.json) --- */
-const RULES = JSON.parse("{\n  \"_comment\": \"Single source of truth for header aliases, bucket rules and correlation signals. Consumed by the Python CLI (ingest.py/analyze.py) and inlined into the browser tool at build time. Edit here, rebuild, and both stay in step.\",\n  \"gates\": {\n    \"min_cases_lift\": 30,\n    \"min_cooccurrence\": 5,\n    \"min_periods_fit\": 3,\n    \"preview_below\": 30,\n    \"top_drivers\": 4\n  },\n  \"aliases\": {\n    \"mno\": [\n      \"mno\",\n      \"memberno\",\n      \"membernumber\",\n      \"memberid\",\n      \"panelistid\",\n      \"panelid\",\n      \"accountid\",\n      \"accountno\",\n      \"hhid\",\n      \"householdid\",\n      \"contactid\"\n    ],\n    \"member_status\": [\n      \"memberstatus\",\n      \"panelistatus\",\n      \"paneliststatus\",\n      \"accountstatus\",\n      \"status\"\n    ],\n    \"case_status\": [\n      \"casestatus\",\n      \"ticketstatus\",\n      \"statusreason\",\n      \"state\"\n    ],\n    \"case_origin\": [\n      \"caseorigin\",\n      \"origin\",\n      \"channel\",\n      \"casechannel\",\n      \"source\",\n      \"casesource\",\n      \"contactchannel\",\n      \"medium\"\n    ],\n    \"modified_on\": [\n      \"modifiedon\",\n      \"lastmodified\",\n      \"modifieddate\",\n      \"lastupdated\",\n      \"updatedon\"\n    ],\n    \"created_on\": [\n      \"createdon\",\n      \"createddate\",\n      \"opened\",\n      \"openeddate\",\n      \"openedon\",\n      \"casecreated\",\n      \"datecreated\",\n      \"casedate\",\n      \"contactdate\"\n    ],\n    \"closed_on\": [\n      \"closedon\",\n      \"closeddate\",\n      \"resolvedon\",\n      \"resolveddate\"\n    ],\n    \"subject\": [\n      \"subject\",\n      \"title\",\n      \"casetitle\",\n      \"summary\",\n      \"casesubject\"\n    ],\n    \"category\": [\n      \"category\",\n      \"categories\",\n      \"casetype\",\n      \"type\",\n      \"reason\",\n      \"casereason\",\n      \"topic\",\n      \"topics\",\n      \"issuetype\",\n      \"subject2\"\n    ],\n    \"description\": [\n      \"description\",\n      \"notes\",\n      \"details\",\n      \"casenotes\",\n      \"body\",\n      \"comments\"\n    ],\n    \"site\": [\n      \"site\",\n      \"office\",\n      \"location\",\n      \"center\",\n      \"callcenter\",\n      \"queue\",\n      \"team\",\n      \"region\"\n    ],\n    \"agent\": [\n      \"agent\",\n      \"owner\",\n      \"assignedto\",\n      \"caseowner\",\n      \"rep\",\n      \"csr\",\n      \"handler\"\n    ],\n    \"member_type\": [\n      \"membertype\",\n      \"relationship\",\n      \"householdrole\",\n      \"primarysecondary\",\n      \"role\"\n    ],\n    \"enrolled_on\": [\n      \"enrolledon\",\n      \"enrollmentdate\",\n      \"joindate\",\n      \"joinedon\",\n      \"installdate\",\n      \"startdate\",\n      \"tenurestart\",\n      \"signupdate\"\n    ]\n  },\n  \"bucket_rules\": [\n    [\n      \"Account Access & Security\",\n      \"password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|account security|security question|lock(?:ed)? out|credential\"\n    ],\n    [\n      \"Incentives & Rewards\",\n      \"incentive|reward|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|sweepstake|bonus|blocked reward\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tag requested|\\\\brma\\\\b|pick[- ]?up|tracking|appointment|field service|technician|install visit|dispatch\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|\\\\bpurge|dormant|non[- ]?complian|participation\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"email|bounce|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number change\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|bbb\"\n    ]\n  ],\n  \"signals\": {\n    \"hardware_meter\": \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|chrome|equipment|hardware|modem|offline|wi-?fi\",\n    \"activity\": \"activity|participation|non[- ]?complian\",\n    \"reactivation\": \"reactivat|inactiv|dormant|\\\\bpurge\",\n    \"blocked_reward\": \"blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)\",\n    \"reward_any\": \"incentive|reward|\\\\bpoint|prepaid|visa|redeem\",\n    \"email_issue\": \"email|bounce|undeliver|mailing\",\n    \"password_access\": \"password|login|sign[- ]?in|\\\\bump\\\\b|credential|lock(?:ed)? out\",\n    \"google_account\": \"google[ _-]?account|google[ _-]?android|gmail|google chrome\",\n    \"outbound_cb\": \"outbound|call ?back\",\n    \"returns_ars\": \"\\\\bars\\\\b|return|tag requested|\\\\brma\\\\b\",\n    \"shipping\": \"\\\\bship|deliver|tracking\",\n    \"appointment\": \"appointment|field service|technician|dispatch|install visit\",\n    \"lost_stolen\": \"lost or stolen|lost/stolen|stolen\",\n    \"setup\": \"set[- ]?up|install|how to|onboard\"\n  },\n  \"risk_profile\": {\n    \"Hardware & Meter\": {\n      \"threat\": \"Panel data loss, cost-to-serve\",\n      \"owner\": \"Engineering / Product (metering)\"\n    },\n    \"Activity & Reactivation\": {\n      \"threat\": \"Panelist churn, panel representativeness\",\n      \"owner\": \"Panel Operations\"\n    },\n    \"Incentives & Rewards\": {\n      \"threat\": \"Trust and brand reputation, repeat contact\",\n      \"owner\": \"Rewards / Finance Ops\"\n    },\n    \"Account Access & Security\": {\n      \"threat\": \"Lockout-driven churn, onboarding failure\",\n      \"owner\": \"Identity / Engineering\"\n    },\n    \"Logistics & Returns\": {\n      \"threat\": \"Cost-to-serve, unrecovered assets\",\n      \"owner\": \"Field Service / Logistics\"\n    },\n    \"Onboarding & Setup\": {\n      \"threat\": \"Early-life churn\",\n      \"owner\": \"Panel Operations / Support Ops\"\n    },\n    \"Outbound & Callbacks\": {\n      \"threat\": \"Handling cost, channel breakdown\",\n      \"owner\": \"WFM / Support Ops\"\n    },\n    \"Communications & Contact\": {\n      \"threat\": \"Deliverability and contactability\",\n      \"owner\": \"CRM / Marketing Ops\"\n    },\n    \"Billing & Tax\": {\n      \"threat\": \"Compliance exposure\",\n      \"owner\": \"Finance\"\n    },\n    \"Complaint & Escalation\": {\n      \"threat\": \"Brand reputation\",\n      \"owner\": \"Support Ops leadership\"\n    },\n    \"Other / Unmapped\": {\n      \"threat\": \"Unclassified demand\",\n      \"owner\": \"Support Ops (taxonomy owner)\"\n    }\n  },\n  \"various_label\": \"Various topics\",\n  \"anomaly\": {\n    \"_comment\": \"A period-over-period move is only flagged when it clears BOTH a percentage and an absolute-case threshold, so small counts cannot manufacture a scary percentage.\",\n    \"pct_threshold\": 25,\n    \"min_abs_change\": 5,\n    \"bucket_pct_threshold\": 40,\n    \"bucket_min_abs\": 5,\n    \"z_threshold\": 2.0,\n    \"min_periods_for_z\": 4\n  },\n  \"subject_rules\": [\n    [\n      \"Incentives & Rewards\",\n      \"reward|incentive|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|\\\\bcash\\\\b|bonus|sweepstake|missing .*(reward|point|payment)|not (?:been )?paid\"\n    ],\n    [\n      \"Account Access & Security\",\n      \"password|passwd|\\\\bpwd\\\\b|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|lock(?:ed)? out|credential|reset .*account|can(?:no|')?t (?:log|sign)\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline|not working|won'?t (?:work|turn|connect|power)|stopped working|no longer works|broken|faulty|not connect|keeps? (?:disconnect|drop)\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tracking|\\\\brma\\\\b|pick[- ]?up|appointment|field service|technician|dispatch|not (?:yet )?(?:arrived|received)|where is my\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|dormant|\\\\bpurge|participation|not credited|no credit\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up|new (?:member|panelist|household)\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call|please call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"\\\\bemail|bounce|undeliver|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|\\\\bbbb\\\\b\"\n    ]\n  ]\n}");
-const CSS = "*,*::before,*::after{box-sizing:border-box}\n:root{\n  color-scheme:light;\n  --bg:#f7f7f5; --surface:#fcfcfb; --surface-2:#f1f1ee; --border:#e0e0da; --border-strong:#c9c9c1;\n  --text:#111110; --text-2:#52514e; --text-3:#7a7973;\n  --accent:#2a78d6; --good:#1a7f4b; --warn:#b26a00; --bad:#c0392f; --na:#8a8a82;\n  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;\n  --seq0:#cde2fb;--seq1:#9ec5f4;--seq2:#6da7ec;--seq3:#3987e5;--seq4:#256abf;--seq5:#184f95;--seq6:#0d366b;\n  --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);\n}\n@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}}\n:root[data-theme=\"dark\"]{\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}\nhtml{-webkit-text-size-adjust:100%}\nbody{margin:0;background:var(--bg);color:var(--text);\n  font:16px/1.62 ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif;\n  font-feature-settings:\"tnum\" 0}\n.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}\nh1,h2,h3,h4{line-height:1.25;margin:0 0 .4em;font-weight:640;letter-spacing:-.01em}\nh1{font-size:clamp(1.6rem,4.4vw,2.3rem)}\nh2{font-size:clamp(1.25rem,3vw,1.6rem);margin-top:0}\nh3{font-size:1.06rem;margin-top:1.6em}\nh4{font-size:.95rem;margin-top:1.3em;color:var(--text-2)}\np{margin:0 0 1em}\na{color:var(--accent)}\n.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}\n.num{font-variant-numeric:tabular-nums}\nheader.rpt{border-bottom:2px solid var(--border-strong);padding-bottom:18px;margin-bottom:26px}\n.eyebrow{text-transform:uppercase;letter-spacing:.11em;font-size:.7rem;font-weight:700;color:var(--text-3);margin:0 0 .5em}\n.sub{color:var(--text-2);font-size:.95rem;margin:.3em 0 0}\n.toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px}\n.btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text-2);\n  border-radius:8px;padding:6px 11px;font-size:.8rem;cursor:pointer;font-family:inherit}\n.btn:hover{color:var(--text);border-color:var(--accent)}\nsection.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;\n  padding:22px 22px 26px;margin:0 0 22px;box-shadow:var(--shadow)}\n.secnum{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;\n  border-radius:7px;background:var(--accent);color:#fff;font-size:.8rem;font-weight:700;margin-right:9px}\n.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin:18px 0 6px}\n.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:13px 14px}\n.stat .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);font-weight:700}\n.stat .v{font-size:clamp(1.35rem,3.4vw,1.85rem);font-weight:680;letter-spacing:-.02em;margin:.16em 0 .05em;\n  font-variant-numeric:tabular-nums}\n.stat .d{font-size:.78rem;color:var(--text-2);line-height:1.35}\n.grid2{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:start}\nfigure{margin:0}\nfigcaption{font-size:.82rem;color:var(--text-3);margin-top:8px}\nsvg{display:block;width:100%;height:auto;overflow:visible}\ntable{border-collapse:collapse;width:100%;font-size:.855rem;margin:10px 0}\nth,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border)}\nth{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:700;\n  border-bottom:1px solid var(--border-strong);white-space:nowrap}\ntd.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}\ntbody tr:hover{background:var(--surface-2)}\n.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}\n.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:baseline}\n.legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin:12px 0 2px;font-size:.82rem;color:var(--text-2)}\n.na{border-left:3px solid var(--na);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0}\n.na .t{font-weight:680;color:var(--text);font-size:.9rem;display:flex;align-items:center;gap:7px}\n.na .t::before{content:\"NOT COMPUTABLE\";font-size:.62rem;letter-spacing:.08em;background:var(--na);\n  color:#fff;padding:2px 6px;border-radius:4px;font-weight:700}\n.na p{margin:.5em 0 0;font-size:.87rem;color:var(--text-2)}\n.na ul{margin:.5em 0 0;padding-left:1.2em;font-size:.87rem;color:var(--text-2)}\n.callout{border-left:3px solid var(--warn);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0;font-size:.89rem}\n.callout.info{border-left-color:var(--accent)}\n.callout .t{font-weight:680;font-size:.9rem;margin-bottom:.3em}\nol.find{counter-reset:f;list-style:none;padding:0;margin:14px 0 0}\nol.find li{counter-increment:f;position:relative;padding:0 0 0 40px;margin:0 0 15px}\nol.find li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;\n  border-radius:7px;background:var(--surface-2);border:1px solid var(--border-strong);\n  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;color:var(--text-2)}\nol.find b{display:block;margin-bottom:.15em}\n.rec{border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin:0 0 12px;background:var(--surface-2)}\n.rec .h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:.45em}\n.pill{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;\n  padding:3px 8px;border-radius:20px;border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}\n.pill.p1{background:var(--bad);border-color:var(--bad);color:#fff}\n.pill.p2{background:var(--warn);border-color:var(--warn);color:#fff}\n.pill.p3{background:var(--surface);color:var(--text-2)}\n.pill.v-supported{background:var(--good);border-color:var(--good);color:#fff}\n.pill.v-none{background:var(--surface);color:var(--text-3)}\n.pill.v-inverse{background:var(--surface);color:var(--text-3)}\n.rec .ties{font-size:.8rem;color:var(--text-3);margin-top:.5em}\n.tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--text);\n  color:var(--bg);padding:6px 9px;border-radius:7px;font-size:.78rem;font-weight:560;z-index:99;\n  white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.28)}\n.tip.on{opacity:1}\n.hit{cursor:default}\n.hit:hover{filter:brightness(1.08)}\n.foot{color:var(--text-3);font-size:.8rem;border-top:1px solid var(--border);padding-top:16px;margin-top:8px}\n@media (max-width:600px){.wrap{padding:16px 13px 60px}section.card{padding:17px 15px 20px;border-radius:11px}\n  .toolbar{position:static;justify-content:flex-end;margin-bottom:10px}}\n@media print{\n  :root{--bg:#fff;--surface:#fff;--surface-2:#f4f4f2;--border:#ccc;--border-strong:#888;\n        --text:#000;--text-2:#333;--text-3:#555;color-scheme:light}\n  body{background:#fff;font-size:10.5pt}\n  .wrap{max-width:none;padding:0}\n  .toolbar,.tip{display:none!important}\n  section.card{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border:1px solid #bbb;margin-bottom:14px}\n  h2{break-after:avoid}\n  figure,table,.rec,.na{break-inside:avoid}\n  a{color:#000;text-decoration:none}\n  @page{margin:14mm}\n}\n.alerts{display:flex;flex-direction:column;gap:9px;margin:14px 0 4px}\n.alert{display:flex;gap:11px;align-items:flex-start;border-left:3px solid var(--warn);\n  background:var(--surface-2);border-radius:0 10px 10px 0;padding:11px 14px;font-size:.89rem}\n.alert.down{border-left-color:var(--accent)}\n.alert.calm{border-left-color:var(--good)}\n.alert .dir{font-weight:700;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;\n  padding:3px 8px;border-radius:5px;background:var(--warn);color:#fff;white-space:nowrap;flex:none}\n.alert.down .dir{background:var(--accent)}\n.alert.calm .dir{background:var(--good)}\n.drivers{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));\n  align-items:start;margin-top:12px}\n.rankno{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;\n  border-radius:6px;background:var(--surface);border:1px solid var(--border-strong);\n  font-size:.72rem;font-weight:700;color:var(--text-2);margin-right:8px;flex:none}\ntr.various td{color:var(--text-2)}\n.mr{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;\n  padding:14px 16px;margin:14px 0 4px}\n.mr .lead{font-size:.95rem;margin-bottom:.4em}\n.mr ul{margin:.4em 0 0;padding-left:1.15em;font-size:.87rem;color:var(--text-2)}\n";
+const RULES = JSON.parse("{\n  \"_comment\": \"Single source of truth for header aliases, bucket rules and correlation signals. Consumed by the Python CLI (ingest.py/analyze.py) and inlined into the browser tool at build time. Edit here, rebuild, and both stay in step.\",\n  \"gates\": {\n    \"min_cases_lift\": 30,\n    \"min_cooccurrence\": 5,\n    \"min_periods_fit\": 3,\n    \"preview_below\": 30,\n    \"top_drivers\": 4\n  },\n  \"aliases\": {\n    \"mno\": [\n      \"mno\",\n      \"memberno\",\n      \"membernumber\",\n      \"memberid\",\n      \"panelistid\",\n      \"panelid\",\n      \"accountid\",\n      \"accountno\",\n      \"hhid\",\n      \"householdid\",\n      \"contactid\"\n    ],\n    \"member_status\": [\n      \"memberstatus\",\n      \"panelistatus\",\n      \"paneliststatus\",\n      \"accountstatus\",\n      \"status\"\n    ],\n    \"case_status\": [\n      \"casestatus\",\n      \"ticketstatus\",\n      \"statusreason\",\n      \"state\"\n    ],\n    \"case_origin\": [\n      \"caseorigin\",\n      \"origin\",\n      \"channel\",\n      \"casechannel\",\n      \"source\",\n      \"casesource\",\n      \"contactchannel\",\n      \"medium\"\n    ],\n    \"modified_on\": [\n      \"modifiedon\",\n      \"lastmodified\",\n      \"modifieddate\",\n      \"lastupdated\",\n      \"updatedon\"\n    ],\n    \"created_on\": [\n      \"createdon\",\n      \"createddate\",\n      \"opened\",\n      \"openeddate\",\n      \"openedon\",\n      \"casecreated\",\n      \"datecreated\",\n      \"casedate\",\n      \"contactdate\"\n    ],\n    \"closed_on\": [\n      \"closedon\",\n      \"closeddate\",\n      \"resolvedon\",\n      \"resolveddate\"\n    ],\n    \"subject\": [\n      \"subject\",\n      \"title\",\n      \"casetitle\",\n      \"summary\",\n      \"casesubject\"\n    ],\n    \"category\": [\n      \"category\",\n      \"categories\",\n      \"casetype\",\n      \"type\",\n      \"reason\",\n      \"casereason\",\n      \"topic\",\n      \"topics\",\n      \"issuetype\",\n      \"subject2\"\n    ],\n    \"description\": [\n      \"description\",\n      \"notes\",\n      \"details\",\n      \"casenotes\",\n      \"body\",\n      \"comments\"\n    ],\n    \"site\": [\n      \"site\",\n      \"office\",\n      \"location\",\n      \"center\",\n      \"callcenter\",\n      \"queue\",\n      \"team\",\n      \"region\"\n    ],\n    \"agent\": [\n      \"agent\",\n      \"owner\",\n      \"assignedto\",\n      \"caseowner\",\n      \"rep\",\n      \"csr\",\n      \"handler\"\n    ],\n    \"member_type\": [\n      \"membertype\",\n      \"relationship\",\n      \"householdrole\",\n      \"primarysecondary\",\n      \"role\"\n    ],\n    \"enrolled_on\": [\n      \"enrolledon\",\n      \"enrollmentdate\",\n      \"joindate\",\n      \"joinedon\",\n      \"installdate\",\n      \"startdate\",\n      \"tenurestart\",\n      \"signupdate\"\n    ]\n  },\n  \"bucket_rules\": [\n    [\n      \"Account Access & Security\",\n      \"password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|account security|security question|lock(?:ed)? out|credential\"\n    ],\n    [\n      \"Incentives & Rewards\",\n      \"incentive|reward|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|sweepstake|bonus|blocked reward\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tag requested|\\\\brma\\\\b|pick[- ]?up|tracking|appointment|field service|technician|install visit|dispatch\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|\\\\bpurge|dormant|non[- ]?complian|participation\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"email|bounce|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number change\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|bbb\"\n    ]\n  ],\n  \"signals\": {\n    \"hardware_meter\": \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|chrome|equipment|hardware|modem|offline|wi-?fi\",\n    \"activity\": \"activity|participation|non[- ]?complian\",\n    \"reactivation\": \"reactivat|inactiv|dormant|\\\\bpurge\",\n    \"blocked_reward\": \"blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)\",\n    \"reward_any\": \"incentive|reward|\\\\bpoint|prepaid|visa|redeem\",\n    \"email_issue\": \"email|bounce|undeliver|mailing\",\n    \"password_access\": \"password|login|sign[- ]?in|\\\\bump\\\\b|credential|lock(?:ed)? out\",\n    \"google_account\": \"google[ _-]?account|google[ _-]?android|gmail|google chrome\",\n    \"outbound_cb\": \"outbound|call ?back\",\n    \"returns_ars\": \"\\\\bars\\\\b|return|tag requested|\\\\brma\\\\b\",\n    \"shipping\": \"\\\\bship|deliver|tracking\",\n    \"appointment\": \"appointment|field service|technician|dispatch|install visit\",\n    \"lost_stolen\": \"lost or stolen|lost/stolen|stolen\",\n    \"setup\": \"set[- ]?up|install|how to|onboard\"\n  },\n  \"risk_profile\": {\n    \"Hardware & Meter\": {\n      \"threat\": \"Panel data loss, cost-to-serve\",\n      \"owner\": \"Engineering / Product (metering)\"\n    },\n    \"Activity & Reactivation\": {\n      \"threat\": \"Panelist churn, panel representativeness\",\n      \"owner\": \"Panel Operations\"\n    },\n    \"Incentives & Rewards\": {\n      \"threat\": \"Trust and brand reputation, repeat contact\",\n      \"owner\": \"Rewards / Finance Ops\"\n    },\n    \"Account Access & Security\": {\n      \"threat\": \"Lockout-driven churn, onboarding failure\",\n      \"owner\": \"Identity / Engineering\"\n    },\n    \"Logistics & Returns\": {\n      \"threat\": \"Cost-to-serve, unrecovered assets\",\n      \"owner\": \"Field Service / Logistics\"\n    },\n    \"Onboarding & Setup\": {\n      \"threat\": \"Early-life churn\",\n      \"owner\": \"Panel Operations / Support Ops\"\n    },\n    \"Outbound & Callbacks\": {\n      \"threat\": \"Handling cost, channel breakdown\",\n      \"owner\": \"WFM / Support Ops\"\n    },\n    \"Communications & Contact\": {\n      \"threat\": \"Deliverability and contactability\",\n      \"owner\": \"CRM / Marketing Ops\"\n    },\n    \"Billing & Tax\": {\n      \"threat\": \"Compliance exposure\",\n      \"owner\": \"Finance\"\n    },\n    \"Complaint & Escalation\": {\n      \"threat\": \"Brand reputation\",\n      \"owner\": \"Support Ops leadership\"\n    },\n    \"Other / Unmapped\": {\n      \"threat\": \"Unclassified demand\",\n      \"owner\": \"Support Ops (taxonomy owner)\"\n    }\n  },\n  \"various_label\": \"Various topics\",\n  \"anomaly\": {\n    \"_comment\": \"A period-over-period move is only flagged when it clears BOTH a percentage and an absolute-case threshold, so small counts cannot manufacture a scary percentage.\",\n    \"pct_threshold\": 25,\n    \"min_abs_change\": 5,\n    \"bucket_pct_threshold\": 40,\n    \"bucket_min_abs\": 5,\n    \"z_threshold\": 2.0,\n    \"min_periods_for_z\": 4,\n    \"peak_ratio\": 1.5,\n    \"peak_min\": 5,\n    \"trend_pct\": 15\n  },\n  \"subject_rules\": [\n    [\n      \"Incentives & Rewards\",\n      \"reward|incentive|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|\\\\bcash\\\\b|bonus|sweepstake|missing .*(reward|point|payment)|not (?:been )?paid\"\n    ],\n    [\n      \"Account Access & Security\",\n      \"password|passwd|\\\\bpwd\\\\b|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|lock(?:ed)? out|credential|reset .*account|can(?:no|')?t (?:log|sign)\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline|not working|won'?t (?:work|turn|connect|power)|stopped working|no longer works|broken|faulty|not connect|keeps? (?:disconnect|drop)\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tracking|\\\\brma\\\\b|pick[- ]?up|appointment|field service|technician|dispatch|not (?:yet )?(?:arrived|received)|where is my\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|dormant|\\\\bpurge|participation|not credited|no credit\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up|new (?:member|panelist|household)\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call|please call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"\\\\bemail|bounce|undeliver|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|\\\\bbbb\\\\b\"\n    ]\n  ]\n}");
+const CSS = "*,*::before,*::after{box-sizing:border-box}\n:root{\n  color-scheme:light;\n  --bg:#f7f7f5; --surface:#fcfcfb; --surface-2:#f1f1ee; --border:#e0e0da; --border-strong:#c9c9c1;\n  --text:#111110; --text-2:#52514e; --text-3:#7a7973;\n  --accent:#2a78d6; --good:#1a7f4b; --warn:#b26a00; --bad:#c0392f; --na:#8a8a82;\n  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;\n  --seq0:#cde2fb;--seq1:#9ec5f4;--seq2:#6da7ec;--seq3:#3987e5;--seq4:#256abf;--seq5:#184f95;--seq6:#0d366b;\n  --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);\n}\n@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}}\n:root[data-theme=\"dark\"]{\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}\nhtml{-webkit-text-size-adjust:100%}\nbody{margin:0;background:var(--bg);color:var(--text);\n  font:16px/1.62 ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif;\n  font-feature-settings:\"tnum\" 0}\n.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}\nh1,h2,h3,h4{line-height:1.25;margin:0 0 .4em;font-weight:640;letter-spacing:-.01em}\nh1{font-size:clamp(1.6rem,4.4vw,2.3rem)}\nh2{font-size:clamp(1.25rem,3vw,1.6rem);margin-top:0}\nh3{font-size:1.06rem;margin-top:1.6em}\nh4{font-size:.95rem;margin-top:1.3em;color:var(--text-2)}\np{margin:0 0 1em}\na{color:var(--accent)}\n.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}\n.num{font-variant-numeric:tabular-nums}\nheader.rpt{border-bottom:2px solid var(--border-strong);padding-bottom:18px;margin-bottom:26px}\n.eyebrow{text-transform:uppercase;letter-spacing:.11em;font-size:.7rem;font-weight:700;color:var(--text-3);margin:0 0 .5em}\n.sub{color:var(--text-2);font-size:.95rem;margin:.3em 0 0}\n.toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px}\n.btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text-2);\n  border-radius:8px;padding:6px 11px;font-size:.8rem;cursor:pointer;font-family:inherit}\n.btn:hover{color:var(--text);border-color:var(--accent)}\nsection.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;\n  padding:22px 22px 26px;margin:0 0 22px;box-shadow:var(--shadow)}\n.secnum{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;\n  border-radius:7px;background:var(--accent);color:#fff;font-size:.8rem;font-weight:700;margin-right:9px}\n.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin:18px 0 6px}\n.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:13px 14px}\n.stat .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);font-weight:700}\n.stat .v{font-size:clamp(1.35rem,3.4vw,1.85rem);font-weight:680;letter-spacing:-.02em;margin:.16em 0 .05em;\n  font-variant-numeric:tabular-nums}\n.stat .d{font-size:.78rem;color:var(--text-2);line-height:1.35}\n.grid2{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:start}\nfigure{margin:0}\nfigcaption{font-size:.82rem;color:var(--text-3);margin-top:8px}\nsvg{display:block;width:100%;height:auto;overflow:visible}\ntable{border-collapse:collapse;width:100%;font-size:.855rem;margin:10px 0}\nth,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border)}\nth{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:700;\n  border-bottom:1px solid var(--border-strong);white-space:nowrap}\ntd.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}\ntbody tr:hover{background:var(--surface-2)}\n.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}\n.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:baseline}\n.legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin:12px 0 2px;font-size:.82rem;color:var(--text-2)}\n.na{border-left:3px solid var(--na);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0}\n.na .t{font-weight:680;color:var(--text);font-size:.9rem;display:flex;align-items:center;gap:7px}\n.na .t::before{content:\"NOT COMPUTABLE\";font-size:.62rem;letter-spacing:.08em;background:var(--na);\n  color:#fff;padding:2px 6px;border-radius:4px;font-weight:700}\n.na p{margin:.5em 0 0;font-size:.87rem;color:var(--text-2)}\n.na ul{margin:.5em 0 0;padding-left:1.2em;font-size:.87rem;color:var(--text-2)}\n.callout{border-left:3px solid var(--warn);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0;font-size:.89rem}\n.callout.info{border-left-color:var(--accent)}\n.callout .t{font-weight:680;font-size:.9rem;margin-bottom:.3em}\nol.find{counter-reset:f;list-style:none;padding:0;margin:14px 0 0}\nol.find li{counter-increment:f;position:relative;padding:0 0 0 40px;margin:0 0 15px}\nol.find li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;\n  border-radius:7px;background:var(--surface-2);border:1px solid var(--border-strong);\n  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;color:var(--text-2)}\nol.find b{display:block;margin-bottom:.15em}\n.rec{border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin:0 0 12px;background:var(--surface-2)}\n.rec .h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:.45em}\n.pill{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;\n  padding:3px 8px;border-radius:20px;border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}\n.pill.p1{background:var(--bad);border-color:var(--bad);color:#fff}\n.pill.p2{background:var(--warn);border-color:var(--warn);color:#fff}\n.pill.p3{background:var(--surface);color:var(--text-2)}\n.pill.v-supported{background:var(--good);border-color:var(--good);color:#fff}\n.pill.v-none{background:var(--surface);color:var(--text-3)}\n.pill.v-inverse{background:var(--surface);color:var(--text-3)}\n.rec .ties{font-size:.8rem;color:var(--text-3);margin-top:.5em}\n.tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--text);\n  color:var(--bg);padding:6px 9px;border-radius:7px;font-size:.78rem;font-weight:560;z-index:99;\n  white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.28)}\n.tip.on{opacity:1}\n.hit{cursor:default}\n.hit:hover{filter:brightness(1.08)}\n.foot{color:var(--text-3);font-size:.8rem;border-top:1px solid var(--border);padding-top:16px;margin-top:8px}\n@media (max-width:600px){.wrap{padding:16px 13px 60px}section.card{padding:17px 15px 20px;border-radius:11px}\n  .toolbar{position:static;justify-content:flex-end;margin-bottom:10px}}\n@media print{\n  :root{--bg:#fff;--surface:#fff;--surface-2:#f4f4f2;--border:#ccc;--border-strong:#888;\n        --text:#000;--text-2:#333;--text-3:#555;color-scheme:light}\n  body{background:#fff;font-size:10.5pt}\n  .wrap{max-width:none;padding:0}\n  .toolbar,.tip{display:none!important}\n  section.card{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border:1px solid #bbb;margin-bottom:14px}\n  h2{break-after:avoid}\n  figure,table,.rec,.na{break-inside:avoid}\n  a{color:#000;text-decoration:none}\n  @page{margin:14mm}\n}\n.alerts{display:flex;flex-direction:column;gap:9px;margin:14px 0 4px}\n.alert{display:flex;gap:11px;align-items:flex-start;border-left:3px solid var(--warn);\n  background:var(--surface-2);border-radius:0 10px 10px 0;padding:11px 14px;font-size:.89rem}\n.alert.down{border-left-color:var(--accent)}\n.alert.calm{border-left-color:var(--good)}\n.alert .dir{font-weight:700;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;\n  padding:3px 8px;border-radius:5px;background:var(--warn);color:#fff;white-space:nowrap;flex:none}\n.alert.down .dir{background:var(--accent)}\n.alert.calm .dir{background:var(--good)}\n.drivers{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));\n  align-items:start;margin-top:12px}\n.rankno{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;\n  border-radius:6px;background:var(--surface);border:1px solid var(--border-strong);\n  font-size:.72rem;font-weight:700;color:var(--text-2);margin-right:8px;flex:none}\ntr.various td{color:var(--text-2)}\n.mr{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;\n  padding:14px 16px;margin:14px 0 4px}\n.mr .lead{font-size:.95rem;margin-bottom:.4em}\n.mr ul{margin:.4em 0 0;padding-left:1.15em;font-size:.87rem;color:var(--text-2)}\n.ins{list-style:none;padding:0;margin:12px 0 18px;display:flex;flex-direction:column;gap:7px}\n.ins li{display:flex;gap:10px;align-items:flex-start;font-size:.89rem;color:var(--text-2)}\n.ins li b{color:var(--text)}\n.ins .k{font-size:.62rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;\n  padding:3px 7px;border-radius:5px;white-space:nowrap;flex:none;min-width:56px;text-align:center;\n  margin-top:1px}\n.ins .k.up{background:var(--warn);color:#fff}\n.ins .k.down{background:var(--accent);color:#fff}\n.ins .k.peak{background:var(--s7);color:#fff}\n.ins .k.flat,.ins .k.range{background:var(--surface-2);color:var(--text-2);\n  border:1px solid var(--border-strong)}\ntd.delta-up{color:var(--warn);font-weight:640}\ntd.delta-down{color:var(--accent);font-weight:640}\n";
 const RUNTIME_JS = "window.__reportInit = function(root){\n  root = root || document;\n  var r=document.documentElement, K='panelist-report-theme';\n  try{var s=localStorage.getItem(K); if(s) r.setAttribute('data-theme',s);}catch(e){}\n  var b=root.getElementById ? root.getElementById('themeBtn') : root.querySelector('#themeBtn');\n  if(b) b.addEventListener('click',function(){\n    var cur=r.getAttribute('data-theme');\n    if(!cur) cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light';\n    var nxt = cur==='dark' ? 'light':'dark';\n    r.setAttribute('data-theme',nxt);\n    try{localStorage.setItem(K,nxt);}catch(e){}\n  });\n  var pb=root.getElementById ? root.getElementById('printBtn') : root.querySelector('#printBtn'); if(pb) pb.addEventListener('click',function(){window.print();});\n  var tip=document.querySelector('body > .tip');\n  if(!tip){ tip=document.createElement('div'); tip.className='tip'; document.body.appendChild(tip); }\n  function show(e){\n    var t=e.currentTarget.getAttribute('data-tip'); if(!t) return;\n    tip.textContent=t; tip.classList.add('on');\n    var x=e.clientX+14, y=e.clientY-34, w=tip.offsetWidth||140;\n    if(x+w>innerWidth-8) x=e.clientX-w-14; if(y<6) y=e.clientY+20;\n    tip.style.left=x+'px'; tip.style.top=y+'px';\n  }\n  function hide(){tip.classList.remove('on');}\n  root.querySelectorAll('[data-tip]').forEach(function(el){\n    if(el.__tipBound) return; el.__tipBound=true;\n    el.classList.add('hit');\n    el.addEventListener('mousemove',show); el.addEventListener('mouseenter',show);\n    el.addEventListener('mouseleave',hide);\n    el.addEventListener('touchstart',function(ev){show(ev.touches?{clientX:ev.touches[0].clientX,\n      clientY:ev.touches[0].clientY,currentTarget:el}:ev);},{passive:true});\n  });\n};\nif (document.readyState === 'loading')\n  document.addEventListener('DOMContentLoaded', function(){ window.__reportInit(document); });\nelse window.__reportInit(document);\n";
 
 /* --- report runtime (theme toggle, tooltips) --- */
@@ -1005,8 +1018,14 @@ function makeEngine(RULES) {
   }
   const monthBounds = d => [Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1),
                             Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)];
-  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d) : monKey(d);
-  const pbounds = (d, freq) => freq === "W" ? weekBounds(d) : monthBounds(d);
+  const quarterBounds = d => {
+    const q = Math.floor(d.getUTCMonth() / 3);
+    return [Date.UTC(d.getUTCFullYear(), q * 3, 1), Date.UTC(d.getUTCFullYear(), q * 3 + 3, 0)];
+  };
+  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d)
+    : freq === "Q" ? qKey(d) : monKey(d);
+  const pbounds = (d, freq) => freq === "W" ? weekBounds(d)
+    : freq === "Q" ? quarterBounds(d) : monthBounds(d);
 
   function series(recs, freq) {
     const withD = recs.filter(r => r._date);
@@ -1110,6 +1129,87 @@ function makeEngine(RULES) {
     return out;
   }
 
+  /* Volume and category mix per complete calendar period, with the direction and
+     any peak stated in words. Complete periods only - a half-finished month would
+     read as a collapse that never happened. */
+  function periodMovement(recs, V, freq, label, drivers) {
+    const { keys, counts } = series(recs, freq);
+    if (keys.length < 2) {
+      return { computable: false, label, periods: keys.length,
+        reason: "only " + keys.length + " complete " + label + "(s) fall inside the data " +
+          "range; 2+ are needed to show movement. Partial periods at the start and end of " +
+          "the export are excluded on purpose.",
+        needs: ["a date column covering 2+ complete " + label + "s"] };
+    }
+    const names = drivers.filter(d => !d.rolled).map(d => d.label);
+    const rolled = drivers.find(d => d.rolled);
+    const ser = bucketSeries(recs, freq, keys, V.bucket.rows.map(b => b.label));
+    const stack = names.map(nm => ({ name: nm, values: ser[nm] || keys.map(() => 0) }));
+    if (rolled) {
+      const acc = keys.map(() => 0);
+      for (const b of rolled.rolled) (ser[b] || []).forEach((v, i) => { acc[i] += v; });
+      if (acc.some(v => v)) stack.push({ name: rolled.label, values: acc });
+    }
+    const totals = keys.map(k => counts[k]);
+    const rows = keys.map((k, i) => {
+      const prev = i ? totals[i - 1] : null;
+      const delta = prev === null ? null : totals[i] - prev;
+      let top = null;
+      for (const s2 of stack) if (!top || s2.values[i] > top.values[i]) top = s2;
+      return { key: k, total: totals[i], delta,
+        pct: prev ? Math.round(1000 * delta / prev) / 10 : null,
+        top_bucket: top ? top.name : null, top_count: top ? top.values[i] : null,
+        top_pct: top && totals[i] ? pct(top.values[i], totals[i]) : null };
+    });
+
+    const ins = [];
+    let hi = 0, lo = 0;
+    totals.forEach((v, i) => { if (v > totals[hi]) hi = i; if (v < totals[lo]) lo = i; });
+    ins.push({ kind: "range", text: "Busiest " + label + " was " + keys[hi] + " at " +
+      totals[hi] + " cases; quietest was " + keys[lo] + " at " + totals[lo] + "." });
+    const first = totals[0], last = totals[totals.length - 1];
+    if (first) {
+      const move = 100 * (last - first) / first;
+      const dir = move >= ANOM.trend_pct ? "rose"
+        : move <= -ANOM.trend_pct ? "fell" : "held roughly flat";
+      ins.push({ kind: move >= ANOM.trend_pct ? "up" : move <= -ANOM.trend_pct ? "down" : "flat",
+        text: "Across " + keys.length + " " + label + "s volume " + dir +
+          (Math.abs(move) < ANOM.trend_pct ? "" : " " + Math.abs(move).toFixed(0) + "%") +
+          ", from " + first + " in " + keys[0] + " to " + last + " in " + keys[keys.length - 1] + "." });
+    }
+    const lastRow = rows[rows.length - 1];
+    if (lastRow.delta !== null && lastRow.pct !== null) {
+      ins.push({ kind: lastRow.delta > 0 ? "up" : lastRow.delta < 0 ? "down" : "flat",
+        text: "Latest " + label + " (" + keys[keys.length - 1] + ") is " +
+          (lastRow.delta >= 0 ? "+" : "") + lastRow.delta + " case(s) on " +
+          keys[keys.length - 2] + ", " + (lastRow.pct >= 0 ? "+" : "") +
+          lastRow.pct.toFixed(1) + "%." });
+    }
+    const peaks = [], moves = [];
+    for (const s2 of stack) {
+      const v = s2.values;
+      const mu = v.reduce((a, b) => a + b, 0) / v.length;
+      let pi = 0;
+      v.forEach((x, i) => { if (x > v[pi]) pi = i; });
+      if (mu && v[pi] >= ANOM.peak_min && v[pi] >= ANOM.peak_ratio * mu) {
+        peaks.push({ kind: "peak", text: s2.name + " peaked in " + keys[pi] + " at " + v[pi] +
+          " cases — " + (v[pi] / mu).toFixed(1) + "x its " + label + " average of " +
+          mu.toFixed(1) + "." });
+      }
+      if (v.length >= 2 && v[0]) {
+        const mv = 100 * (v[v.length - 1] - v[0]) / v[0];
+        if (Math.abs(mv) >= ANOM.bucket_pct_threshold &&
+            Math.abs(v[v.length - 1] - v[0]) >= ANOM.bucket_min_abs) {
+          moves.push({ kind: mv > 0 ? "up" : "down", text: s2.name + (mv > 0 ? " grew " : " shrank ") +
+            Math.abs(mv).toFixed(0) + "% across the window (" + v[0] + " in " + keys[0] + " to " +
+            v[v.length - 1] + " in " + keys[keys.length - 1] + ")." });
+        }
+      }
+    }
+    ins.push(...peaks, ...moves);
+    return { computable: true, label, keys, totals, stack, rows, insights: ins };
+  }
+
   function mostReceived(recs, V) {
     if (!V.bucket.rows.length) return null;
     const top = V.bucket.rows[0];
@@ -1148,7 +1248,11 @@ function makeEngine(RULES) {
       return { volume, correlation: correlationSection(recs),
                forecast: forecastSection(volume), mapping: mappingAudit(recs),
                inference: inferenceAudit(recs), drivers: topDrivers(volume),
-               anomaly: anomalySection(recs, volume), most_received: mostReceived(recs, volume) };
+               anomaly: anomalySection(recs, volume), most_received: mostReceived(recs, volume),
+               movement: {
+                 monthly: periodMovement(recs, volume, "M", "month", topDrivers(volume)),
+                 quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
+               } };
     },
   };
 }
@@ -1330,6 +1434,106 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
         " projected: " + q.point + " cases (range " + q.low + "–" + q.high + ")")}"/>`);
     });
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img">${p.join("")}</svg>`;
+  }
+
+  /* One bar per period: height is volume, segments are the five drivers - so a
+     rise or fall and a category peak are both readable off the same chart. */
+  function svgStacked(keys, stack, totals) {
+    const W = 720, H = 340, pl = 46, pb = 40, pt = 26, pr = 12;
+    const pw = W - pl - pr, ph = H - pt - pb;
+    const n = keys.length;
+    const mx = Math.max(...totals, 1);
+    const slot = pw / Math.max(n, 1);
+    const bw = Math.min(slot * 0.66, 54);
+    const X = i => pl + slot * (i + 0.5) - bw / 2;
+    const Y = v => pt + ph - ph * v / mx;
+    const p = [];
+    for (let g = 0; g < 5; g++) {
+      const y = pt + ph * g / 4;
+      p.push(`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W - pr}" y2="${y.toFixed(1)}" ` +
+        `stroke="var(--border)" stroke-width="1"/>`);
+      p.push(`<text x="${pl - 7}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="11" ` +
+        `fill="var(--text-3)">${Math.round(mx * (4 - g) / 4)}</text>`);
+    }
+    const step = Math.max(1, Math.floor((n + 13) / 14));
+    keys.forEach((k, i) => {
+      if (i % step === 0 || i === n - 1)
+        p.push(`<text x="${(X(i) + bw / 2).toFixed(1)}" y="${H - pb + 17}" text-anchor="middle" ` +
+          `font-size="10.5" fill="var(--text-3)">${ESC(k)}</text>`);
+    });
+    for (let i = 0; i < n; i++) {
+      let acc = 0;
+      const segs = [];
+      stack.forEach((s2, si) => { if (s2.values[i] > 0) segs.push([si, s2.values[i]]); });
+      segs.forEach(([si, v], j) => {
+        const y0 = Y(acc + v), y1 = Y(acc);
+        const h = Math.max(y1 - y0 - (j < segs.length - 1 ? 2 : 0), 1);
+        const tip = ESC(keys[i] + " · " + stack[si].name + ": " + v + " cases");
+        if (j === segs.length - 1) {
+          const r = Math.min(4, h / 2, bw / 2);
+          const d = `M${X(i).toFixed(2)} ${(y0 + h).toFixed(2)} L${X(i).toFixed(2)} ` +
+            `${(y0 + r).toFixed(2)} Q${X(i).toFixed(2)} ${y0.toFixed(2)} ` +
+            `${(X(i) + r).toFixed(2)} ${y0.toFixed(2)} L${(X(i) + bw - r).toFixed(2)} ` +
+            `${y0.toFixed(2)} Q${(X(i) + bw).toFixed(2)} ${y0.toFixed(2)} ` +
+            `${(X(i) + bw).toFixed(2)} ${(y0 + r).toFixed(2)} L${(X(i) + bw).toFixed(2)} ` +
+            `${(y0 + h).toFixed(2)} Z`;
+          p.push(`<path d="${d}" fill="${cvar(si)}" data-tip="${tip}"/>`);
+        } else {
+          p.push(`<rect x="${X(i).toFixed(1)}" y="${y0.toFixed(1)}" width="${bw.toFixed(1)}" ` +
+            `height="${h.toFixed(1)}" fill="${cvar(si)}" data-tip="${tip}"/>`);
+        }
+        acc += v;
+      });
+      if (totals[i]) {
+        p.push(`<text x="${(X(i) + bw / 2).toFixed(1)}" y="${(Y(totals[i]) - 7).toFixed(1)}" ` +
+          `text-anchor="middle" font-size="11" font-weight="640" fill="var(--text-2)" ` +
+          `style="font-variant-numeric:tabular-nums">${totals[i]}</text>`);
+      }
+    }
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img">` +
+      `${p.join("")}</svg>`;
+  }
+
+  const INS_WORD = { up: "rising", down: "falling", peak: "peak", flat: "flat", range: "range" };
+
+  const insightList = insights => '<ul class="ins">' + insights.map(i =>
+    `<li><span class="k ${i.kind}">${INS_WORD[i.kind] || i.kind}</span>` +
+    `<span>${ESC(i.text)}</span></li>`).join("") + "</ul>";
+
+  function movementTable(mv) {
+    const cap = mv.label.charAt(0).toUpperCase() + mv.label.slice(1);
+    const h = [`<div class="scroll"><table><thead><tr><th>${ESC(cap)}</th>` +
+      '<th class="n">Cases</th><th class="n">Change</th><th class="n">%</th>' +
+      '<th>Largest driver</th><th class="n">Its share</th></tr></thead><tbody>'];
+    for (const r of mv.rows) {
+      const d = r.delta;
+      const cls = (d === null || d === 0) ? "" : (d > 0 ? " delta-up" : " delta-down");
+      h.push(`<tr><td><b>${ESC(r.key)}</b></td><td class="n">${r.total}</td>` +
+        `<td class="n${cls}">${d === null ? "—" : (d >= 0 ? "+" : "") + d}</td>` +
+        `<td class="n${cls}">${r.pct === null ? "—" :
+          (r.pct >= 0 ? "+" : "") + f1(r.pct) + "%"}</td>` +
+        `<td>${ESC(r.top_bucket || "—")}</td><td class="n">${r.top_pct === null ? "—" :
+          r.top_count + " (" + f1(r.top_pct) + "%)"}</td></tr>`);
+    }
+    h.push("</tbody></table></div>");
+    return h.join("");
+  }
+
+  const ADJ = { month: "Monthly", quarter: "Quarterly", week: "Weekly" };
+
+  function movementBlock(mv) {
+    if (!mv || !mv.computable) {
+      return naBlock((ADJ[mv && mv.label] || "Period") + " movement", mv || {});
+    }
+    const out = [insightList(mv.insights), svgStacked(mv.keys, mv.stack, mv.totals)];
+    out.push('<div class="legend">' + mv.stack.map((s2, i) =>
+      `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(s2.name)}</span>`)
+      .join("") + "</div>");
+    out.push(`<p class="sub">Bar height is total volume for the ${mv.label}; segments are the ` +
+      `five call drivers. Only complete calendar ${mv.label}s are shown — a partial period at ` +
+      "either end of the export is excluded so it cannot read as a collapse.</p>");
+    out.push(movementTable(mv));
+    return out.join("");
   }
 
   function heatTable(ct) {
@@ -1726,21 +1930,13 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
       tl.top.slice(0, 10).map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
         `<td class="n">${f1(t.pct_of_cases)}%</td></tr>`).join("") + "</tbody></table></div>");
 
-    A("<h3>Movement over time</h3>");
-    if (V.monthly.computable) {
-      const m = V.monthly;
-      const ser = DR.length ? foldSeries(m.by_bucket, DR) : Object.entries(m.by_bucket)
-        .sort((a, b) => b[1].reduce((x, y) => x + y, 0) - a[1].reduce((x, y) => x + y, 0))
-        .slice(0, MAXSERIES).map(([k, v]) => ({ name: k, values: v }));
-      A(svgLine(m.months, ser));
-      A('<div class="legend">' + ser.map((s, i) =>
-        `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(s.name)}</span>`)
-        .join("") + "</div>");
-      const first = m.total[0], last = m.total[m.total.length - 1];
-      const chg = first ? 100 * (last - first) / first : 0;
-      A(`<p class="sub">Total monthly volume moved from ${first} to ${last} across ` +
-        `${m.months.length} months (${chg >= 0 ? "+" : ""}${f1(chg)}%).</p>`);
-    } else A(naBlock("Growth / decline by category and origin", V.monthly));
+    const MV = res.movement || {};
+    A("<h3>Monthly movement</h3>");
+    A(movementBlock(MV.monthly || { label: "month", reason: "no monthly view available",
+      needs: ["a date column"] }));
+    A("<h3>Quarterly movement</h3>");
+    A(movementBlock(MV.quarterly || { label: "quarter", reason: "no quarterly view available",
+      needs: ["a date column"] }));
 
     for (const [key, ttl] of [["site", "Breakdown by office / site"], ["agent", "Breakdown by agent"]]) {
       const rec = V[key] || {};
