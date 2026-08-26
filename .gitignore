@@ -3,3 +3,7 @@ __pycache__/
 *.pyc
 *.pyo
 .env
+
+# panelist report: raw case exports are never committed
+panelist-report/data/*
+!panelist-report/data/.gitkeep

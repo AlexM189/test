@@ -1,0 +1,861 @@
+"""Render the analysis dict into one self-contained, theme-aware, printable HTML report."""
+import html, datetime, json
+
+ESC = lambda s: html.escape(str(s), quote=True)
+
+# categorical slots - validated adjacent-pair safe in both modes (dataviz reference palette)
+CAT_L = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+CAT_D = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+SEQ   = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"]
+MAXSERIES = 8
+
+CSS = """
+*,*::before,*::after{box-sizing:border-box}
+:root{
+  color-scheme:light;
+  --bg:#f7f7f5; --surface:#fcfcfb; --surface-2:#f1f1ee; --border:#e0e0da; --border-strong:#c9c9c1;
+  --text:#111110; --text-2:#52514e; --text-3:#7a7973;
+  --accent:#2a78d6; --good:#1a7f4b; --warn:#b26a00; --bad:#c0392f; --na:#8a8a82;
+  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;
+  --seq0:#cde2fb;--seq1:#9ec5f4;--seq2:#6da7ec;--seq3:#3987e5;--seq4:#256abf;--seq5:#184f95;--seq6:#0d366b;
+  --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;
+  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;
+  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;
+  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;
+  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+}}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;
+  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;
+  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;
+  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;
+  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);
+}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:16px/1.62 ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font-feature-settings:"tnum" 0}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}
+h1,h2,h3,h4{line-height:1.25;margin:0 0 .4em;font-weight:640;letter-spacing:-.01em}
+h1{font-size:clamp(1.6rem,4.4vw,2.3rem)}
+h2{font-size:clamp(1.25rem,3vw,1.6rem);margin-top:0}
+h3{font-size:1.06rem;margin-top:1.6em}
+h4{font-size:.95rem;margin-top:1.3em;color:var(--text-2)}
+p{margin:0 0 1em}
+a{color:var(--accent)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}
+.num{font-variant-numeric:tabular-nums}
+header.rpt{border-bottom:2px solid var(--border-strong);padding-bottom:18px;margin-bottom:26px}
+.eyebrow{text-transform:uppercase;letter-spacing:.11em;font-size:.7rem;font-weight:700;color:var(--text-3);margin:0 0 .5em}
+.sub{color:var(--text-2);font-size:.95rem;margin:.3em 0 0}
+.toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px}
+.btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text-2);
+  border-radius:8px;padding:6px 11px;font-size:.8rem;cursor:pointer;font-family:inherit}
+.btn:hover{color:var(--text);border-color:var(--accent)}
+section.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:22px 22px 26px;margin:0 0 22px;box-shadow:var(--shadow)}
+.secnum{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;
+  border-radius:7px;background:var(--accent);color:#fff;font-size:.8rem;font-weight:700;margin-right:9px}
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin:18px 0 6px}
+.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:13px 14px}
+.stat .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);font-weight:700}
+.stat .v{font-size:clamp(1.35rem,3.4vw,1.85rem);font-weight:680;letter-spacing:-.02em;margin:.16em 0 .05em;
+  font-variant-numeric:tabular-nums}
+.stat .d{font-size:.78rem;color:var(--text-2);line-height:1.35}
+.grid2{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:start}
+figure{margin:0}
+figcaption{font-size:.82rem;color:var(--text-3);margin-top:8px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+table{border-collapse:collapse;width:100%;font-size:.855rem;margin:10px 0}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border)}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:700;
+  border-bottom:1px solid var(--border-strong);white-space:nowrap}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tbody tr:hover{background:var(--surface-2)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}
+.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:baseline}
+.legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin:12px 0 2px;font-size:.82rem;color:var(--text-2)}
+.na{border-left:3px solid var(--na);background:var(--surface-2);border-radius:0 10px 10px 0;
+  padding:13px 15px;margin:14px 0}
+.na .t{font-weight:680;color:var(--text);font-size:.9rem;display:flex;align-items:center;gap:7px}
+.na .t::before{content:"NOT COMPUTABLE";font-size:.62rem;letter-spacing:.08em;background:var(--na);
+  color:#fff;padding:2px 6px;border-radius:4px;font-weight:700}
+.na p{margin:.5em 0 0;font-size:.87rem;color:var(--text-2)}
+.na ul{margin:.5em 0 0;padding-left:1.2em;font-size:.87rem;color:var(--text-2)}
+.callout{border-left:3px solid var(--warn);background:var(--surface-2);border-radius:0 10px 10px 0;
+  padding:13px 15px;margin:14px 0;font-size:.89rem}
+.callout.info{border-left-color:var(--accent)}
+.callout .t{font-weight:680;font-size:.9rem;margin-bottom:.3em}
+ol.find{counter-reset:f;list-style:none;padding:0;margin:14px 0 0}
+ol.find li{counter-increment:f;position:relative;padding:0 0 0 40px;margin:0 0 15px}
+ol.find li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;
+  border-radius:7px;background:var(--surface-2);border:1px solid var(--border-strong);
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;color:var(--text-2)}
+ol.find b{display:block;margin-bottom:.15em}
+.rec{border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin:0 0 12px;background:var(--surface-2)}
+.rec .h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:.45em}
+.pill{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;
+  padding:3px 8px;border-radius:20px;border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}
+.pill.p1{background:var(--bad);border-color:var(--bad);color:#fff}
+.pill.p2{background:var(--warn);border-color:var(--warn);color:#fff}
+.pill.p3{background:var(--surface);color:var(--text-2)}
+.pill.v-supported{background:var(--good);border-color:var(--good);color:#fff}
+.pill.v-none{background:var(--surface);color:var(--text-3)}
+.pill.v-inverse{background:var(--surface);color:var(--text-3)}
+.rec .ties{font-size:.8rem;color:var(--text-3);margin-top:.5em}
+.tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--text);
+  color:var(--bg);padding:6px 9px;border-radius:7px;font-size:.78rem;font-weight:560;z-index:99;
+  white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.28)}
+.tip.on{opacity:1}
+.hit{cursor:default}
+.hit:hover{filter:brightness(1.08)}
+.foot{color:var(--text-3);font-size:.8rem;border-top:1px solid var(--border);padding-top:16px;margin-top:8px}
+@media (max-width:600px){.wrap{padding:16px 13px 60px}section.card{padding:17px 15px 20px;border-radius:11px}
+  .toolbar{position:static;justify-content:flex-end;margin-bottom:10px}}
+@media print{
+  :root{--bg:#fff;--surface:#fff;--surface-2:#f4f4f2;--border:#ccc;--border-strong:#888;
+        --text:#000;--text-2:#333;--text-3:#555;color-scheme:light}
+  body{background:#fff;font-size:10.5pt}
+  .wrap{max-width:none;padding:0}
+  .toolbar,.tip{display:none!important}
+  section.card{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border:1px solid #bbb;margin-bottom:14px}
+  h2{break-after:avoid}
+  figure,table,.rec,.na{break-inside:avoid}
+  a{color:#000;text-decoration:none}
+  @page{margin:14mm}
+}
+"""
+
+JS = """
+(function(){
+  var r=document.documentElement, K='panelist-report-theme';
+  try{var s=localStorage.getItem(K); if(s) r.setAttribute('data-theme',s);}catch(e){}
+  var b=document.getElementById('themeBtn');
+  if(b) b.addEventListener('click',function(){
+    var cur=r.getAttribute('data-theme');
+    if(!cur) cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light';
+    var nxt = cur==='dark' ? 'light':'dark';
+    r.setAttribute('data-theme',nxt);
+    try{localStorage.setItem(K,nxt);}catch(e){}
+  });
+  var pb=document.getElementById('printBtn'); if(pb) pb.addEventListener('click',function(){window.print();});
+  var tip=document.createElement('div'); tip.className='tip'; document.body.appendChild(tip);
+  function show(e){
+    var t=e.currentTarget.getAttribute('data-tip'); if(!t) return;
+    tip.textContent=t; tip.classList.add('on');
+    var x=e.clientX+14, y=e.clientY-34, w=tip.offsetWidth||140;
+    if(x+w>innerWidth-8) x=e.clientX-w-14; if(y<6) y=e.clientY+20;
+    tip.style.left=x+'px'; tip.style.top=y+'px';
+  }
+  function hide(){tip.classList.remove('on');}
+  document.querySelectorAll('[data-tip]').forEach(function(el){
+    el.classList.add('hit');
+    el.addEventListener('mousemove',show); el.addEventListener('mouseenter',show);
+    el.addEventListener('mouseleave',hide);
+    el.addEventListener('touchstart',function(ev){show(ev.touches?{clientX:ev.touches[0].clientX,
+      clientY:ev.touches[0].clientY,currentTarget:el}:ev);},{passive:true});
+  });
+})();
+"""
+
+
+# ------------------------------------------------------------------ chart helpers
+def cvar(i):
+    return "var(--s%d)" % (i % MAXSERIES + 1)
+
+
+def cap_series(rows, n=MAXSERIES):
+    """Never cycle hues: fold the tail into a single Other row."""
+    if len(rows) <= n:
+        return rows, False
+    head = rows[:n - 1]
+    tail = rows[n - 1:]
+    head.append({"label": "Other (%d labels)" % len(tail),
+                 "count": sum(r["count"] for r in tail),
+                 "pct": round(sum(r["pct"] for r in tail), 1)})
+    return head, True
+
+
+def svg_donut(rows, total, cx=132, r_out=118, r_in=72):
+    import math
+    W, H = 264, 264
+    if not rows or total <= 0:
+        return '<p class="sub">No data to plot.</p>'
+    parts, ang = [], -math.pi / 2
+    gap = 0.016 if len(rows) > 1 else 0        # 2px-equivalent surface gap between fills
+    for i, rrow in enumerate(rows):
+        frac = rrow["count"] / total
+        sweep = frac * 2 * math.pi
+        a0, a1 = ang + gap / 2, ang + sweep - gap / 2
+        ang += sweep
+        if a1 <= a0:
+            a1 = a0 + 0.004
+        big = 1 if (a1 - a0) > math.pi else 0
+        x0, y0 = cx + r_out * math.cos(a0), H / 2 + r_out * math.sin(a0)
+        x1, y1 = cx + r_out * math.cos(a1), H / 2 + r_out * math.sin(a1)
+        x2, y2 = cx + r_in * math.cos(a1), H / 2 + r_in * math.sin(a1)
+        x3, y3 = cx + r_in * math.cos(a0), H / 2 + r_in * math.sin(a0)
+        d = ("M%.2f %.2f A%.2f %.2f 0 %d 1 %.2f %.2f L%.2f %.2f A%.2f %.2f 0 %d 0 %.2f %.2f Z"
+             % (x0, y0, r_out, r_out, big, x1, y1, x2, y2, r_in, r_in, big, x3, y3))
+        parts.append('<path d="%s" fill="%s" data-tip="%s"/>'
+                     % (d, cvar(i), ESC("%s — %d cases (%.1f%%)" % (rrow["label"], rrow["count"], rrow["pct"]))))
+    parts.append('<text x="%d" y="%d" text-anchor="middle" font-size="30" font-weight="700" '
+                 'fill="var(--text)" style="font-variant-numeric:tabular-nums">%d</text>'
+                 % (cx, H / 2 + 2, total))
+    parts.append('<text x="%d" y="%d" text-anchor="middle" font-size="11.5" fill="var(--text-3)" '
+                 'letter-spacing=".07em">CASES</text>' % (cx, H / 2 + 22))
+    return '<svg viewBox="0 0 %d %d" role="img" style="max-width:300px;margin:0 auto">%s</svg>' % (
+        W, H, "".join(parts))
+
+
+def svg_hbar(rows, total, series_color=None, label_w=178, W=720):
+    if not rows:
+        return '<p class="sub">No data to plot.</p>'
+    rowh, gap = 30, 9
+    H = len(rows) * (rowh + gap) + 6
+    bar_x = label_w + 8
+    bar_w = W - bar_x - 78
+    mx = max(r["count"] for r in rows) or 1
+    p = []
+    for i, rrow in enumerate(rows):
+        y = i * (rowh + gap)
+        w = max(bar_w * rrow["count"] / mx, 3)
+        col = series_color or cvar(i)
+        lbl = rrow["label"]
+        short = lbl if len(lbl) <= 30 else lbl[:29] + "…"
+        p.append('<text x="%d" y="%.1f" text-anchor="end" font-size="12.5" fill="var(--text-2)">%s'
+                 '<title>%s</title></text>' % (label_w, y + rowh * .68, ESC(short), ESC(lbl)))
+        p.append('<rect x="%d" y="%.1f" width="%.2f" height="%d" rx="4" fill="%s" data-tip="%s"/>'
+                 % (bar_x, y, w, rowh, col,
+                    ESC("%s — %d cases (%.1f%%)" % (lbl, rrow["count"], rrow["pct"]))))
+        p.append('<text x="%.1f" y="%.1f" font-size="12.5" font-weight="640" fill="var(--text)" '
+                 'style="font-variant-numeric:tabular-nums">%d <tspan fill="var(--text-3)" '
+                 'font-weight="400">(%.1f%%)</tspan></text>'
+                 % (bar_x + w + 9, y + rowh * .68, rrow["count"], rrow["pct"]))
+    return ('<svg class="chart" viewBox="0 0 %d %d" style="max-width:%dpx" '
+            'preserveAspectRatio="xMinYMid meet" role="img">%s</svg>' % (W, H, W, "".join(p)))
+
+
+def svg_line(months, series, ylab="cases"):
+    W, H, pad_l, pad_b, pad_t, pad_r = 720, 300, 46, 34, 14, 14
+    pw, ph = W - pad_l - pad_r, H - pad_t - pad_b
+    allv = [v for s in series for v in s["values"]] or [0]
+    mx = max(allv) or 1
+    n = len(months)
+    X = lambda i: pad_l + (pw * i / max(n - 1, 1))
+    Y = lambda v: pad_t + ph - ph * v / mx
+    p = []
+    for g in range(5):
+        y = pad_t + ph * g / 4
+        p.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--border)" stroke-width="1"/>'
+                 % (pad_l, y, W - pad_r, y))
+        p.append('<text x="%d" y="%.1f" text-anchor="end" font-size="11" fill="var(--text-3)">%d</text>'
+                 % (pad_l - 7, y + 3.5, round(mx * (4 - g) / 4)))
+    for i, m in enumerate(months):
+        p.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="11" fill="var(--text-3)">%s</text>'
+                 % (X(i), H - pad_b + 18, ESC(m)))
+    for si, s in enumerate(series):
+        pts = " ".join("%.1f,%.1f" % (X(i), Y(v)) for i, v in enumerate(s["values"]))
+        p.append('<polyline points="%s" fill="none" stroke="%s" stroke-width="2" '
+                 'stroke-linejoin="round" stroke-linecap="round"/>' % (pts, cvar(si)))
+        for i, v in enumerate(s["values"]):
+            p.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="%s" stroke="var(--surface)" '
+                     'stroke-width="2" data-tip="%s"/>'
+                     % (X(i), Y(v), cvar(si), ESC("%s · %s: %d %s" % (months[i], s["name"], v, ylab))))
+    return ('<svg class="chart" viewBox="0 0 %d %d" style="max-width:%dpx" '
+            'preserveAspectRatio="xMinYMid meet" role="img">%s</svg>' % (W, H, W, "".join(p)))
+
+
+def svg_forecast(hist, proj):
+    W, H, pl, pb, pt, pr = 720, 320, 50, 36, 16, 16
+    pw, ph = W - pl - pr, H - pt - pb
+    labels = [h["label"] for h in hist] + [q["label"] for q in proj]
+    n = len(labels)
+    mx = max([h["point"] for h in hist] + [q["high"] for q in proj] + [1])
+    X = lambda i: pl + pw * i / max(n - 1, 1)
+    Y = lambda v: pt + ph - ph * v / mx
+    p = []
+    for g in range(5):
+        y = pt + ph * g / 4
+        p.append('<line x1="%d" y1="%.1f" x2="%d" y2="%.1f" stroke="var(--border)" stroke-width="1"/>'
+                 % (pl, y, W - pr, y))
+        p.append('<text x="%d" y="%.1f" text-anchor="end" font-size="11" fill="var(--text-3)">%d</text>'
+                 % (pl - 7, y + 3.5, round(mx * (4 - g) / 4)))
+    step = max(1, n // 12)
+    for i, l in enumerate(labels):
+        if i % step == 0 or i >= len(hist):
+            p.append('<text x="%.1f" y="%d" text-anchor="middle" font-size="10.5" fill="var(--text-3)">%s</text>'
+                     % (X(i), H - pb + 18, ESC(l)))
+    b = len(hist) - 1
+    if b >= 0:
+        p.append('<line x1="%.1f" y1="%d" x2="%.1f" y2="%d" stroke="var(--border-strong)" '
+                 'stroke-width="1" stroke-dasharray="3 3"/>' % (X(b), pt, X(b), pt + ph))
+        p.append('<text x="%.1f" y="%d" font-size="10.5" fill="var(--text-3)">projection →</text>'
+                 % (X(b) + 6, pt + 11))
+    # interval band, anchored at the last observed point so it opens from history
+    if hist and proj:
+        top = [(X(b), Y(hist[-1]["point"]))] + [(X(b + 1 + i), Y(q["high"])) for i, q in enumerate(proj)]
+        bot = [(X(b + 1 + i), Y(q["low"])) for i, q in enumerate(proj)][::-1] + [(X(b), Y(hist[-1]["point"]))]
+        pts = " ".join("%.1f,%.1f" % t for t in top + bot)
+        p.append('<polygon points="%s" fill="var(--s1)" opacity=".14"/>' % pts)
+    hp = " ".join("%.1f,%.1f" % (X(i), Y(h["point"])) for i, h in enumerate(hist))
+    p.append('<polyline points="%s" fill="none" stroke="var(--s1)" stroke-width="2" '
+             'stroke-linejoin="round"/>' % hp)
+    fp = " ".join(["%.1f,%.1f" % (X(b), Y(hist[-1]["point"]))] if hist else []) + " " + \
+         " ".join("%.1f,%.1f" % (X(b + 1 + i), Y(q["point"])) for i, q in enumerate(proj))
+    p.append('<polyline points="%s" fill="none" stroke="var(--s1)" stroke-width="2" '
+             'stroke-dasharray="6 4" stroke-linejoin="round"/>' % fp.strip())
+    for i, h in enumerate(hist):
+        p.append('<circle cx="%.1f" cy="%.1f" r="4" fill="var(--s1)" stroke="var(--surface)" '
+                 'stroke-width="2" data-tip="%s"/>'
+                 % (X(i), Y(h["point"]), ESC("%s observed: %d cases" % (h["label"], h["point"]))))
+    for i, q in enumerate(proj):
+        p.append('<circle cx="%.1f" cy="%.1f" r="4.5" fill="var(--surface)" stroke="var(--s1)" '
+                 'stroke-width="2.5" data-tip="%s"/>'
+                 % (X(b + 1 + i), Y(q["point"]),
+                    ESC("%s projected: %d cases (range %d–%d)" % (q["label"], q["point"], q["low"], q["high"]))))
+    return ('<svg class="chart" viewBox="0 0 %d %d" style="max-width:%dpx" role="img">%s</svg>'
+            % (W, H, W, "".join(p)))
+
+
+def heat_table(ct):
+    origins, buckets, M = ct["origins"], ct["buckets"], ct["matrix"]
+    mx = max((max(r) for r in M), default=0) or 1
+    h = ['<div class="scroll"><table><thead><tr><th>Origin \\ Category bucket</th>']
+    for b in buckets:
+        h.append('<th class="n">%s</th>' % ESC(b))
+    h.append('<th class="n">Total</th></tr></thead><tbody>')
+    for i, o in enumerate(origins):
+        h.append("<tr><td><b>%s</b></td>" % ESC(o))
+        for j, b in enumerate(buckets):
+            v = M[i][j]
+            step = 0 if v == 0 else min(6, 1 + int(5 * v / mx))
+            style = "" if v == 0 else ('background:var(--seq%d);color:%s'
+                                       % (step, "#fff" if step >= 3 else "var(--text)"))
+            h.append('<td class="n" style="%s" data-tip="%s">%s</td>'
+                     % (style, ESC("%s x %s: %d cases" % (o, b, v)), v or "–"))
+        h.append('<td class="n"><b>%d</b></td></tr>' % ct["row_totals"][i])
+    h.append("<tr><td><b>Total</b></td>")
+    for t in ct["col_totals"]:
+        h.append('<td class="n"><b>%d</b></td>' % t)
+    h.append('<td class="n"><b>%d</b></td></tr></tbody></table></div>' % sum(ct["col_totals"]))
+    return "".join(h)
+
+
+def dist_table(rows, total, head="Label"):
+    h = ['<div class="scroll"><table><thead><tr><th>%s</th><th class="n">Cases</th>'
+         '<th class="n">%% of total</th></tr></thead><tbody>' % ESC(head)]
+    for i, r in enumerate(rows):
+        h.append('<tr><td><span class="swatch" style="background:%s"></span>%s</td>'
+                 '<td class="n">%d</td><td class="n">%.1f%%</td></tr>'
+                 % (cvar(i), ESC(r["label"]), r["count"], r["pct"]))
+    h.append('<tr><td><b>Total</b></td><td class="n"><b>%d</b></td>'
+             '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>' % total)
+    return "".join(h)
+
+
+def legend(rows):
+    return ('<div class="legend">' + "".join(
+        '<span><span class="swatch" style="background:%s"></span>%s</span>' % (cvar(i), ESC(r["label"]))
+        for i, r in enumerate(rows)) + "</div>")
+
+
+def na_block(title, rec):
+    needs = rec.get("needs") or rec.get("missing_fields") or []
+    h = ['<div class="na"><div class="t">%s</div><p>%s</p>' % (ESC(title), ESC(rec.get("reason", "")))]
+    if needs:
+        h.append("<p style='margin-bottom:.2em'>Required to compute this:</p><ul>"
+                 + "".join("<li>%s</li>" % ESC(x) for x in needs) + "</ul>")
+    if rec.get("note"):
+        h.append('<p><i>%s</i></p>' % ESC(rec["note"]))
+    h.append("</div>")
+    return "".join(h)
+
+
+# ------------------------------------------------------------------ domain framing
+# Operational interpretation layer: which function owns a bucket and what it threatens.
+# This is judgement, NOT derived from the export - it is labelled as such in the report.
+RISK_PROFILE = {
+    "Hardware & Meter":         ("Panel data loss, cost-to-serve", "Engineering / Product (metering)"),
+    "Activity & Reactivation":  ("Panelist churn, panel representativeness", "Panel Operations"),
+    "Incentives & Rewards":     ("Trust and brand reputation, repeat contact", "Rewards / Finance Ops"),
+    "Account Access & Security":("Lockout-driven churn, onboarding failure", "Identity / Engineering"),
+    "Logistics & Returns":      ("Cost-to-serve, unrecovered assets", "Field Service / Logistics"),
+    "Onboarding & Setup":       ("Early-life churn", "Panel Operations / Support Ops"),
+    "Outbound & Callbacks":     ("Handling cost, channel breakdown", "WFM / Support Ops"),
+    "Communications & Contact": ("Deliverability and contactability", "CRM / Marketing Ops"),
+    "Billing & Tax":            ("Compliance exposure", "Finance"),
+    "Complaint & Escalation":   ("Brand reputation", "Support Ops leadership"),
+    "Other / Unmapped":         ("Unclassified demand", "Support Ops (taxonomy owner)"),
+}
+
+
+def build_findings(V, C, preview):
+    """Findings are generated from computed values only; each states its own evidence."""
+    f = []
+    n = V["total_cases"]
+    b = V["bucket"]["rows"]
+    if b:
+        top = b[0]
+        f.append(("Demand concentrates in %s" % top["label"],
+                  "%d of %d cases (%.1f%%) carry %s as their primary category. "
+                  "The top two buckets together account for %.1f%% of all contacts."
+                  % (top["count"], n, top["pct"], top["label"],
+                     sum(x["pct"] for x in b[:2]))))
+    tl = V["tag_load"]
+    if tl["mean_tags_per_case"] > 1.2:
+        f.append(("Cases are multi-issue, so single-category routing understates real demand",
+                  "Cases carry %.2f category tags on average and %.1f%% carry more than one "
+                  "(%d distinct labels in use). Counting only the primary category hides "
+                  "%d secondary topic tags that agents still had to handle."
+                  % (tl["mean_tags_per_case"], tl["multi_tag_pct"], tl["distinct_tags"],
+                     tl["total_tags"] - n)))
+    o = V["origin"]
+    if o.get("computable") and o["rows"]:
+        t = o["rows"][0]
+        f.append(("%s dominates contact volume" % t["label"],
+                  "%d of %d cases (%.1f%%) arrive via %s across %d origin(s) in use. "
+                  "Deflection and self-service capacity should be sized against that channel first."
+                  % (t["count"], n, t["pct"], t["label"], len(o["rows"]))))
+    rc = C.get("repeat_contact", {})
+    if rc.get("computable") and rc["members_with_multiple_cases"] > 0:
+        f.append(("Repeat contact is measurable at member level",
+                  "%d of %d members (%.1f%%) opened more than one case, generating %d cases "
+                  "(%.1f%% of volume); the highest single member opened %d."
+                  % (rc["members_with_multiple_cases"], rc["members"], rc["pct_members_repeat"],
+                     rc["cases_from_repeat_members"], rc["pct_cases_from_repeat"],
+                     rc["max_cases_one_member"])))
+    for k in ("chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout", "chain_field_service"):
+        ch = C.get(k, {})
+        if ch.get("computable") and (ch.get("lift") or 0) >= 1.2:
+            f.append(("Confirmed link: %s" % ch["title"],
+                      "Of the %d cases carrying the leading signal, %.1f%% also carry the "
+                      "downstream signal, against a %.1f%% base rate — a lift of %.2fx (n=%d joint)."
+                      % (ch["n_a"], ch["pct_of_a_with_b"], ch["base_rate_b"], ch["lift"], ch["joint"])))
+    return f[:3]
+
+
+def build_risks(V, C):
+    out = []
+    for r in V["bucket"]["rows"][:6]:
+        threat, owner = RISK_PROFILE.get(r["label"], ("Unclassified", "Support Ops"))
+        out.append({"bucket": r["label"], "count": r["count"], "pct": r["pct"],
+                    "threat": threat, "owner": owner})
+    return out
+
+
+def build_recs(V, C, F):
+    """Recommendations tie to a specific computed finding or a specific missing field."""
+    recs = []
+    n = V["total_cases"]
+    # 1. instrumentation gaps - these are grounded in fields we KNOW are absent
+    missing = []
+    if V.get("date_field_is_proxy"):
+        missing.append(("Created On / case-open timestamp",
+                        "Every trend, seasonality and 'within N days' figure in this report is "
+                        "currently anchored to Modified On, which records last touch, not arrival."))
+    if not (V.get("site") or {}).get("computable"):
+        missing.append(("Office / site", "No site-level breakdown of volume or mix is possible."))
+    if not (V.get("agent") or {}).get("computable"):
+        missing.append(("Agent / case owner", "No handling-side variance analysis is possible."))
+    for ch, fld in (("chain_google_lockout", "Member type / household role (primary vs secondary)"),
+                    ("chain_field_service", "Enrollment / join date")):
+        c = C.get(ch, {})
+        if c.get("missing_fields") or not c.get("computable"):
+            for m in (c.get("missing_fields") or []):
+                missing.append((m, c.get("note", "")))
+    seen, miss = set(), []
+    for m, why in missing:
+        if m.lower() not in seen:
+            seen.add(m.lower()); miss.append((m, why))
+    if miss:
+        recs.append({"pri": 1, "horizon": "Quick win (0–30 days)",
+                     "owner": "Support Ops / CRM administration",
+                     "title": "Add %d missing field(s) to the case export" % len(miss),
+                     "body": "The export currently supports volume and mix analysis but blocks "
+                             "several causal tests outright. Adding these fields costs a report "
+                             "definition change, not a system change: "
+                             + "; ".join("<b>%s</b> — %s" % (ESC(m), ESC(w)) for m, w in miss) + ".",
+                     "tie": "Ties to the NOT COMPUTABLE panels in sections 2 and 3."})
+    b = V["bucket"]["rows"]
+    if b:
+        top = b[0]
+        threat, owner = RISK_PROFILE.get(top["label"], ("Unclassified", "Support Ops"))
+        recs.append({"pri": 1, "horizon": "Quick win (0–30 days)", "owner": owner,
+                     "title": "Attack the %s driver first" % top["label"],
+                     "body": "%s is the largest single primary category at %.1f%% of cases "
+                             "(%d of %d). Any deflection built here has the widest reach; "
+                             "the associated exposure is %s."
+                             % (top["label"], top["pct"], top["count"], n, threat.lower()),
+                     "tie": "Ties to Finding 1 and section 1's category breakdown."})
+    tl = V["tag_load"]
+    if tl["mean_tags_per_case"] > 1.2:
+        recs.append({"pri": 2, "horizon": "This quarter", "owner": "Support Ops (taxonomy owner)",
+                     "title": "Split the multi-topic case into countable units",
+                     "body": "At %.2f tags per case and %.1f%% of cases multi-tagged, a single "
+                             "case can conceal an equipment fault, a reward dispute and a password "
+                             "reset at once. Either capture a required primary reason with "
+                             "explicit sub-reasons, or emit one case line per topic, so demand "
+                             "sizing and AHT attribution stop disagreeing."
+                             % (tl["mean_tags_per_case"], tl["multi_tag_pct"]),
+                     "tie": "Ties to Finding 2 and the tag-load table in section 1."})
+    o = V["origin"]
+    if o.get("computable") and o["rows"] and o["rows"][0]["pct"] >= 50:
+        t = o["rows"][0]
+        recs.append({"pri": 2, "horizon": "This quarter", "owner": "WFM / Support Ops",
+                     "title": "Size deflection against %s before adding headcount" % t["label"],
+                     "body": "%.1f%% of contacts arrive on %s. Channel concentration at this level "
+                             "means capacity planning, IVR routing and self-service ROI all hinge "
+                             "on that single origin." % (t["pct"], t["label"]),
+                     "tie": "Ties to Finding 3 and section 1's origin split."})
+    if not C.get("discovered", {}).get("computable"):
+        recs.append({"pri": 3, "horizon": "Next 2–3 quarters", "owner": "Analytics / Support Ops",
+                     "title": "Re-run this analysis on a full-period export",
+                     "body": "Correlation and forecasting are gated off at the current record count. "
+                             "The same pipeline produces the quantified chains, the discovered "
+                             "correlations and a fitted four-quarter forecast once a multi-month "
+                             "export is supplied — no rework required.",
+                     "tie": "Ties to the gates stated in sections 2 and 3."})
+    return recs
+
+
+# ------------------------------------------------------------------ document
+def build(res, meta):
+    V, C, Fc, MAP = res["volume"], res["correlation"], res["forecast"], res["mapping"]
+    n = V["total_cases"]
+    preview = n < 30
+    H = []
+    A = H.append
+
+    A('<div class="toolbar"><button class="btn" id="themeBtn" type="button">Light / dark</button>'
+      '<button class="btn" id="printBtn" type="button">Print / PDF</button></div>')
+    A('<div class="wrap">')
+    A('<header class="rpt"><p class="eyebrow">Executive report · Panelist Support Operations</p>'
+      '<h1>Panelist Support: Case Volume, Correlations &amp; Four-Quarter Outlook</h1>'
+      '<p class="sub">%s &nbsp;·&nbsp; %d case record(s) from %d source file(s) &nbsp;·&nbsp; '
+      'Generated %s</p></header>'
+      % (ESC(("Coverage %s to %s" % (V["date_min"], V["date_max"])) if V["date_min"]
+              else "No usable date field"),
+         n, meta["file_count"], datetime.date.today().isoformat()))
+
+    if preview:
+        A('<div class="callout"><div class="t">Layout preview — not a finished analysis</div>'
+          'This render is built from <b>%d sample record(s)</b> transcribed from the header '
+          'screenshot, purely to show structure, mapping and chart treatment. Every figure below '
+          'is arithmetically correct for those %d rows and meaningless as an operational result. '
+          'Panels that require a real sample size are gated off and say so explicitly.</div>' % (n, n))
+
+    # ---------------- executive summary
+    A('<section class="card"><h2>Executive summary</h2>')
+    tiles = [("Total cases", "{:,}".format(n), "All records after de-duplication")]
+    if V["unique_members"]:
+        tiles.append(("Unique members", "{:,}".format(V["unique_members"]),
+                      "%.2f cases per member" % (n / V["unique_members"])))
+    if V["bucket"]["rows"]:
+        t = V["bucket"]["rows"][0]
+        tiles.append(("Top category", "%.0f%%" % t["pct"], "%s (%d cases)" % (t["label"], t["count"])))
+    if V["origin"].get("computable") and V["origin"]["rows"]:
+        t = V["origin"]["rows"][0]
+        tiles.append(("Top origin", "%.0f%%" % t["pct"], "%s (%d cases)" % (t["label"], t["count"])))
+    tiles.append(("Topics per case", "%.2f" % V["tag_load"]["mean_tags_per_case"],
+                  "%.0f%% of cases carry 2+ topic tags" % V["tag_load"]["multi_tag_pct"]))
+    rc = C.get("repeat_contact", {})
+    if rc.get("computable"):
+        tiles.append(("Repeat contacts", "%.0f%%" % rc["pct_cases_from_repeat"],
+                      "of cases come from members with 2+ cases"))
+    A('<div class="stats">' + "".join(
+        '<div class="stat"><div class="k">%s</div><div class="v num">%s</div><div class="d">%s</div></div>'
+        % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:6]) + "</div>")
+
+    A("<h3>Top findings</h3>")
+    finds = build_findings(V, C, preview)
+    if finds:
+        A('<ol class="find">' + "".join("<li><b>%s</b>%s</li>" % (ESC(t), ESC(d)) for t, d in finds) + "</ol>")
+    else:
+        A('<p class="sub">No finding clears its evidence threshold at this record count.</p>')
+
+    if V["date_field_is_proxy"]:
+        A('<div class="callout"><div class="t">Date caveat carried through the whole report</div>'
+          'No case-creation timestamp is present, so every time-based figure uses <b>Modified On</b>. '
+          'That records the last time a case was touched, not when it arrived — a case opened in '
+          'March and reopened in July counts as July. Trend direction and any "within N days" '
+          'sequencing should be read with that distortion in mind.</div>')
+    A("</section>")
+
+    # ---------------- 1. volume
+    A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>')
+    A('<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its '
+      'Category field — and that primary label is mapped to a reporting bucket. Shares therefore '
+      'sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are '
+      'counted separately in the topic-load table so multi-issue demand is not lost.</p>')
+
+    A('<div class="grid2">')
+    brows, folded = cap_series(list(V["bucket"]["rows"]))
+    A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>'
+      + svg_donut(brows, n) + legend(brows)
+      + '<figcaption>One bucket per case; shares sum to 100%%.%s</figcaption></figure>'
+      % (" Lowest-volume buckets folded into Other." if folded else ""))
+    A("<div>" + dist_table(brows, n, "Category bucket") + "</div>")
+    A("</div>")
+
+    A('<div class="grid2" style="margin-top:26px">')
+    if V["origin"].get("computable"):
+        orows, ofold = cap_series(list(V["origin"]["rows"]))
+        A('<figure><h3 style="margin-top:0">Contact origin</h3>' + svg_hbar(orows, n, W=520)
+          + "<figcaption>Count and share of total cases by channel of arrival.</figcaption></figure>")
+        A("<div>" + dist_table(orows, n, "Origin") + "</div>")
+    else:
+        A(na_block("Origin breakdown", V["origin"]))
+    A("</div>")
+
+    A("<h3>Most frequent primary categories (raw labels, before bucketing)</h3>")
+    prows, _ = cap_series(list(V["primary_raw"]["rows"]), 10)
+    A(svg_hbar(prows, n, series_color="var(--s1)", label_w=240))
+
+    A("<h3>Origin × category cross-tab</h3>")
+    if V["crosstab"].get("computable"):
+        A(heat_table(V["crosstab"]))
+        A('<p class="sub">Cell shading is a single-hue sequential ramp on case count; '
+          'exact counts are printed in every cell.</p>')
+    else:
+        A(na_block("Origin × category cross-tab", V["crosstab"]))
+
+    A("<h3>Topic load (all tags, not just the primary)</h3>")
+    tl = V["tag_load"]
+    A('<p>Cases carry <b>%.2f</b> category tags on average; <b>%d</b> of %d cases (%.1f%%) carry '
+      'more than one, across <b>%d</b> distinct labels. The denominator below is cases, so these '
+      'shares deliberately sum above 100%%.</p>'
+      % (tl["mean_tags_per_case"], tl["multi_tag_cases"], n, tl["multi_tag_pct"], tl["distinct_tags"]))
+    A('<div class="scroll"><table><thead><tr><th>Topic tag (any position)</th><th class="n">Cases</th>'
+      '<th class="n">% of cases</th></tr></thead><tbody>'
+      + "".join('<tr><td>%s</td><td class="n">%d</td><td class="n">%.1f%%</td></tr>'
+                % (ESC(t["label"]), t["count"], t["pct_of_cases"]) for t in tl["top"])
+      + "</tbody></table></div>")
+
+    A("<h3>Movement over time</h3>")
+    if V["monthly"].get("computable"):
+        m = V["monthly"]
+        ser = [{"name": k, "values": v} for k, v in
+               sorted(m["by_bucket"].items(), key=lambda kv: -sum(kv[1]))[:MAXSERIES]]
+        A(svg_line(m["months"], ser))
+        A('<div class="legend">' + "".join(
+            '<span><span class="swatch" style="background:%s"></span>%s</span>' % (cvar(i), ESC(s["name"]))
+            for i, s in enumerate(ser)) + "</div>")
+        first, last = m["total"][0], m["total"][-1]
+        A('<p class="sub">Total monthly volume moved from %d to %d across %d months (%+.1f%%).</p>'
+          % (first, last, len(m["months"]), 100.0 * (last - first) / first if first else 0))
+    else:
+        A(na_block("Growth / decline by category and origin", V["monthly"]))
+
+    for key, ttl in (("site", "Breakdown by office / site"), ("agent", "Breakdown by agent")):
+        rec = V.get(key) or {}
+        if rec.get("computable"):
+            rows, _ = cap_series(list(rec["rows"]), 10)
+            A("<h3>%s</h3>" % ESC(ttl) + svg_hbar(rows, n))
+        else:
+            A("<h3>%s</h3>" % ESC(ttl) + na_block(ttl, rec))
+    A("</section>")
+
+    # ---------------- 2. correlation
+    A('<section class="card"><h2><span class="secnum">2</span>Multivariate correlation analysis</h2>')
+    g = C["gate"]
+    A('<p>Each hypothesised chain is tested as measured co-occurrence, not asserted narrative. '
+      'A chain is only reported when the dataset carries at least <b>%d cases</b> and at least '
+      '<b>%d cases showing both signals</b>; otherwise it is marked NOT COMPUTABLE with the '
+      'specific field or volume it needs. Signals are matched across every category tag on a case '
+      'plus its subject line — never the free-text description body, which is excluded from all '
+      'processing that reaches this page.</p>' % (g["min_cases"], g["min_cooccurrence"]))
+
+    for key in ("chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout", "chain_field_service"):
+        ch = C[key]
+        if ch.get("computable"):
+            A('<h3 style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline">%s'
+              '<span class="pill v-%s">%s</span></h3>'
+              % (ESC(ch["title"]), ch["verdict"], ESC(ch["verdict_text"])))
+        else:
+            A("<h3>%s</h3>" % ESC(ch["title"]))
+        if ch.get("computable"):
+            A('<div class="stats">' + "".join(
+                '<div class="stat"><div class="k">%s</div><div class="v num">%s</div>'
+                '<div class="d">%s</div></div>' % (k, v, d) for k, v, d in [
+                    ("Cases with leading signal", "{:,}".format(ch["n_a"]), "denominator"),
+                    ("Also show downstream", "%.1f%%" % ch["pct_of_a_with_b"],
+                     "%d joint cases" % ch["joint"]),
+                    ("Base rate", "%.1f%%" % ch["base_rate_b"], "downstream signal, all cases"),
+                    ("Lift", "%.2fx" % (ch["lift"] or 0), "vs. base rate")]) + "</div>")
+            if ch.get("note"):
+                A('<div class="callout info"><div class="t">Scope limit</div>%s</div>' % ESC(ch["note"]))
+        else:
+            A(na_block(ch["title"], ch))
+
+    A("<h3>Repeat-contact behaviour</h3>")
+    if rc.get("computable"):
+        A('<div class="stats">' + "".join(
+            '<div class="stat"><div class="k">%s</div><div class="v num">%s</div><div class="d">%s</div></div>'
+            % (k, v, d) for k, v, d in [
+                ("Members", "{:,}".format(rc["members"]), "distinct member IDs"),
+                ("Repeat members", "{:,}".format(rc["members_with_multiple_cases"]),
+                 "%.1f%% of members" % rc["pct_members_repeat"]),
+                ("Cases from repeats", "{:,}".format(rc["cases_from_repeat_members"]),
+                 "%.1f%% of volume" % rc["pct_cases_from_repeat"]),
+                ("Busiest member", "{:,}".format(rc["max_cases_one_member"]), "cases, single member")]) + "</div>")
+        A('<p class="sub">Member identifiers are used only to group cases; no identifier, name, '
+          'email or phone number appears anywhere in this report.</p>')
+    else:
+        A(na_block("Repeat-contact behaviour", rc))
+
+    A("<h3>Other correlations found in the data</h3>")
+    d = C["discovered"]
+    if d.get("computable") and d["pairs"]:
+        A('<div class="scroll"><table><thead><tr><th>Signal A</th><th>Signal B</th>'
+          '<th class="n">Cases with A</th><th class="n">Both</th><th class="n">% of A with B</th>'
+          '<th class="n">Base rate</th><th class="n">Lift</th></tr></thead><tbody>'
+          + "".join('<tr><td>%s</td><td>%s</td><td class="n">%d</td><td class="n">%d</td>'
+                    '<td class="n">%.1f%%</td><td class="n">%.1f%%</td><td class="n"><b>%.2fx</b></td></tr>'
+                    % (ESC(p["a"].replace("_", " ")), ESC(p["b"].replace("_", " ")), p["n_a"],
+                       p["joint"], p["pct_of_a_with_b"], p["base_rate_b"], p["lift"])
+                    for p in d["pairs"]) + "</tbody></table></div>")
+        A('<p class="sub">Co-occurrence within a single case. Lift above 1.0 means the pair appears '
+          'together more often than the downstream signal\'s overall rate — association, not causation. '
+          'Pairs where one signal wholly contains the other are excluded as definitional.</p>')
+    elif d.get("computable"):
+        A('<p class="sub">No signal pair cleared the joint-occurrence threshold.</p>')
+    else:
+        A(na_block("Open correlation scan", d))
+    A("</section>")
+
+    # ---------------- 3. forecast
+    A('<section class="card"><h2><span class="secnum">3</span>Projected support trends — next four quarters</h2>')
+    if Fc.get("computable"):
+        A('<p><b>Method:</b> ordinary least-squares linear trend fitted to <b>%d</b> months of '
+          'observed case volume (slope %+.2f cases/month), summed to quarterly totals. The interval '
+          'is ±1.96 residual standard deviations. %s</p>'
+          % (Fc["months_fitted"], Fc["slope_cases_per_month"], ESC(Fc["caveat"])))
+        A('<p class="sub">Observed history below shows only calendar quarters with all three '
+          'months present. A forward quarter that already contains observed months uses those '
+          'actuals and models only the remainder — its interval narrows accordingly.</p>'
+          if Fc.get("partial_note") else "")
+        A('<div class="scroll"><table><thead><tr><th>Quarter</th><th class="n">Projected cases</th>'
+          '<th class="n">Low</th><th class="n">High</th><th class="n">Months modelled</th></tr></thead><tbody>'
+          + "".join('<tr><td><b>%s</b>%s</td><td class="n">%s</td><td class="n">%s</td>'
+                    '<td class="n">%s</td><td class="n">%d of 3</td></tr>'
+                    % (ESC(q["label"]),
+                       ' <span class="pill p3" style="font-size:.6rem">part observed</span>'
+                       if q["partial"] else "",
+                       "{:,}".format(q["point"]), "{:,}".format(q["low"]),
+                       "{:,}".format(q["high"]), q["fitted_months"]) for q in Fc["quarters"])
+          + "</tbody></table></div>")
+        A(svg_forecast(Fc.get("history", []), Fc["quarters"]))
+        A('<div class="legend"><span><span class="swatch" style="background:var(--s1)"></span>'
+          'Observed quarterly volume (solid)</span><span><span class="swatch" '
+          'style="background:var(--s1);opacity:.35"></span>Projection with ±1.96 residual-SD interval '
+          '(dashed)</span></div>')
+    else:
+        A('<p><b>Method:</b> no forecast is produced.</p>')
+        A(na_block("Four-quarter forecast", Fc))
+        A('<div class="callout"><div class="t">Why no directional estimate is shown either</div>'
+          'A directional estimate built from category mix would still need a category mix that is '
+          'representative of the operation. At this record count it is not, so publishing a shaped '
+          'curve would give a VP a number with no evidence behind it. Supply an export spanning '
+          'three or more months and this section fills in automatically with a fitted trend, '
+          'per-quarter interval and mix projection.</div>')
+    A("</section>")
+
+    # ---------------- 4. risk
+    A('<section class="card"><h2><span class="secnum">4</span>Predictive trend analysis &amp; risk forecasting</h2>')
+    A('<p>Exposure below is sized directly from measured case share. The threat and owner columns '
+      'are an <b>operational interpretation</b> of each bucket, not a value derived from the export — '
+      'they are shown so the ranking is actionable, and should be challenged where they do not match '
+      'how the operation is actually organised.</p>')
+    risks = build_risks(V, C)
+    A('<div class="scroll"><table><thead><tr><th>Rank</th><th>Category bucket</th>'
+      '<th class="n">Cases</th><th class="n">Share</th><th>Principal forward risk</th>'
+      '<th>Likely owner</th></tr></thead><tbody>'
+      + "".join('<tr><td class="n">%d</td><td><span class="swatch" style="background:%s"></span>'
+                '<b>%s</b></td><td class="n">%d</td><td class="n">%.1f%%</td><td>%s</td><td>%s</td></tr>'
+                % (i + 1, cvar(i), ESC(r["bucket"]), r["count"], r["pct"], ESC(r["threat"]), ESC(r["owner"]))
+                for i, r in enumerate(risks)) + "</tbody></table></div>")
+
+    A("<h3>Leading indicators worth instrumenting</h3>")
+    A("<ul>"
+      "<li><b>Topic tags per case</b> — currently %.2f. A rise means single contacts are absorbing "
+      "more unresolved issues; it moves before handle time and before CSAT.</li>"
+      "<li><b>Share of volume from repeat members</b> — %s. Rising repeat share is the earliest "
+      "sign that first-contact resolution is failing.</li>"
+      "<li><b>Reactivation and activity-inquiry share of primary category</b> — the closest "
+      "available proxy for panelists drifting toward involuntary purge.</li>"
+      "<li><b>Outbound / callback share</b> — a rise indicates inbound channels are not closing "
+      "issues on first contact.</li></ul>"
+      % (V["tag_load"]["mean_tags_per_case"],
+         ("%.1f%%" % rc["pct_cases_from_repeat"]) if rc.get("computable") else "not yet computable"))
+
+    A("<h3>If nothing changes</h3>")
+    if Fc.get("computable"):
+        q4 = Fc["quarters"][-1]
+        A("<p>The fitted trend carries volume to roughly <b>%s cases</b> in %s (range %s–%s) with the "
+          "current mix intact — that is the do-nothing baseline against which any intervention "
+          "should be measured.</p>" % ("{:,}".format(q4["point"]), ESC(q4["label"]),
+                                       "{:,}".format(q4["low"]), "{:,}".format(q4["high"])))
+    else:
+        A('<div class="na"><div class="t">Do-nothing trajectory</div><p>Quantifying the do-nothing '
+          'case requires the forecast in section 3, which is gated off. What can be stated without '
+          'a forecast: the concentration in the leading bucket and the multi-topic case structure '
+          'are both structural, so neither resolves on its own without an intervention.</p></div>')
+    A("</section>")
+
+    # ---------------- 5. recommendations
+    A('<section class="card"><h2><span class="secnum">5</span>Strategic recommendations &amp; action plan</h2>')
+    recs = build_recs(V, C, finds)
+    for i, r in enumerate(recs):
+        A('<div class="rec"><div class="h"><span class="pill p%d">Priority %d</span>'
+          '<span class="pill p3">%s</span><span class="pill p3">Owner: %s</span></div>'
+          '<h4 style="margin:.1em 0 .35em;font-size:1rem;color:var(--text)">%s</h4><p>%s</p>'
+          '<div class="ties">%s</div></div>'
+          % (min(r["pri"], 3), r["pri"], ESC(r["horizon"]), ESC(r["owner"]),
+             ESC(r["title"]), r["body"], ESC(r["tie"])))
+    A("</section>")
+
+    # ---------------- appendix
+    A('<section class="card"><h2>Appendix A — category label mapping (audit)</h2>')
+    A('<p>Every distinct label seen in the Category field, the bucket it was assigned to, and how '
+      'often it appears in any tag position. <b>%d</b> distinct labels; <b>%d</b> fell through to '
+      'Other / Unmapped. Ordered rules are applied to the label text, first match wins — so a label '
+      'naming a device resolves to Hardware &amp; Meter even when it also mentions activity.</p>'
+      % (MAP["distinct"], MAP["unmapped_count"]))
+    A('<div class="scroll"><table><thead><tr><th>Raw label</th><th>Assigned bucket</th>'
+      '<th class="n">Occurrences</th></tr></thead><tbody>'
+      + "".join('<tr><td class="mono">%s</td><td>%s</td><td class="n">%d</td></tr>'
+                % (ESC(i["label"]), ESC(i["bucket"]), i["count"]) for i in MAP["items"])
+      + "</tbody></table></div></section>")
+
+    A('<section class="card"><h2>Appendix B — sources &amp; data handling</h2>')
+    A('<div class="scroll"><table><thead><tr><th>File</th><th>Sheet</th><th>Status</th>'
+      '<th class="n">Rows</th><th>Columns not mapped</th></tr></thead><tbody>'
+      + "".join('<tr><td class="mono">%s</td><td>%s</td><td>%s</td><td class="n">%s</td>'
+                '<td class="mono">%s</td></tr>'
+                % (ESC(p["file"]), ESC(p.get("sheet", "") or "—"), ESC(p["status"]), p["rows"],
+                   ESC(", ".join(p.get("unmapped", [])) or "—")) for p in meta["prov"])
+      + "</tbody></table></div>")
+    A("<p>Records read: <b>%d</b>. Exact duplicates removed: <b>%d</b>. Records analysed: <b>%d</b>.</p>"
+      % (meta["stats"].get("rows_read", 0), meta["stats"].get("exact_duplicates_removed", 0),
+         meta["stats"].get("rows_after_dedupe", 0)))
+    A('<p><b>Privacy.</b> Member identifiers are used only to group cases into members and are never '
+      'printed. Subject and description free text is used only for keyword signal matching; no '
+      'free-text content, name, email address or phone number is rendered anywhere in this '
+      'document, and no row-level record is included.</p>')
+    A('<p class="foot">All figures computed directly from the supplied export(s). Panels marked '
+      'NOT COMPUTABLE indicate a field or sample size the export does not provide; no value in this '
+      'report is estimated, imputed or carried over from outside the data.</p>')
+    A("</section></div>")
+
+    return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+            "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+            "<title>Panelist Support — Executive Report</title><style>" + CSS + "</style></head>"
+            "<body>" + "".join(H) + "<script>" + JS + "</script></body></html>")
