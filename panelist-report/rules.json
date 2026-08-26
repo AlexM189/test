@@ -1,0 +1,238 @@
+{
+  "_comment": "Single source of truth for header aliases, bucket rules and correlation signals. Consumed by the Python CLI (ingest.py/analyze.py) and inlined into the browser tool at build time. Edit here, rebuild, and both stay in step.",
+  "gates": {
+    "min_cases_lift": 30,
+    "min_cooccurrence": 5,
+    "min_periods_fit": 3,
+    "preview_below": 30
+  },
+  "aliases": {
+    "mno": [
+      "mno",
+      "memberno",
+      "membernumber",
+      "memberid",
+      "panelistid",
+      "panelid",
+      "accountid",
+      "accountno",
+      "hhid",
+      "householdid",
+      "contactid"
+    ],
+    "member_status": [
+      "memberstatus",
+      "panelistatus",
+      "paneliststatus",
+      "accountstatus",
+      "status"
+    ],
+    "case_status": [
+      "casestatus",
+      "ticketstatus",
+      "statusreason",
+      "state"
+    ],
+    "case_origin": [
+      "caseorigin",
+      "origin",
+      "channel",
+      "casechannel",
+      "source",
+      "casesource",
+      "contactchannel",
+      "medium"
+    ],
+    "modified_on": [
+      "modifiedon",
+      "lastmodified",
+      "modifieddate",
+      "lastupdated",
+      "updatedon"
+    ],
+    "created_on": [
+      "createdon",
+      "createddate",
+      "opened",
+      "openeddate",
+      "openedon",
+      "casecreated",
+      "datecreated",
+      "casedate",
+      "contactdate"
+    ],
+    "closed_on": [
+      "closedon",
+      "closeddate",
+      "resolvedon",
+      "resolveddate"
+    ],
+    "subject": [
+      "subject",
+      "title",
+      "casetitle",
+      "summary",
+      "casesubject"
+    ],
+    "category": [
+      "category",
+      "categories",
+      "casetype",
+      "type",
+      "reason",
+      "casereason",
+      "topic",
+      "topics",
+      "issuetype",
+      "subject2"
+    ],
+    "description": [
+      "description",
+      "notes",
+      "details",
+      "casenotes",
+      "body",
+      "comments"
+    ],
+    "site": [
+      "site",
+      "office",
+      "location",
+      "center",
+      "callcenter",
+      "queue",
+      "team",
+      "region"
+    ],
+    "agent": [
+      "agent",
+      "owner",
+      "assignedto",
+      "caseowner",
+      "rep",
+      "csr",
+      "handler"
+    ],
+    "member_type": [
+      "membertype",
+      "relationship",
+      "householdrole",
+      "primarysecondary",
+      "role"
+    ],
+    "enrolled_on": [
+      "enrolledon",
+      "enrollmentdate",
+      "joindate",
+      "joinedon",
+      "installdate",
+      "startdate",
+      "tenurestart",
+      "signupdate"
+    ]
+  },
+  "bucket_rules": [
+    [
+      "Account Access & Security",
+      "password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\bump\\b|google[ _-]?account|account security|security question|lock(?:ed)? out|credential"
+    ],
+    [
+      "Incentives & Rewards",
+      "incentive|reward|\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|sweepstake|bonus|blocked reward"
+    ],
+    [
+      "Hardware & Meter",
+      "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\bchrome\\b|\\bdevice\\b|equipment|hardware|modem|set[- ]?top|\\bstb\\b|dongle|battery|firmware|wi-?fi|connectivity|offline"
+    ],
+    [
+      "Logistics & Returns",
+      "\\bars\\b|return|\\bship|deliver|tag requested|\\brma\\b|pick[- ]?up|tracking|appointment|field service|technician|install visit|dispatch"
+    ],
+    [
+      "Activity & Reactivation",
+      "activity|reactivat|inactiv|\\bpurge|dormant|non[- ]?complian|participation"
+    ],
+    [
+      "Onboarding & Setup",
+      "set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up"
+    ],
+    [
+      "Outbound & Callbacks",
+      "outbound|call ?back|follow[- ]?up call"
+    ],
+    [
+      "Communications & Contact",
+      "email|bounce|\\bsms\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number change"
+    ],
+    [
+      "Billing & Tax",
+      "\\btax\\b|w-?9|1099|invoice|billing"
+    ],
+    [
+      "Complaint & Escalation",
+      "complaint|escalat|supervisor|dissatisf|legal|bbb"
+    ]
+  ],
+  "signals": {
+    "hardware_meter": "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|browser extension|chrome|equipment|hardware|modem|offline|wi-?fi",
+    "activity": "activity|participation|non[- ]?complian",
+    "reactivation": "reactivat|inactiv|dormant|\\bpurge",
+    "blocked_reward": "blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)",
+    "reward_any": "incentive|reward|\\bpoint|prepaid|visa|redeem",
+    "email_issue": "email|bounce|undeliver|mailing",
+    "password_access": "password|login|sign[- ]?in|\\bump\\b|credential|lock(?:ed)? out",
+    "google_account": "google[ _-]?account|google[ _-]?android|gmail|google chrome",
+    "outbound_cb": "outbound|call ?back",
+    "returns_ars": "\\bars\\b|return|tag requested|\\brma\\b",
+    "shipping": "\\bship|deliver|tracking",
+    "appointment": "appointment|field service|technician|dispatch|install visit",
+    "lost_stolen": "lost or stolen|lost/stolen|stolen",
+    "setup": "set[- ]?up|install|how to|onboard"
+  },
+  "risk_profile": {
+    "Hardware & Meter": {
+      "threat": "Panel data loss, cost-to-serve",
+      "owner": "Engineering / Product (metering)"
+    },
+    "Activity & Reactivation": {
+      "threat": "Panelist churn, panel representativeness",
+      "owner": "Panel Operations"
+    },
+    "Incentives & Rewards": {
+      "threat": "Trust and brand reputation, repeat contact",
+      "owner": "Rewards / Finance Ops"
+    },
+    "Account Access & Security": {
+      "threat": "Lockout-driven churn, onboarding failure",
+      "owner": "Identity / Engineering"
+    },
+    "Logistics & Returns": {
+      "threat": "Cost-to-serve, unrecovered assets",
+      "owner": "Field Service / Logistics"
+    },
+    "Onboarding & Setup": {
+      "threat": "Early-life churn",
+      "owner": "Panel Operations / Support Ops"
+    },
+    "Outbound & Callbacks": {
+      "threat": "Handling cost, channel breakdown",
+      "owner": "WFM / Support Ops"
+    },
+    "Communications & Contact": {
+      "threat": "Deliverability and contactability",
+      "owner": "CRM / Marketing Ops"
+    },
+    "Billing & Tax": {
+      "threat": "Compliance exposure",
+      "owner": "Finance"
+    },
+    "Complaint & Escalation": {
+      "threat": "Brand reputation",
+      "owner": "Support Ops leadership"
+    },
+    "Other / Unmapped": {
+      "threat": "Unclassified demand",
+      "owner": "Support Ops (taxonomy owner)"
+    }
+  }
+}

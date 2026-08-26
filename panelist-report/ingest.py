@@ -1,30 +1,11 @@
 """Load panelist support case exports from CSV/TSV/XLSX/PDF/PPTX into one normalised frame."""
-import re, sys, glob, os
+import re, sys, glob, os, json
 import pandas as pd
 
 # ---------------------------------------------------------------- column aliases
-ALIASES = {
-    "mno":            ["mno", "memberno", "membernumber", "memberid", "panelistid", "panelid",
-                       "accountid", "accountno", "hhid", "householdid", "contactid"],
-    "member_status":  ["memberstatus", "panelistatus", "paneliststatus", "accountstatus", "status"],
-    "case_status":    ["casestatus", "ticketstatus", "statusreason", "state"],
-    "case_origin":    ["caseorigin", "origin", "channel", "casechannel", "source", "casesource",
-                       "contactchannel", "medium"],
-    "modified_on":    ["modifiedon", "lastmodified", "modifieddate", "lastupdated", "updatedon"],
-    "created_on":     ["createdon", "createddate", "opened", "openeddate", "openedon", "casecreated",
-                       "datecreated", "casedate", "contactdate"],
-    "closed_on":      ["closedon", "closeddate", "resolvedon", "resolveddate"],
-    "subject":        ["subject", "title", "casetitle", "summary", "casesubject"],
-    "category":       ["category", "categories", "casetype", "type", "reason", "casereason",
-                       "topic", "topics", "issuetype", "subject2"],
-    "description":    ["description", "notes", "details", "casenotes", "body", "comments"],
-    # optional enrichment
-    "site":           ["site", "office", "location", "center", "callcenter", "queue", "team", "region"],
-    "agent":          ["agent", "owner", "assignedto", "caseowner", "rep", "csr", "handler"],
-    "member_type":    ["membertype", "relationship", "householdrole", "primarysecondary", "role"],
-    "enrolled_on":    ["enrolledon", "enrollmentdate", "joindate", "joinedon", "installdate",
-                       "startdate", "tenurestart", "signupdate"],
-}
+RULES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules.json")))
+ALIASES = RULES["aliases"]
+
 _norm = lambda s: re.sub(r"[^a-z0-9]", "", str(s).lower())
 
 

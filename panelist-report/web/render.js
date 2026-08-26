@@ -1,0 +1,661 @@
+/* Report renderer - port of render.py. Shares report.css, report-runtime.js and
+   rules.json with the Python CLI; tools/crossvalidate.py checks the two engines
+   still agree. Produces the full report body as an HTML string. */
+
+export function makeRenderer(RULES, CSS, RUNTIME_JS) {
+  const RISK = RULES.risk_profile;
+  const MAXSERIES = 8;
+
+  const ESC = s => String(s ?? "").replace(/[&<>"']/g,
+    c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#x27;" }[c]));
+  const cvar = i => "var(--s" + (i % MAXSERIES + 1) + ")";
+  const f1 = n => (Math.round(n * 10) / 10).toFixed(1);
+  const f2 = n => (Math.round(n * 100) / 100).toFixed(2);
+  const f0 = n => String(Math.round(n));
+  const th = n => Number(n).toLocaleString("en-US");
+
+  function capSeries(rows, n) {
+    n = n || MAXSERIES;
+    if (rows.length <= n) return [rows, false];
+    const head = rows.slice(0, n - 1), tail = rows.slice(n - 1);
+    head.push({ label: "Other (" + tail.length + " labels)",
+                count: tail.reduce((a, b) => a + b.count, 0),
+                pct: Math.round(tail.reduce((a, b) => a + b.pct, 0) * 10) / 10 });
+    return [head, true];
+  }
+
+  /* ---------------------------------------------------------- charts */
+  function svgDonut(rows, total) {
+    const W = 264, H = 264, cx = 132, rOut = 118, rIn = 72;
+    if (!rows.length || total <= 0) return '<p class="sub">No data to plot.</p>';
+    const p = [];
+    let ang = -Math.PI / 2;
+    const gap = rows.length > 1 ? 0.016 : 0;
+    rows.forEach((row, i) => {
+      const sweep = row.count / total * 2 * Math.PI;
+      let a0 = ang + gap / 2, a1 = ang + sweep - gap / 2;
+      ang += sweep;
+      if (a1 <= a0) a1 = a0 + 0.004;
+      const big = (a1 - a0) > Math.PI ? 1 : 0;
+      const x0 = cx + rOut * Math.cos(a0), y0 = H / 2 + rOut * Math.sin(a0);
+      const x1 = cx + rOut * Math.cos(a1), y1 = H / 2 + rOut * Math.sin(a1);
+      const x2 = cx + rIn * Math.cos(a1), y2 = H / 2 + rIn * Math.sin(a1);
+      const x3 = cx + rIn * Math.cos(a0), y3 = H / 2 + rIn * Math.sin(a0);
+      const d = `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rOut} ${rOut} 0 ${big} 1 ` +
+        `${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} ` +
+        `A${rIn} ${rIn} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
+      p.push(`<path d="${d}" fill="${cvar(i)}" data-tip="${ESC(row.label + " — " +
+        row.count + " cases (" + f1(row.pct) + "%)")}"/>`);
+    });
+    p.push(`<text x="${cx}" y="${H / 2 + 2}" text-anchor="middle" font-size="30" font-weight="700" ` +
+      `fill="var(--text)" style="font-variant-numeric:tabular-nums">${total}</text>`);
+    p.push(`<text x="${cx}" y="${H / 2 + 22}" text-anchor="middle" font-size="11.5" ` +
+      `fill="var(--text-3)" letter-spacing=".07em">CASES</text>`);
+    return `<svg viewBox="0 0 ${W} ${H}" role="img" style="max-width:300px;margin:0 auto">${p.join("")}</svg>`;
+  }
+
+  function svgHbar(rows, total, seriesColor, labelW, W) {
+    labelW = labelW || 178; W = W || 720;
+    if (!rows.length) return '<p class="sub">No data to plot.</p>';
+    const rowh = 30, gap = 9;
+    const H = rows.length * (rowh + gap) + 6;
+    const barX = labelW + 8, barW = W - barX - 78;
+    const mx = Math.max(...rows.map(r => r.count)) || 1;
+    const p = [];
+    rows.forEach((row, i) => {
+      const y = i * (rowh + gap);
+      const w = Math.max(barW * row.count / mx, 3);
+      const col = seriesColor || cvar(i);
+      const lbl = row.label;
+      const short = lbl.length <= 30 ? lbl : lbl.slice(0, 29) + "…";
+      p.push(`<text x="${labelW}" y="${(y + rowh * 0.68).toFixed(1)}" text-anchor="end" ` +
+        `font-size="12.5" fill="var(--text-2)">${ESC(short)}<title>${ESC(lbl)}</title></text>`);
+      p.push(`<rect x="${barX}" y="${y.toFixed(1)}" width="${w.toFixed(2)}" height="${rowh}" ` +
+        `rx="4" fill="${col}" data-tip="${ESC(lbl + " — " + row.count + " cases (" +
+        f1(row.pct) + "%)")}"/>`);
+      p.push(`<text x="${(barX + w + 9).toFixed(1)}" y="${(y + rowh * 0.68).toFixed(1)}" ` +
+        `font-size="12.5" font-weight="640" fill="var(--text)" ` +
+        `style="font-variant-numeric:tabular-nums">${row.count} ` +
+        `<tspan fill="var(--text-3)" font-weight="400">(${f1(row.pct)}%)</tspan></text>`);
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" ` +
+      `preserveAspectRatio="xMinYMid meet" role="img">${p.join("")}</svg>`;
+  }
+
+  function svgLine(months, series, ylab) {
+    ylab = ylab || "cases";
+    const W = 720, H = 300, pl = 46, pb = 34, pt = 14, pr = 14;
+    const pw = W - pl - pr, ph = H - pt - pb;
+    const all = series.flatMap(s => s.values);
+    const mx = Math.max(...(all.length ? all : [0])) || 1;
+    const n = months.length;
+    const X = i => pl + pw * i / Math.max(n - 1, 1);
+    const Y = v => pt + ph - ph * v / mx;
+    const p = [];
+    for (let g = 0; g < 5; g++) {
+      const y = pt + ph * g / 4;
+      p.push(`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W - pr}" y2="${y.toFixed(1)}" ` +
+        `stroke="var(--border)" stroke-width="1"/>`);
+      p.push(`<text x="${pl - 7}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="11" ` +
+        `fill="var(--text-3)">${Math.round(mx * (4 - g) / 4)}</text>`);
+    }
+    const step = Math.max(1, Math.ceil(n / 14));
+    months.forEach((m, i) => {
+      if (i % step === 0 || i === n - 1)
+        p.push(`<text x="${X(i).toFixed(1)}" y="${H - pb + 18}" text-anchor="middle" ` +
+          `font-size="11" fill="var(--text-3)">${ESC(m)}</text>`);
+    });
+    series.forEach((s, si) => {
+      const pts = s.values.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+      p.push(`<polyline points="${pts}" fill="none" stroke="${cvar(si)}" stroke-width="2" ` +
+        `stroke-linejoin="round" stroke-linecap="round"/>`);
+      s.values.forEach((v, i) => {
+        p.push(`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="4.5" fill="${cvar(si)}" ` +
+          `stroke="var(--surface)" stroke-width="2" data-tip="${ESC(months[i] + " · " +
+          s.name + ": " + v + " " + ylab)}"/>`);
+      });
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" ` +
+      `preserveAspectRatio="xMinYMid meet" role="img">${p.join("")}</svg>`;
+  }
+
+  function svgForecast(hist, proj) {
+    const W = 720, H = 320, pl = 50, pb = 36, pt = 16, pr = 16;
+    const pw = W - pl - pr, ph = H - pt - pb;
+    const labels = hist.map(h => h.label).concat(proj.map(q => q.label));
+    const n = labels.length;
+    const mx = Math.max(...hist.map(h => h.point), ...proj.map(q => q.high), 1);
+    const X = i => pl + pw * i / Math.max(n - 1, 1);
+    const Y = v => pt + ph - ph * v / mx;
+    const p = [];
+    for (let g = 0; g < 5; g++) {
+      const y = pt + ph * g / 4;
+      p.push(`<line x1="${pl}" y1="${y.toFixed(1)}" x2="${W - pr}" y2="${y.toFixed(1)}" ` +
+        `stroke="var(--border)" stroke-width="1"/>`);
+      p.push(`<text x="${pl - 7}" y="${(y + 3.5).toFixed(1)}" text-anchor="end" font-size="11" ` +
+        `fill="var(--text-3)">${Math.round(mx * (4 - g) / 4)}</text>`);
+    }
+    const step = Math.max(1, Math.floor(n / 12));
+    labels.forEach((l, i) => {
+      if (i % step === 0 || i >= hist.length)
+        p.push(`<text x="${X(i).toFixed(1)}" y="${H - pb + 18}" text-anchor="middle" ` +
+          `font-size="10.5" fill="var(--text-3)">${ESC(l)}</text>`);
+    });
+    const b = hist.length - 1;
+    if (b >= 0) {
+      p.push(`<line x1="${X(b).toFixed(1)}" y1="${pt}" x2="${X(b).toFixed(1)}" y2="${pt + ph}" ` +
+        `stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3 3"/>`);
+      p.push(`<text x="${(X(b) + 6).toFixed(1)}" y="${pt + 11}" font-size="10.5" ` +
+        `fill="var(--text-3)">projection →</text>`);
+    }
+    if (hist.length && proj.length) {
+      const top = [[X(b), Y(hist[hist.length - 1].point)]]
+        .concat(proj.map((q, i) => [X(b + 1 + i), Y(q.high)]));
+      const bot = proj.map((q, i) => [X(b + 1 + i), Y(q.low)]).reverse()
+        .concat([[X(b), Y(hist[hist.length - 1].point)]]);
+      const pts = top.concat(bot).map(t => `${t[0].toFixed(1)},${t[1].toFixed(1)}`).join(" ");
+      p.push(`<polygon points="${pts}" fill="var(--s1)" opacity=".14"/>`);
+    }
+    const hp = hist.map((h, i) => `${X(i).toFixed(1)},${Y(h.point).toFixed(1)}`).join(" ");
+    p.push(`<polyline points="${hp}" fill="none" stroke="var(--s1)" stroke-width="2" ` +
+      `stroke-linejoin="round"/>`);
+    const fp = (hist.length ? [`${X(b).toFixed(1)},${Y(hist[hist.length - 1].point).toFixed(1)}`] : [])
+      .concat(proj.map((q, i) => `${X(b + 1 + i).toFixed(1)},${Y(q.point).toFixed(1)}`)).join(" ");
+    p.push(`<polyline points="${fp}" fill="none" stroke="var(--s1)" stroke-width="2" ` +
+      `stroke-dasharray="6 4" stroke-linejoin="round"/>`);
+    hist.forEach((h, i) => {
+      p.push(`<circle cx="${X(i).toFixed(1)}" cy="${Y(h.point).toFixed(1)}" r="4" fill="var(--s1)" ` +
+        `stroke="var(--surface)" stroke-width="2" data-tip="${ESC(h.label + " observed: " +
+        h.point + " cases")}"/>`);
+    });
+    proj.forEach((q, i) => {
+      p.push(`<circle cx="${X(b + 1 + i).toFixed(1)}" cy="${Y(q.point).toFixed(1)}" r="4.5" ` +
+        `fill="var(--surface)" stroke="var(--s1)" stroke-width="2.5" data-tip="${ESC(q.label +
+        " projected: " + q.point + " cases (range " + q.low + "–" + q.high + ")")}"/>`);
+    });
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" role="img">${p.join("")}</svg>`;
+  }
+
+  function heatTable(ct) {
+    const mx = Math.max(...ct.matrix.map(r => Math.max(...r, 0)), 0) || 1;
+    const h = ['<div class="scroll"><table><thead><tr><th>Origin \\ Category bucket</th>'];
+    ct.buckets.forEach(b => h.push(`<th class="n">${ESC(b)}</th>`));
+    h.push('<th class="n">Total</th></tr></thead><tbody>');
+    ct.origins.forEach((o, i) => {
+      h.push(`<tr><td><b>${ESC(o)}</b></td>`);
+      ct.buckets.forEach((b, j) => {
+        const v = ct.matrix[i][j];
+        const stp = v === 0 ? 0 : Math.min(6, 1 + Math.floor(5 * v / mx));
+        const style = v === 0 ? "" :
+          `background:var(--seq${stp});color:${stp >= 3 ? "#fff" : "var(--text)"}`;
+        h.push(`<td class="n" style="${style}" data-tip="${ESC(o + " x " + b + ": " + v +
+          " cases")}">${v || "–"}</td>`);
+      });
+      h.push(`<td class="n"><b>${ct.row_totals[i]}</b></td></tr>`);
+    });
+    h.push("<tr><td><b>Total</b></td>");
+    ct.col_totals.forEach(t => h.push(`<td class="n"><b>${t}</b></td>`));
+    h.push(`<td class="n"><b>${ct.col_totals.reduce((a, b) => a + b, 0)}</b></td></tr></tbody></table></div>`);
+    return h.join("");
+  }
+
+  function distTable(rows, total, head) {
+    const h = [`<div class="scroll"><table><thead><tr><th>${ESC(head)}</th>` +
+      `<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>`];
+    rows.forEach((r, i) => {
+      h.push(`<tr><td><span class="swatch" style="background:${cvar(i)}"></span>${ESC(r.label)}</td>` +
+        `<td class="n">${r.count}</td><td class="n">${f1(r.pct)}%</td></tr>`);
+    });
+    h.push(`<tr><td><b>Total</b></td><td class="n"><b>${total}</b></td>` +
+      `<td class="n"><b>100.0%</b></td></tr></tbody></table></div>`);
+    return h.join("");
+  }
+
+  const legend = rows => '<div class="legend">' + rows.map((r, i) =>
+    `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(r.label)}</span>`).join("") + "</div>";
+
+  function naBlock(title, rec) {
+    const needs = rec.needs || rec.missing_fields || [];
+    const h = [`<div class="na"><div class="t">${ESC(title)}</div><p>${ESC(rec.reason || "")}</p>`];
+    if (needs.length) h.push("<p style='margin-bottom:.2em'>Required to compute this:</p><ul>" +
+      needs.map(x => `<li>${ESC(x)}</li>`).join("") + "</ul>");
+    if (rec.note) h.push(`<p><i>${ESC(rec.note)}</i></p>`);
+    h.push("</div>");
+    return h.join("");
+  }
+
+  /* ---------------------------------------------------------- narrative */
+  function buildFindings(V, C) {
+    const f = [], n = V.total_cases, b = V.bucket.rows;
+    if (b.length) {
+      const t = b[0];
+      f.push([`Demand concentrates in ${t.label}`,
+        `${t.count} of ${n} cases (${f1(t.pct)}%) carry ${t.label} as their primary category. ` +
+        `The top two buckets together account for ` +
+        `${f1(b.slice(0, 2).reduce((a, x) => a + x.pct, 0))}% of all contacts.`]);
+    }
+    const tl = V.tag_load;
+    if (tl.mean_tags_per_case > 1.2) {
+      f.push(["Cases are multi-issue, so single-category routing understates real demand",
+        `Cases carry ${f2(tl.mean_tags_per_case)} category tags on average and ` +
+        `${f1(tl.multi_tag_pct)}% carry more than one (${tl.distinct_tags} distinct labels in use). ` +
+        `Counting only the primary category hides ${tl.total_tags - n} secondary topic tags that ` +
+        `agents still had to handle.`]);
+    }
+    if (V.origin.computable && V.origin.rows.length) {
+      const t = V.origin.rows[0];
+      f.push([`${t.label} dominates contact volume`,
+        `${t.count} of ${n} cases (${f1(t.pct)}%) arrive via ${t.label} across ` +
+        `${V.origin.rows.length} origin(s) in use. Deflection and self-service capacity should be ` +
+        `sized against that channel first.`]);
+    }
+    const rc = C.repeat_contact || {};
+    if (rc.computable && rc.members_with_multiple_cases > 0) {
+      f.push(["Repeat contact is measurable at member level",
+        `${rc.members_with_multiple_cases} of ${rc.members} members (${f1(rc.pct_members_repeat)}%) ` +
+        `opened more than one case, generating ${rc.cases_from_repeat_members} cases ` +
+        `(${f1(rc.pct_cases_from_repeat)}% of volume); the highest single member opened ` +
+        `${rc.max_cases_one_member}.`]);
+    }
+    for (const k of ["chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout",
+                     "chain_field_service"]) {
+      const ch = C[k] || {};
+      if (ch.computable && (ch.lift || 0) >= 1.2) {
+        f.push([`Confirmed link: ${ch.title}`,
+          `Of the ${ch.n_a} cases carrying the leading signal, ${f1(ch.pct_of_a_with_b)}% also ` +
+          `carry the downstream signal, against a ${f1(ch.base_rate_b)}% base rate — a lift of ` +
+          `${f2(ch.lift)}x (n=${ch.joint} joint).`]);
+      }
+    }
+    return f.slice(0, 3);
+  }
+
+  const buildRisks = V => V.bucket.rows.slice(0, 6).map(r => {
+    const p = RISK[r.label] || { threat: "Unclassified", owner: "Support Ops" };
+    return { bucket: r.label, count: r.count, pct: r.pct, threat: p.threat, owner: p.owner };
+  });
+
+  function buildRecs(V, C) {
+    const recs = [], n = V.total_cases, missing = [];
+    if (V.date_field_is_proxy) missing.push(["Created On / case-open timestamp",
+      "Every trend, seasonality and 'within N days' figure in this report is currently anchored " +
+      "to Modified On, which records last touch, not arrival."]);
+    if (!(V.site || {}).computable) missing.push(["Office / site",
+      "No site-level breakdown of volume or mix is possible."]);
+    if (!(V.agent || {}).computable) missing.push(["Agent / case owner",
+      "No handling-side variance analysis is possible."]);
+    for (const k of ["chain_google_lockout", "chain_field_service"]) {
+      const c = C[k] || {};
+      for (const m of (c.missing_fields || c.needs || []))
+        if (!/larger export/i.test(m)) missing.push([m, c.note || ""]);
+    }
+    const seen = new Set(), miss = [];
+    for (const [m, why] of missing) {
+      if (seen.has(m.toLowerCase())) continue;
+      seen.add(m.toLowerCase()); miss.push([m, why]);
+    }
+    if (miss.length) recs.push({ pri: 1, horizon: "Quick win (0–30 days)",
+      owner: "Support Ops / CRM administration",
+      title: `Add ${miss.length} missing field(s) to the case export`,
+      body: "The export currently supports volume and mix analysis but blocks several causal " +
+        "tests outright. Adding these fields costs a report definition change, not a system " +
+        "change: " + miss.map(([m, w]) => `<b>${ESC(m)}</b> — ${ESC(w)}`).join("; ") + ".",
+      tie: "Ties to the NOT COMPUTABLE panels in sections 2 and 3." });
+
+    if (V.bucket.rows.length) {
+      const t = V.bucket.rows[0];
+      const p = RISK[t.label] || { threat: "Unclassified", owner: "Support Ops" };
+      recs.push({ pri: 1, horizon: "Quick win (0–30 days)", owner: p.owner,
+        title: `Attack the ${t.label} driver first`,
+        body: `${ESC(t.label)} is the largest single primary category at ${f1(t.pct)}% of cases ` +
+          `(${t.count} of ${n}). Any deflection built here has the widest reach; the associated ` +
+          `exposure is ${ESC(p.threat.toLowerCase())}.`,
+        tie: "Ties to Finding 1 and section 1's category breakdown." });
+    }
+    const tl = V.tag_load;
+    if (tl.mean_tags_per_case > 1.2) recs.push({ pri: 2, horizon: "This quarter",
+      owner: "Support Ops (taxonomy owner)",
+      title: "Split the multi-topic case into countable units",
+      body: `At ${f2(tl.mean_tags_per_case)} tags per case and ${f1(tl.multi_tag_pct)}% of cases ` +
+        "multi-tagged, a single case can conceal an equipment fault, a reward dispute and a " +
+        "password reset at once. Either capture a required primary reason with explicit " +
+        "sub-reasons, or emit one case line per topic, so demand sizing and AHT attribution stop " +
+        "disagreeing.",
+      tie: "Ties to Finding 2 and the tag-load table in section 1." });
+
+    if (V.origin.computable && V.origin.rows.length && V.origin.rows[0].pct >= 50) {
+      const t = V.origin.rows[0];
+      recs.push({ pri: 2, horizon: "This quarter", owner: "WFM / Support Ops",
+        title: `Size deflection against ${t.label} before adding headcount`,
+        body: `${f1(t.pct)}% of contacts arrive on ${ESC(t.label)}. Channel concentration at this ` +
+          "level means capacity planning, IVR routing and self-service ROI all hinge on that " +
+          "single origin.",
+        tie: "Ties to Finding 3 and section 1's origin split." });
+    }
+    if (!(C.discovered || {}).computable) recs.push({ pri: 3, horizon: "Next 2–3 quarters",
+      owner: "Analytics / Support Ops",
+      title: "Re-run this analysis on a full-period export",
+      body: "Correlation and forecasting are gated off at the current record count. The same " +
+        "pipeline produces the quantified chains, the discovered correlations and a fitted " +
+        "four-quarter forecast once a multi-month export is supplied — no rework required.",
+      tie: "Ties to the gates stated in sections 2 and 3." });
+    return recs;
+  }
+
+  /* ---------------------------------------------------------- document */
+  function buildBody(res, meta) {
+    const V = res.volume, C = res.correlation, Fc = res.forecast, MAP = res.mapping;
+    const n = V.total_cases;
+    const preview = n < (RULES.gates.preview_below || 30);
+    const H = [];
+    const A = s => H.push(s);
+
+    A('<div class="toolbar"><button class="btn" id="themeBtn" type="button">Light / dark</button>' +
+      '<button class="btn" id="printBtn" type="button">Print / PDF</button></div>');
+    A('<div class="wrap">');
+    A('<header class="rpt"><p class="eyebrow">Executive report · Panelist Support Operations</p>' +
+      '<h1>Panelist Support: Case Volume, Correlations &amp; Four-Quarter Outlook</h1>' +
+      `<p class="sub">${ESC(V.date_min ? "Coverage " + V.date_min + " to " + V.date_max
+        : "No usable date field")} &nbsp;·&nbsp; ${n} case record(s) from ` +
+      `${meta.file_count} source file(s) &nbsp;·&nbsp; Generated ` +
+      `${new Date().toISOString().slice(0, 10)}</p></header>`);
+
+    if (preview) A('<div class="callout"><div class="t">Small sample — read as a layout preview' +
+      `</div>Only <b>${n} record(s)</b> were loaded. Every figure below is arithmetically correct ` +
+      "for those rows and should not be read as an operational result. Panels that require a " +
+      "real sample size are gated off and say so explicitly.</div>");
+
+    // executive summary
+    A('<section class="card"><h2>Executive summary</h2>');
+    const tiles = [["Total cases", th(n), "All records after de-duplication"]];
+    if (V.unique_members) tiles.push(["Unique members", th(V.unique_members),
+      f2(n / V.unique_members) + " cases per member"]);
+    if (V.bucket.rows.length) {
+      const t = V.bucket.rows[0];
+      tiles.push(["Top category", f0(t.pct) + "%", `${t.label} (${t.count} cases)`]);
+    }
+    if (V.origin.computable && V.origin.rows.length) {
+      const t = V.origin.rows[0];
+      tiles.push(["Top origin", f0(t.pct) + "%", `${t.label} (${t.count} cases)`]);
+    }
+    tiles.push(["Topics per case", f2(V.tag_load.mean_tags_per_case),
+      f0(V.tag_load.multi_tag_pct) + "% of cases carry 2+ topic tags"]);
+    const rc = C.repeat_contact || {};
+    if (rc.computable) tiles.push(["Repeat contacts", f0(rc.pct_cases_from_repeat) + "%",
+      "of cases come from members with 2+ cases"]);
+    A('<div class="stats">' + tiles.slice(0, 6).map(([k, v, d]) =>
+      `<div class="stat"><div class="k">${ESC(k)}</div><div class="v num">${ESC(v)}</div>` +
+      `<div class="d">${ESC(d)}</div></div>`).join("") + "</div>");
+
+    A("<h3>Top findings</h3>");
+    const finds = buildFindings(V, C);
+    A(finds.length
+      ? '<ol class="find">' + finds.map(([t, d]) => `<li><b>${ESC(t)}</b>${ESC(d)}</li>`).join("") + "</ol>"
+      : '<p class="sub">No finding clears its evidence threshold at this record count.</p>');
+
+    if (V.date_field_is_proxy) A('<div class="callout"><div class="t">Date caveat carried through ' +
+      "the whole report</div>No case-creation timestamp is present, so every time-based figure " +
+      "uses <b>Modified On</b>. That records the last time a case was touched, not when it " +
+      "arrived — a case opened in March and reopened in July counts as July. Trend direction and " +
+      'any "within N days" sequencing should be read with that distortion in mind.</div>');
+    A("</section>");
+
+    // 1. volume
+    A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>');
+    A("<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its " +
+      "Category field — and that primary label is mapped to a reporting bucket. Shares therefore " +
+      "sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are " +
+      "counted separately in the topic-load table so multi-issue demand is not lost.</p>");
+
+    A('<div class="grid2">');
+    const [brows, folded] = capSeries(V.bucket.rows.slice());
+    A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>' + svgDonut(brows, n) +
+      legend(brows) + "<figcaption>One bucket per case; shares sum to 100%." +
+      (folded ? " Lowest-volume buckets folded into Other." : "") + "</figcaption></figure>");
+    A("<div>" + distTable(brows, n, "Category bucket") + "</div>");
+    A("</div>");
+
+    A('<div class="grid2" style="margin-top:26px">');
+    if (V.origin.computable) {
+      const [orows] = capSeries(V.origin.rows.slice());
+      A('<figure><h3 style="margin-top:0">Contact origin</h3>' + svgHbar(orows, n, null, 178, 520) +
+        "<figcaption>Count and share of total cases by channel of arrival.</figcaption></figure>");
+      A("<div>" + distTable(orows, n, "Origin") + "</div>");
+    } else A(naBlock("Origin breakdown", V.origin));
+    A("</div>");
+
+    A("<h3>Most frequent primary categories (raw labels, before bucketing)</h3>");
+    const [prows] = capSeries(V.primary_raw.rows.slice(), 10);
+    A(svgHbar(prows, n, "var(--s1)", 240));
+
+    A("<h3>Origin × category cross-tab</h3>");
+    if (V.crosstab.computable) {
+      A(heatTable(V.crosstab));
+      A('<p class="sub">Cell shading is a single-hue sequential ramp on case count; exact counts ' +
+        "are printed in every cell.</p>");
+    } else A(naBlock("Origin × category cross-tab", V.crosstab));
+
+    A("<h3>Topic load (all tags, not just the primary)</h3>");
+    const tl = V.tag_load;
+    A(`<p>Cases carry <b>${f2(tl.mean_tags_per_case)}</b> category tags on average; ` +
+      `<b>${tl.multi_tag_cases}</b> of ${n} cases (${f1(tl.multi_tag_pct)}%) carry more than one, ` +
+      `across <b>${tl.distinct_tags}</b> distinct labels. The denominator below is cases, so ` +
+      "these shares deliberately sum above 100%.</p>");
+    A('<div class="scroll"><table><thead><tr><th>Topic tag (any position)</th>' +
+      '<th class="n">Cases</th><th class="n">% of cases</th></tr></thead><tbody>' +
+      tl.top.map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
+        `<td class="n">${f1(t.pct_of_cases)}%</td></tr>`).join("") + "</tbody></table></div>");
+
+    A("<h3>Movement over time</h3>");
+    if (V.monthly.computable) {
+      const m = V.monthly;
+      const ser = Object.entries(m.by_bucket)
+        .sort((a, b) => b[1].reduce((x, y) => x + y, 0) - a[1].reduce((x, y) => x + y, 0))
+        .slice(0, MAXSERIES).map(([k, v]) => ({ name: k, values: v }));
+      A(svgLine(m.months, ser));
+      A('<div class="legend">' + ser.map((s, i) =>
+        `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(s.name)}</span>`)
+        .join("") + "</div>");
+      const first = m.total[0], last = m.total[m.total.length - 1];
+      const chg = first ? 100 * (last - first) / first : 0;
+      A(`<p class="sub">Total monthly volume moved from ${first} to ${last} across ` +
+        `${m.months.length} months (${chg >= 0 ? "+" : ""}${f1(chg)}%).</p>`);
+    } else A(naBlock("Growth / decline by category and origin", V.monthly));
+
+    for (const [key, ttl] of [["site", "Breakdown by office / site"], ["agent", "Breakdown by agent"]]) {
+      const rec = V[key] || {};
+      A(`<h3>${ESC(ttl)}</h3>`);
+      if (rec.computable) { const [rows] = capSeries(rec.rows.slice(), 10); A(svgHbar(rows, n)); }
+      else A(naBlock(ttl, rec));
+    }
+    A("</section>");
+
+    // 2. correlation
+    A('<section class="card"><h2><span class="secnum">2</span>Multivariate correlation analysis</h2>');
+    A(`<p>Each hypothesised chain is tested as measured co-occurrence, not asserted narrative. ` +
+      `A chain is only reported when the dataset carries at least <b>${C.gate.min_cases} cases</b> ` +
+      `and at least <b>${C.gate.min_cooccurrence} cases showing both signals</b>; otherwise it is ` +
+      "marked NOT COMPUTABLE with the specific field or volume it needs. Signals are matched " +
+      "across every category tag on a case plus its subject line — never the free-text " +
+      "description body, which is excluded from all processing that reaches this page.</p>");
+
+    for (const key of ["chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout",
+                       "chain_field_service"]) {
+      const ch = C[key];
+      if (ch.computable) {
+        A('<h3 style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline">' +
+          `${ESC(ch.title)}<span class="pill v-${ch.verdict}">${ESC(ch.verdict_text)}</span></h3>`);
+        A('<div class="stats">' + [
+          ["Cases with leading signal", th(ch.n_a), "denominator"],
+          ["Also show downstream", f1(ch.pct_of_a_with_b) + "%", ch.joint + " joint cases"],
+          ["Base rate", f1(ch.base_rate_b) + "%", "downstream signal, all cases"],
+          ["Lift", f2(ch.lift || 0) + "x", "vs. base rate"],
+        ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
+          `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
+        if (ch.note) A(`<div class="callout info"><div class="t">Scope limit</div>${ESC(ch.note)}</div>`);
+      } else {
+        A(`<h3>${ESC(ch.title)}</h3>`);
+        A(naBlock(ch.title, ch));
+      }
+    }
+
+    A("<h3>Repeat-contact behaviour</h3>");
+    if (rc.computable) {
+      A('<div class="stats">' + [
+        ["Members", th(rc.members), "distinct member IDs"],
+        ["Repeat members", th(rc.members_with_multiple_cases), f1(rc.pct_members_repeat) + "% of members"],
+        ["Cases from repeats", th(rc.cases_from_repeat_members), f1(rc.pct_cases_from_repeat) + "% of volume"],
+        ["Busiest member", th(rc.max_cases_one_member), "cases, single member"],
+      ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div><div class="v num">${v}</div>` +
+        `<div class="d">${d}</div></div>`).join("") + "</div>");
+      A('<p class="sub">Member identifiers are used only to group cases; no identifier, name, ' +
+        "email or phone number appears anywhere in this report.</p>");
+    } else A(naBlock("Repeat-contact behaviour", rc));
+
+    A("<h3>Other correlations found in the data</h3>");
+    const d = C.discovered;
+    if (d.computable && d.pairs.length) {
+      A('<div class="scroll"><table><thead><tr><th>Signal A</th><th>Signal B</th>' +
+        '<th class="n">Cases with A</th><th class="n">Both</th><th class="n">% of A with B</th>' +
+        '<th class="n">Base rate</th><th class="n">Lift</th></tr></thead><tbody>' +
+        d.pairs.map(p => `<tr><td>${ESC(p.a.replace(/_/g, " "))}</td>` +
+          `<td>${ESC(p.b.replace(/_/g, " "))}</td><td class="n">${p.n_a}</td>` +
+          `<td class="n">${p.joint}</td><td class="n">${f1(p.pct_of_a_with_b)}%</td>` +
+          `<td class="n">${f1(p.base_rate_b)}%</td><td class="n"><b>${f2(p.lift)}x</b></td></tr>`)
+          .join("") + "</tbody></table></div>");
+      A('<p class="sub">Co-occurrence within a single case. Lift above 1.0 means the pair appears ' +
+        "together more often than the downstream signal's overall rate — association, not " +
+        "causation. Pairs where one signal wholly contains the other are excluded as definitional.</p>");
+    } else if (d.computable) {
+      A('<p class="sub">No signal pair cleared the joint-occurrence threshold.</p>');
+    } else A(naBlock("Open correlation scan", d));
+    A("</section>");
+
+    // 3. forecast
+    A('<section class="card"><h2><span class="secnum">3</span>Projected support trends — next four quarters</h2>');
+    if (Fc.computable) {
+      A(`<p><b>Method:</b> ordinary least-squares linear trend fitted to <b>${Fc.months_fitted}</b> ` +
+        `months of observed case volume (slope ${Fc.slope_cases_per_month >= 0 ? "+" : ""}` +
+        `${f2(Fc.slope_cases_per_month)} cases/month), summed to quarterly totals. The interval is ` +
+        `±1.96 residual standard deviations. ${ESC(Fc.caveat)}</p>`);
+      if (Fc.partial_note) A('<p class="sub">Observed history below shows only calendar quarters ' +
+        "with all three months present. A forward quarter that already contains observed months " +
+        "uses those actuals and models only the remainder — its interval narrows accordingly.</p>");
+      A('<div class="scroll"><table><thead><tr><th>Quarter</th><th class="n">Projected cases</th>' +
+        '<th class="n">Low</th><th class="n">High</th><th class="n">Months modelled</th>' +
+        "</tr></thead><tbody>" + Fc.quarters.map(q =>
+          `<tr><td><b>${ESC(q.label)}</b>${q.partial ?
+            ' <span class="pill p3" style="font-size:.6rem">part observed</span>' : ""}</td>` +
+          `<td class="n">${th(q.point)}</td><td class="n">${th(q.low)}</td>` +
+          `<td class="n">${th(q.high)}</td><td class="n">${q.fitted_months} of 3</td></tr>`)
+          .join("") + "</tbody></table></div>");
+      A(svgForecast(Fc.history || [], Fc.quarters));
+      A('<div class="legend"><span><span class="swatch" style="background:var(--s1)"></span>' +
+        'Observed quarterly volume (solid)</span><span><span class="swatch" ' +
+        'style="background:var(--s1);opacity:.35"></span>Projection with ±1.96 residual-SD ' +
+        "interval (dashed)</span></div>");
+    } else {
+      A("<p><b>Method:</b> no forecast is produced.</p>");
+      A(naBlock("Four-quarter forecast", Fc));
+      A('<div class="callout"><div class="t">Why no directional estimate is shown either</div>' +
+        "A directional estimate built from category mix would still need a category mix that is " +
+        "representative of the operation. At this record count it is not, so publishing a shaped " +
+        "curve would give a VP a number with no evidence behind it. Supply an export spanning " +
+        "three or more months and this section fills in automatically with a fitted trend, " +
+        "per-quarter interval and mix projection.</div>");
+    }
+    A("</section>");
+
+    // 4. risk
+    A('<section class="card"><h2><span class="secnum">4</span>Predictive trend analysis &amp; risk forecasting</h2>');
+    A("<p>Exposure below is sized directly from measured case share. The threat and owner columns " +
+      "are an <b>operational interpretation</b> of each bucket, not a value derived from the " +
+      "export — they are shown so the ranking is actionable, and should be challenged where they " +
+      "do not match how the operation is actually organised.</p>");
+    A('<div class="scroll"><table><thead><tr><th>Rank</th><th>Category bucket</th>' +
+      '<th class="n">Cases</th><th class="n">Share</th><th>Principal forward risk</th>' +
+      "<th>Likely owner</th></tr></thead><tbody>" + buildRisks(V).map((r, i) =>
+        `<tr><td class="n">${i + 1}</td><td><span class="swatch" style="background:${cvar(i)}">` +
+        `</span><b>${ESC(r.bucket)}</b></td><td class="n">${r.count}</td>` +
+        `<td class="n">${f1(r.pct)}%</td><td>${ESC(r.threat)}</td><td>${ESC(r.owner)}</td></tr>`)
+        .join("") + "</tbody></table></div>");
+
+    A("<h3>Leading indicators worth instrumenting</h3>");
+    A("<ul><li><b>Topic tags per case</b> — currently " + f2(V.tag_load.mean_tags_per_case) +
+      ". A rise means single contacts are absorbing more unresolved issues; it moves before " +
+      "handle time and before CSAT.</li><li><b>Share of volume from repeat members</b> — " +
+      (rc.computable ? f1(rc.pct_cases_from_repeat) + "%" : "not yet computable") +
+      ". Rising repeat share is the earliest sign that first-contact resolution is failing.</li>" +
+      "<li><b>Reactivation and activity-inquiry share of primary category</b> — the closest " +
+      "available proxy for panelists drifting toward involuntary purge.</li>" +
+      "<li><b>Outbound / callback share</b> — a rise indicates inbound channels are not closing " +
+      "issues on first contact.</li></ul>");
+
+    A("<h3>If nothing changes</h3>");
+    if (Fc.computable) {
+      const q4 = Fc.quarters[Fc.quarters.length - 1];
+      A(`<p>The fitted trend carries volume to roughly <b>${th(q4.point)} cases</b> in ` +
+        `${ESC(q4.label)} (range ${th(q4.low)}–${th(q4.high)}) with the current mix intact — that ` +
+        "is the do-nothing baseline against which any intervention should be measured.</p>");
+    } else {
+      A('<div class="na"><div class="t">Do-nothing trajectory</div><p>Quantifying the do-nothing ' +
+        "case requires the forecast in section 3, which is gated off. What can be stated without " +
+        "a forecast: the concentration in the leading bucket and the multi-topic case structure " +
+        "are both structural, so neither resolves on its own without an intervention.</p></div>");
+    }
+    A("</section>");
+
+    // 5. recommendations
+    A('<section class="card"><h2><span class="secnum">5</span>Strategic recommendations &amp; action plan</h2>');
+    for (const r of buildRecs(V, C)) {
+      A(`<div class="rec"><div class="h"><span class="pill p${Math.min(r.pri, 3)}">Priority ` +
+        `${r.pri}</span><span class="pill p3">${ESC(r.horizon)}</span>` +
+        `<span class="pill p3">Owner: ${ESC(r.owner)}</span></div>` +
+        `<h4 style="margin:.1em 0 .35em;font-size:1rem;color:var(--text)">${ESC(r.title)}</h4>` +
+        `<p>${r.body}</p><div class="ties">${ESC(r.tie)}</div></div>`);
+    }
+    A("</section>");
+
+    // appendices
+    A('<section class="card"><h2>Appendix A — category label mapping (audit)</h2>');
+    A("<p>Every distinct label seen in the Category field, the bucket it was assigned to, and how " +
+      `often it appears in any tag position. <b>${MAP.distinct}</b> distinct labels; ` +
+      `<b>${MAP.unmapped_count}</b> fell through to Other / Unmapped. Ordered rules are applied to ` +
+      "the label text, first match wins — so a label naming a device resolves to Hardware &amp; " +
+      "Meter even when it also mentions activity.</p>");
+    A('<div class="scroll"><table><thead><tr><th>Raw label</th><th>Assigned bucket</th>' +
+      '<th class="n">Occurrences</th></tr></thead><tbody>' + MAP.items.map(i =>
+        `<tr><td class="mono">${ESC(i.label)}</td><td>${ESC(i.bucket)}</td>` +
+        `<td class="n">${i.count}</td></tr>`).join("") + "</tbody></table></div></section>");
+
+    A('<section class="card"><h2>Appendix B — sources &amp; data handling</h2>');
+    A('<div class="scroll"><table><thead><tr><th>File</th><th>Sheet</th><th>Status</th>' +
+      '<th class="n">Rows</th><th>Columns not mapped</th></tr></thead><tbody>' +
+      meta.prov.map(p => `<tr><td class="mono">${ESC(p.file)}</td>` +
+        `<td>${ESC(p.sheet || "—")}</td><td>${ESC(p.status)}</td><td class="n">${p.rows}</td>` +
+        `<td class="mono">${ESC((p.unmapped || []).join(", ") || "—")}</td></tr>`).join("") +
+      "</tbody></table></div>");
+    A(`<p>Records read: <b>${meta.stats.rows_read}</b>. Exact duplicates removed: ` +
+      `<b>${meta.stats.exact_duplicates_removed}</b>. Records analysed: ` +
+      `<b>${meta.stats.rows_after_dedupe}</b>.</p>`);
+    A("<p><b>Privacy.</b> Member identifiers are used only to group cases into members and are " +
+      "never printed. Subject and description free text is used only for keyword signal matching; " +
+      "no free-text content, name, email address or phone number is rendered anywhere in this " +
+      "document, and no row-level record is included.</p>");
+    A('<p class="foot">All figures computed directly from the supplied export(s). Panels marked ' +
+      "NOT COMPUTABLE indicate a field or sample size the export does not provide; no value in " +
+      "this report is estimated, imputed or carried over from outside the data. Analysis ran " +
+      "entirely in this browser — no file was uploaded to any server.</p>");
+    A("</section></div>");
+    return H.join("");
+  }
+
+  function buildDocument(res, meta) {
+    return '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+      '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+      "<title>Panelist Support — Executive Report</title><style>" + CSS + "</style></head><body>" +
+      buildBody(res, meta) + "<script>" + RUNTIME_JS + "<\/script></body></html>";
+  }
+
+  return { buildBody, buildDocument };
+}

@@ -1,0 +1,23 @@
+import sys, json, glob
+import os; sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import ingest, analyze
+d,prov=ingest.load_paths([sys.argv[1]]); d,stats=ingest.clean(d)
+r=analyze.run(d); V,C,F=r['volume'],r['correlation'],r['forecast']
+out={
+ "total":V["total_cases"],"members":V["unique_members"],"months":V["months_spanned"],
+ "dmin":V["date_min"],"dmax":V["date_max"],"dedupe":stats["exact_duplicates_removed"],
+ "buckets":[[x["label"],x["count"],x["pct"]] for x in V["bucket"]["rows"]],
+ "origins":[[x["label"],x["count"],x["pct"]] for x in V["origin"]["rows"]],
+ "tag_mean":V["tag_load"]["mean_tags_per_case"],"tag_distinct":V["tag_load"]["distinct_tags"],
+ "crosstab_total":V["crosstab"]["col_totals"],
+ "chains":[[k,([C[k]["n_a"],C[k]["joint"],C[k]["pct_of_a_with_b"],C[k]["lift"]] if C[k].get("computable") else "NC")]
+           for k in ("chain_hw_inactivity","chain_reward_dupes","chain_google_lockout","chain_field_service")],
+ "repeat":([C["repeat_contact"]["members"],C["repeat_contact"]["members_with_multiple_cases"],
+            C["repeat_contact"]["pct_cases_from_repeat"]] if C["repeat_contact"].get("computable") else "NC"),
+ "discovered":[[p["a"],p["b"],p["lift"]] for p in C["discovered"].get("pairs",[])],
+ "fc_method":F["method"],"fc_slope":F.get("slope_cases_per_month"),
+ "fc_hist":[[h["label"],h["point"]] for h in F.get("history",[])],
+ "fc_q":[[q["label"],q["point"],q["low"],q["high"],q["fitted_months"]] for q in F.get("quarters",[])],
+ "map_distinct":r["mapping"]["distinct"],"map_unmapped":r["mapping"]["unmapped_count"],
+}
+print(json.dumps(out))

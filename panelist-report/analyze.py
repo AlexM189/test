@@ -1,63 +1,17 @@
 """Derive categories, buckets and every statistic the report needs.
 Hard rule: anything that cannot be computed from the data returns a
 `not_computable` record naming the missing field - never an estimate."""
-import re, math, itertools
+import re, math, itertools, json, os
 from collections import Counter, defaultdict
 import pandas as pd
 
-# ------------------------------------------------------------------ gates
-MIN_CASES_LIFT   = 30    # min cases before a lift/co-occurrence figure is reported
-MIN_COOCCUR      = 5     # min joint occurrences before lift is reported
-MIN_PERIODS_FIT  = 3     # min historical periods before a trend is fitted
-
-# ------------------------------------------------------------------ bucket rules
-# Ordered: first match wins. Specific signals beat generic ones.
-BUCKET_RULES = [
-    ("Account Access & Security",
-     r"password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\bump\b|"
-     r"google[ _-]?account|account security|security question|lock(?:ed)? out|credential"),
-    ("Incentives & Rewards",
-     r"incentive|reward|\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|"
-     r"compensat|sweepstake|bonus|blocked reward"),
-    ("Hardware & Meter",
-     r"tv meter|\bmeter\b|router|box switch|screenwise|tablet|browser extension|"
-     r"google chrome|\bchrome\b|\bdevice\b|equipment|hardware|modem|set[- ]?top|"
-     r"\bstb\b|dongle|battery|firmware|wi-?fi|connectivity|offline"),
-    ("Logistics & Returns",
-     r"\bars\b|return|\bship|deliver|tag requested|\brma\b|pick[- ]?up|tracking|"
-     r"appointment|field service|technician|install visit|dispatch"),
-    ("Activity & Reactivation",
-     r"activity|reactivat|inactiv|\bpurge|dormant|non[- ]?complian|participation"),
-    ("Onboarding & Setup",
-     r"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up"),
-    ("Outbound & Callbacks",
-     r"outbound|call ?back|follow[- ]?up call"),
-    ("Communications & Contact",
-     r"email|bounce|\bsms\b|text message|mailing|contact preference|address change|"
-     r"unsubscribe|opt[- ]?out|phone number change"),
-    ("Billing & Tax",  r"\btax\b|w-?9|1099|invoice|billing"),
-    ("Complaint & Escalation", r"complaint|escalat|supervisor|dissatisf|legal|bbb"),
-]
-BUCKETS = [b for b, _ in BUCKET_RULES] + ["Other / Unmapped"]
-
-# tag-level signals used by the correlation chains (searched across ALL tags on a case)
-SIGNALS = {
-    "hardware_meter":  r"tv meter|\bmeter\b|router|box switch|screenwise|tablet|"
-                       r"browser extension|chrome|equipment|hardware|modem|offline|wi-?fi",
-    "activity":        r"activity|participation|non[- ]?complian",
-    "reactivation":    r"reactivat|inactiv|dormant|\bpurge",
-    "blocked_reward":  r"blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)",
-    "reward_any":      r"incentive|reward|\bpoint|prepaid|visa|redeem",
-    "email_issue":     r"email|bounce|undeliver|mailing",
-    "password_access": r"password|login|sign[- ]?in|\bump\b|credential|lock(?:ed)? out",
-    "google_account":  r"google[ _-]?account|google[ _-]?android|gmail|google chrome",
-    "outbound_cb":     r"outbound|call ?back",
-    "returns_ars":     r"\bars\b|return|tag requested|\brma\b",
-    "shipping":        r"\bship|deliver|tracking",
-    "appointment":     r"appointment|field service|technician|dispatch|install visit",
-    "lost_stolen":     r"lost or stolen|lost/stolen|stolen",
-    "setup":           r"set[- ]?up|install|how to|onboard",
-}
+RULES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules.json")))
+MIN_CASES_LIFT  = RULES["gates"]["min_cases_lift"]
+MIN_COOCCUR     = RULES["gates"]["min_cooccurrence"]
+MIN_PERIODS_FIT = RULES["gates"]["min_periods_fit"]
+BUCKET_RULES    = [(n, p) for n, p in RULES["bucket_rules"]]
+BUCKETS         = [b for b, _ in BUCKET_RULES] + ["Other / Unmapped"]
+SIGNALS         = RULES["signals"]
 
 _ws = lambda s: re.sub(r"\s+", " ", str(s or "")).strip()
 
@@ -150,6 +104,10 @@ def volume_section(df, date_col):
     # origin x bucket cross-tab
     if isinstance(out["origin"], dict) and out["origin"].get("computable"):
         ct = pd.crosstab(df["case_origin"].replace("", "(blank)"), df["bucket"])
+        # order rows and columns by volume, so the cross-tab reads in the same
+        # order as the donut, the legend and the distribution tables
+        ct = ct.reindex(index=[r["label"] for r in out["origin"]["rows"] if r["label"] in ct.index],
+                        columns=[r["label"] for r in out["bucket"]["rows"] if r["label"] in ct.columns])
         out["crosstab"] = {"computable": True,
                            "origins": list(ct.index),
                            "buckets": list(ct.columns),
