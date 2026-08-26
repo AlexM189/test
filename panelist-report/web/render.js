@@ -214,6 +214,56 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
   const legend = rows => '<div class="legend">' + rows.map((r, i) =>
     `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(r.label)}</span>`).join("") + "</div>";
 
+  /* Collapse a {bucket: [values]} map onto the driver set, rolling every
+     non-driver bucket into the single Various row - so every chart in the
+     report shows the same five things. */
+  function foldSeries(byBucket, drivers) {
+    const names = drivers.filter(d => !d.rolled).map(d => d.label);
+    const rolled = drivers.find(d => d.rolled);
+    const out = names.filter(nm => byBucket[nm]).map(nm => ({ name: nm, values: byBucket[nm] }));
+    if (rolled) {
+      const first = Object.values(byBucket)[0] || [];
+      const acc = first.map(() => 0);
+      for (const b of rolled.rolled)
+        (byBucket[b] || []).forEach((v, i) => { acc[i] += v; });
+      if (acc.some(v => v)) out.push({ name: rolled.label, values: acc });
+    }
+    return out;
+  }
+
+  function foldCrosstab(ct, drivers) {
+    const names = drivers.filter(d => !d.rolled).map(d => d.label);
+    const rolled = drivers.find(d => d.rolled);
+    const idx = new Map(ct.buckets.map((b, i) => [b, i]));
+    let cols = names.filter(b => idx.has(b));
+    let M = ct.matrix.map(row => cols.map(b => row[idx.get(b)]));
+    if (rolled) {
+      const extra = rolled.rolled.filter(b => idx.has(b)).map(b => idx.get(b));
+      if (extra.length) {
+        cols = cols.concat([rolled.label]);
+        M = M.map((row, r) => row.concat([extra.reduce((a, i) => a + ct.matrix[r][i], 0)]));
+      }
+    }
+    return { computable: true, origins: ct.origins, buckets: cols, matrix: M,
+             row_totals: M.map(r => r.reduce((a, b) => a + b, 0)),
+             col_totals: cols.map((_, j) => M.reduce((a, r) => a + r[j], 0)) };
+  }
+
+  function driversTable(drivers, total) {
+    const h = ['<div class="scroll"><table><thead><tr><th>#</th><th>Call driver</th>' +
+      '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>'];
+    drivers.forEach((d, i) => {
+      const tip = d.rolled ? ` title="${ESC(d.rolled.join(", "))}"` : "";
+      h.push(`<tr${d.rolled ? ' class="various"' : ""}><td class="n">${d.rank}</td>` +
+        `<td${tip}><span class="swatch" style="background:${cvar(i)}"></span>${ESC(d.label)}` +
+        (d.rolled ? ` <span style='color:var(--text-3)'>(${d.rolled.length} categories)</span>` : "") +
+        `</td><td class="n">${d.count}</td><td class="n">${f1(d.pct)}%</td></tr>`);
+    });
+    h.push(`<tr><td></td><td><b>Total</b></td><td class="n"><b>${total}</b></td>` +
+      `<td class="n"><b>100.0%</b></td></tr></tbody></table></div>`);
+    return h.join("");
+  }
+
   function naBlock(title, rec) {
     const needs = rec.needs || rec.missing_fields || [];
     const h = [`<div class="na"><div class="t">${ESC(title)}</div><p>${ESC(rec.reason || "")}</p>`];
@@ -387,6 +437,59 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       `<div class="stat"><div class="k">${ESC(k)}</div><div class="v num">${ESC(v)}</div>` +
       `<div class="d">${ESC(d)}</div></div>`).join("") + "</div>");
 
+    const MR = res.most_received;
+    if (MR) {
+      A("<h3>Most received cases</h3>");
+      const bits = [`<div class="mr"><div class="lead"><b>${ESC(MR.label)}</b> is the largest ` +
+        `driver at <b>${MR.count} cases</b> (${f1(MR.pct)}% of all volume)` +
+        (MR.members ? ` raised by ${MR.members} distinct members` : "") + ".</div>"];
+      bits.push("<ul>");
+      if (MR.top_labels.length) bits.push("<li>Most common labels inside it: " +
+        MR.top_labels.map(l => `${ESC(l.label)} (${l.count})`).join("; ") + "</li>");
+      if (MR.origin) bits.push(`<li>Arrives mainly on <b>${ESC(MR.origin.label)}</b> — ` +
+        `${MR.origin.count} of its ${MR.count} cases (${f1(MR.origin.pct)}%)</li>`);
+      bits.push("</ul></div>");
+      A(bits.join(""));
+    }
+
+    const AN = res.anomaly || {};
+    A("<h3>Movement watch</h3>");
+    if ((AN.alerts || []).length) {
+      A('<div class="alerts">' + AN.alerts.map(a =>
+        `<div class="alert ${a.level === "down" ? "down" : "up"}"><span class="dir">` +
+        `${a.level === "up" ? "increase" : "decrease"}</span><span>${ESC(a.text)}</span></div>`)
+        .join("") + "</div>");
+    } else if ((AN.weekly || {}).computable || (AN.monthly || {}).computable) {
+      const parts = [];
+      for (const b of [AN.weekly, AN.monthly]) {
+        if (b && b.computable) parts.push(`${b.label}-over-${b.label} ` +
+          `${b.change >= 0 ? "+" : ""}${b.change} case(s) (${b.previous_key} to ${b.current_key})`);
+      }
+      A('<div class="alerts"><div class="alert calm"><span class="dir">steady</span><span>' +
+        `Nothing crossed the alert thresholds (a move must be at least ` +
+        `${RULES.anomaly.pct_threshold}% <i>and</i> at least ${RULES.anomaly.min_abs_change} ` +
+        `cases): ${parts.length ? parts.join("; ") : "no complete period pair to compare"}.` +
+        "</span></div></div>");
+    } else {
+      const wk = AN.weekly || {}, mo = AN.monthly || {};
+      A(naBlock("Week-over-week and month-over-month movement", {
+        reason: AN.reason || wk.reason || mo.reason ||
+          "not enough complete periods to compare",
+        needs: AN.needs || ["a date column covering 2+ complete periods"] }));
+    }
+
+    const DR = res.drivers || [];
+    if (DR.length) {
+      A("<h3>Top 5 call drivers</h3>");
+      A('<p class="sub">Ranked by primary category. Positions 1–' + RULES.gates.top_drivers +
+        " are the named drivers; position " + DR.length + " rolls up every remaining category " +
+        "so the five add to 100%.</p>");
+      const chartRows = DR.map(d => ({ label: d.rank + ". " + d.label,
+                                       count: d.count, pct: d.pct }));
+      A('<div class="drivers"><figure>' + svgHbar(chartRows, n, null, 196, 560) +
+        "</figure><div>" + driversTable(DR, n) + "</div></div>");
+    }
+
     A("<h3>Top findings</h3>");
     const finds = buildFindings(V, C);
     A(finds.length
@@ -402,17 +505,35 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
 
     // 1. volume
     A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>');
+    const INF = res.inference || {};
+    if (INF.from_subject || INF.unresolved) {
+      A('<div class="callout info"><div class="t">Cases bucketed from the subject line</div>' +
+        `<b>${INF.from_subject} of ${INF.total} cases (${f1(INF.pct_from_subject)}%)</b> had no ` +
+        "usable Category value — blank, or a label that matched no bucket rule — so their bucket " +
+        "was inferred from the subject line instead. " +
+        ((INF.by_bucket || []).length ? "They landed in: " +
+          INF.by_bucket.map(b => `${ESC(b.label)} (${b.count})`).join("; ") + ". " : "") +
+        `A further <b>${INF.unresolved} case(s) (${f1(INF.pct_unresolved)}%)</b> could not be ` +
+        "placed from either field and stay in Other / Unmapped. Every inferred assignment, and " +
+        "the keyword that triggered it, is listed in Appendix A.</div>");
+    }
     A("<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its " +
       "Category field — and that primary label is mapped to a reporting bucket. Shares therefore " +
       "sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are " +
       "counted separately in the topic-load table so multi-issue demand is not lost.</p>");
 
+    const brows = DR.length
+      ? DR.map(d => ({ label: d.label, count: d.count, pct: d.pct }))
+      : capSeries(V.bucket.rows.slice())[0];
+    const rolledDrv = DR.find(d => d.rolled);
     A('<div class="grid2">');
-    const [brows, folded] = capSeries(V.bucket.rows.slice());
     A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>' + svgDonut(brows, n) +
       legend(brows) + "<figcaption>One bucket per case; shares sum to 100%." +
-      (folded ? " Lowest-volume buckets folded into Other." : "") + "</figcaption></figure>");
-    A("<div>" + distTable(brows, n, "Category bucket") + "</div>");
+      (rolledDrv ? ` ${ESC(rolledDrv.label)} rolls up ${rolledDrv.rolled.length} lower-volume ` +
+        "categories, itemised in the table." : "") + "</figcaption></figure>");
+    A("<div>" + distTable(brows, n, "Category bucket") +
+      (rolledDrv ? `<p class='sub'>${ESC(rolledDrv.label)} contains: ` +
+        `${ESC(rolledDrv.rolled.join(", "))}.</p>` : "") + "</div>");
     A("</div>");
 
     A('<div class="grid2" style="margin-top:26px">');
@@ -424,15 +545,18 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     } else A(naBlock("Origin breakdown", V.origin));
     A("</div>");
 
-    A("<h3>Most frequent primary categories (raw labels, before bucketing)</h3>");
-    const [prows] = capSeries(V.primary_raw.rows.slice(), 10);
+    A("<h3>Top 5 primary category labels (raw, before bucketing)</h3>");
+    const prows = V.primary_raw.rows.slice(0, 5);
     A(svgHbar(prows, n, "var(--s1)", 240));
+    A('<p class="sub">The five most-used raw labels out of ' + V.tag_load.distinct_tags +
+      " distinct labels seen in the Category field; the remainder are in the Appendix A mapping " +
+      "table. Percentages are of all " + n + " cases, so these five do not sum to 100%.</p>");
 
     A("<h3>Origin × category cross-tab</h3>");
     if (V.crosstab.computable) {
-      A(heatTable(V.crosstab));
-      A('<p class="sub">Cell shading is a single-hue sequential ramp on case count; exact counts ' +
-        "are printed in every cell.</p>");
+      A(heatTable(DR.length ? foldCrosstab(V.crosstab, DR) : V.crosstab));
+      A('<p class="sub">Columns are the same five call drivers used throughout; cell shading is ' +
+        "a single-hue sequential ramp on case count and exact counts are printed in every cell.</p>");
     } else A(naBlock("Origin × category cross-tab", V.crosstab));
 
     A("<h3>Topic load (all tags, not just the primary)</h3>");
@@ -441,15 +565,15 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       `<b>${tl.multi_tag_cases}</b> of ${n} cases (${f1(tl.multi_tag_pct)}%) carry more than one, ` +
       `across <b>${tl.distinct_tags}</b> distinct labels. The denominator below is cases, so ` +
       "these shares deliberately sum above 100%.</p>");
-    A('<div class="scroll"><table><thead><tr><th>Topic tag (any position)</th>' +
+    A('<div class="scroll"><table><thead><tr><th>Top 10 topic tags (any position)</th>' +
       '<th class="n">Cases</th><th class="n">% of cases</th></tr></thead><tbody>' +
-      tl.top.map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
+      tl.top.slice(0, 10).map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
         `<td class="n">${f1(t.pct_of_cases)}%</td></tr>`).join("") + "</tbody></table></div>");
 
     A("<h3>Movement over time</h3>");
     if (V.monthly.computable) {
       const m = V.monthly;
-      const ser = Object.entries(m.by_bucket)
+      const ser = DR.length ? foldSeries(m.by_bucket, DR) : Object.entries(m.by_bucket)
         .sort((a, b) => b[1].reduce((x, y) => x + y, 0) - a[1].reduce((x, y) => x + y, 0))
         .slice(0, MAXSERIES).map(([k, v]) => ({ name: k, values: v }));
       A(svgLine(m.months, ser));
@@ -626,7 +750,19 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A('<div class="scroll"><table><thead><tr><th>Raw label</th><th>Assigned bucket</th>' +
       '<th class="n">Occurrences</th></tr></thead><tbody>' + MAP.items.map(i =>
         `<tr><td class="mono">${ESC(i.label)}</td><td>${ESC(i.bucket)}</td>` +
-        `<td class="n">${i.count}</td></tr>`).join("") + "</tbody></table></div></section>");
+        `<td class="n">${i.count}</td></tr>`).join("") + "</tbody></table></div>");
+    if ((INF.keywords || []).length) {
+      A("<h3>Subject-line inference (cases with no usable category)</h3>");
+      A("<p>Where the Category field was blank or unrecognised, the subject line was matched " +
+        "against the same ordered rules. The keyword below is the exact text that triggered each " +
+        "assignment — the subject itself is never shown, since it can carry identifying detail.</p>");
+      A('<div class="scroll"><table><thead><tr><th>Matched keyword in subject</th>' +
+        '<th>Assigned bucket</th><th class="n">Cases</th></tr></thead><tbody>' +
+        INF.keywords.map(k => `<tr><td class="mono">${ESC(k.keyword)}</td>` +
+          `<td>${ESC(k.bucket)}</td><td class="n">${k.count}</td></tr>`).join("") +
+        "</tbody></table></div>");
+    }
+    A("</section>");
 
     A('<section class="card"><h2>Appendix B — sources &amp; data handling</h2>');
     A('<div class="scroll"><table><thead><tr><th>File</th><th>Sheet</th><th>Status</th>' +

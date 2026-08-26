@@ -217,6 +217,61 @@ def legend(rows):
         for i, r in enumerate(rows)) + "</div>")
 
 
+def driver_labels(drivers):
+    return [d["label"] for d in drivers]
+
+
+def fold_series(by_bucket, drivers):
+    """Collapse a {bucket: [values]} map onto the driver set, rolling every
+    non-driver bucket into the single Various row - so every chart in the report
+    shows the same five things."""
+    names = [d["label"] for d in drivers if not d.get("rolled")]
+    rolled = next((d for d in drivers if d.get("rolled")), None)
+    out = [{"name": nm, "values": by_bucket.get(nm, [])} for nm in names if nm in by_bucket]
+    if rolled:
+        n = len(next(iter(by_bucket.values()), []))
+        acc = [0] * n
+        for b in rolled["rolled"]:
+            for i, v in enumerate(by_bucket.get(b, [])):
+                acc[i] += v
+        if any(acc):
+            out.append({"name": rolled["label"], "values": acc})
+    return out
+
+
+def fold_crosstab(ct, drivers):
+    names = [d["label"] for d in drivers if not d.get("rolled")]
+    rolled = next((d for d in drivers if d.get("rolled")), None)
+    idx = {b: i for i, b in enumerate(ct["buckets"])}
+    cols = [b for b in names if b in idx]
+    M = [[row[idx[b]] for b in cols] for row in ct["matrix"]]
+    if rolled:
+        extra = [i for b, i in idx.items() if b in rolled["rolled"]]
+        if extra:
+            cols = cols + [rolled["label"]]
+            M = [row + [sum(ct["matrix"][r][i] for i in extra)] for r, row in enumerate(M)]
+    return {"computable": True, "origins": ct["origins"], "buckets": cols, "matrix": M,
+            "row_totals": [sum(r) for r in M],
+            "col_totals": [sum(r[j] for r in M) for j in range(len(cols))]}
+
+
+def drivers_table(drivers, total):
+    h = ['<div class="scroll"><table><thead><tr><th>#</th><th>Call driver</th>'
+         '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>']
+    for i, d in enumerate(drivers):
+        rolled = d.get("rolled")
+        tip = (' title="%s"' % ESC(", ".join(rolled))) if rolled else ""
+        h.append('<tr%s><td class="n">%d</td><td%s><span class="swatch" style="background:%s">'
+                 '</span>%s%s</td><td class="n">%d</td><td class="n">%.1f%%</td></tr>'
+                 % (' class="various"' if rolled else "", d["rank"], tip, cvar(i),
+                    ESC(d["label"]),
+                    (" <span style='color:var(--text-3)'>(%d categories)</span>" % len(rolled))
+                    if rolled else "", d["count"], d["pct"]))
+    h.append('<tr><td></td><td><b>Total</b></td><td class="n"><b>%d</b></td>'
+             '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>' % total)
+    return "".join(h)
+
+
 def na_block(title, rec):
     needs = rec.get("needs") or rec.get("missing_fields") or []
     h = ['<div class="na"><div class="t">%s</div><p>%s</p>' % (ESC(title), ESC(rec.get("reason", "")))]
@@ -234,6 +289,7 @@ def na_block(title, rec):
 # This is judgement, NOT derived from the export - it is labelled as such in the report.
 _R = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "rules.json")))
 RISK_PROFILE = {k: (v["threat"], v["owner"]) for k, v in _R["risk_profile"].items()}
+RULES = _R
 
 
 def build_findings(V, C, preview):
@@ -385,11 +441,10 @@ def build(res, meta):
          n, meta["file_count"], datetime.date.today().isoformat()))
 
     if preview:
-        A('<div class="callout"><div class="t">Layout preview — not a finished analysis</div>'
-          'This render is built from <b>%d sample record(s)</b> transcribed from the header '
-          'screenshot, purely to show structure, mapping and chart treatment. Every figure below '
-          'is arithmetically correct for those %d rows and meaningless as an operational result. '
-          'Panels that require a real sample size are gated off and say so explicitly.</div>' % (n, n))
+        A('<div class="callout"><div class="t">Small sample — read as a layout preview</div>'
+          'Only <b>%d record(s)</b> were loaded. Every figure below is arithmetically correct '
+          'for those rows and should not be read as an operational result. Panels that require a '
+          'real sample size are gated off and say so explicitly.</div>' % n)
 
     # ---------------- executive summary
     A('<section class="card"><h2>Executive summary</h2>')
@@ -413,6 +468,65 @@ def build(res, meta):
         '<div class="stat"><div class="k">%s</div><div class="v num">%s</div><div class="d">%s</div></div>'
         % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:6]) + "</div>")
 
+    MR = res.get("most_received")
+    if MR:
+        A("<h3>Most received cases</h3>")
+        bits = ['<div class="mr"><div class="lead"><b>%s</b> is the largest driver at '
+                '<b>%d cases</b> (%.1f%% of all volume)%s.</div>'
+                % (ESC(MR["label"]), MR["count"], MR["pct"],
+                   (" raised by %d distinct members" % MR["members"]) if MR["members"] else "")]
+        bits.append("<ul>")
+        if MR["top_labels"]:
+            bits.append("<li>Most common labels inside it: "
+                        + "; ".join("%s (%d)" % (ESC(l["label"]), l["count"])
+                                    for l in MR["top_labels"]) + "</li>")
+        if MR["origin"]:
+            bits.append("<li>Arrives mainly on <b>%s</b> — %d of its %d cases (%.1f%%)</li>"
+                        % (ESC(MR["origin"]["label"]), MR["origin"]["count"], MR["count"],
+                           MR["origin"]["pct"]))
+        bits.append("</ul></div>")
+        A("".join(bits))
+
+    AN = res.get("anomaly") or {}
+    A("<h3>Movement watch</h3>")
+    if AN.get("alerts"):
+        A('<div class="alerts">' + "".join(
+            '<div class="alert %s"><span class="dir">%s</span><span>%s</span></div>'
+            % ("down" if a["level"] == "down" else "up",
+               "increase" if a["level"] == "up" else "decrease", ESC(a["text"]))
+            for a in AN["alerts"]) + "</div>")
+    elif (AN.get("weekly") or {}).get("computable") or (AN.get("monthly") or {}).get("computable"):
+        parts = []
+        for b in (AN.get("weekly"), AN.get("monthly")):
+            if b and b.get("computable"):
+                parts.append("%s-over-%s %+d case(s) (%s to %s)"
+                             % (b["label"], b["label"], b["change"],
+                                b["previous_key"], b["current_key"]))
+        A('<div class="alerts"><div class="alert calm"><span class="dir">steady</span>'
+          "<span>Nothing crossed the alert thresholds (a move must be at least %d%% "
+          "<i>and</i> at least %d cases): %s.</span></div></div>"
+          % (RULES["anomaly"]["pct_threshold"], RULES["anomaly"]["min_abs_change"],
+             "; ".join(parts) if parts else "no complete period pair to compare"))
+    else:
+        wk = AN.get("weekly") or {}
+        mo = AN.get("monthly") or {}
+        A(na_block("Week-over-week and month-over-month movement",
+                   {"reason": AN.get("reason")
+                              or wk.get("reason") or mo.get("reason")
+                              or "not enough complete periods to compare",
+                    "needs": AN.get("needs") or ["a date column covering 2+ complete periods"]}))
+
+    DR = res.get("drivers") or []
+    if DR:
+        A("<h3>Top 5 call drivers</h3>")
+        A('<p class="sub">Ranked by primary category. Positions 1–%d are the named drivers; '
+          'position %d rolls up every remaining category so the five add to 100%%.</p>'
+          % (RULES["gates"]["top_drivers"], len(DR)))
+        chart_rows = [{"label": "%d. %s" % (d["rank"], d["label"]),
+                       "count": d["count"], "pct": d["pct"]} for d in DR]
+        A('<div class="drivers"><figure>' + svg_hbar(chart_rows, n, label_w=196, W=560)
+          + "</figure><div>" + drivers_table(DR, n) + "</div></div>")
+
     A("<h3>Top findings</h3>")
     finds = build_findings(V, C, preview)
     if finds:
@@ -430,18 +544,38 @@ def build(res, meta):
 
     # ---------------- 1. volume
     A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>')
+    INF = res.get("inference") or {}
+    if INF.get("from_subject") or INF.get("unresolved"):
+        A('<div class="callout info"><div class="t">Cases bucketed from the subject line</div>'
+          '<b>%d of %d cases (%.1f%%)</b> had no usable Category value — blank, or a label that '
+          'matched no bucket rule — so their bucket was inferred from the subject line instead. '
+          '%s A further <b>%d case(s) (%.1f%%)</b> could not be placed from either field and stay '
+          'in Other / Unmapped. Every inferred assignment, and the keyword that triggered it, is '
+          'listed in Appendix A.</div>'
+          % (INF.get("from_subject", 0), INF.get("total", 0), INF.get("pct_from_subject", 0.0),
+             ("They landed in: " + "; ".join("%s (%d)" % (ESC(b["label"]), b["count"])
+                                             for b in INF.get("by_bucket", [])) + ".")
+             if INF.get("by_bucket") else "",
+             INF.get("unresolved", 0), INF.get("pct_unresolved", 0.0)))
     A('<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its '
       'Category field — and that primary label is mapped to a reporting bucket. Shares therefore '
       'sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are '
       'counted separately in the topic-load table so multi-issue demand is not lost.</p>')
 
+    DRV = res.get("drivers") or []
+    brows = [{"label": d["label"], "count": d["count"], "pct": d["pct"]} for d in DRV] \
+        or cap_series(list(V["bucket"]["rows"]))[0]
+    rolled = next((d for d in DRV if d.get("rolled")), None)
     A('<div class="grid2">')
-    brows, folded = cap_series(list(V["bucket"]["rows"]))
     A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>'
       + svg_donut(brows, n) + legend(brows)
       + '<figcaption>One bucket per case; shares sum to 100%%.%s</figcaption></figure>'
-      % (" Lowest-volume buckets folded into Other." if folded else ""))
-    A("<div>" + dist_table(brows, n, "Category bucket") + "</div>")
+      % (" %s rolls up %d lower-volume categories, itemised in the table."
+         % (rolled["label"], len(rolled["rolled"])) if rolled else ""))
+    A("<div>" + dist_table(brows, n, "Category bucket")
+      + (("<p class='sub'>%s contains: %s.</p>"
+          % (ESC(rolled["label"]), ESC(", ".join(rolled["rolled"])))) if rolled else "")
+      + "</div>")
     A("</div>")
 
     A('<div class="grid2" style="margin-top:26px">')
@@ -454,15 +588,20 @@ def build(res, meta):
         A(na_block("Origin breakdown", V["origin"]))
     A("</div>")
 
-    A("<h3>Most frequent primary categories (raw labels, before bucketing)</h3>")
-    prows, _ = cap_series(list(V["primary_raw"]["rows"]), 10)
+    A("<h3>Top 5 primary category labels (raw, before bucketing)</h3>")
+    prows = list(V["primary_raw"]["rows"])[:5]
     A(svg_hbar(prows, n, series_color="var(--s1)", label_w=240))
+    A('<p class="sub">The five most-used raw labels out of %d distinct labels seen in the '
+      'Category field; the remainder are in the Appendix A mapping table. Percentages are of '
+      'all %d cases, so these five do not sum to 100%%.</p>'
+      % (V["tag_load"]["distinct_tags"], n))
 
     A("<h3>Origin × category cross-tab</h3>")
     if V["crosstab"].get("computable"):
-        A(heat_table(V["crosstab"]))
-        A('<p class="sub">Cell shading is a single-hue sequential ramp on case count; '
-          'exact counts are printed in every cell.</p>')
+        A(heat_table(fold_crosstab(V["crosstab"], DRV) if DRV else V["crosstab"]))
+        A('<p class="sub">Columns are the same five call drivers used throughout; cell shading '
+          'is a single-hue sequential ramp on case count and exact counts are printed in every '
+          'cell.</p>')
     else:
         A(na_block("Origin × category cross-tab", V["crosstab"]))
 
@@ -472,17 +611,18 @@ def build(res, meta):
       'more than one, across <b>%d</b> distinct labels. The denominator below is cases, so these '
       'shares deliberately sum above 100%%.</p>'
       % (tl["mean_tags_per_case"], tl["multi_tag_cases"], n, tl["multi_tag_pct"], tl["distinct_tags"]))
-    A('<div class="scroll"><table><thead><tr><th>Topic tag (any position)</th><th class="n">Cases</th>'
+    A('<div class="scroll"><table><thead><tr><th>Top 10 topic tags (any position)</th><th class="n">Cases</th>'
       '<th class="n">% of cases</th></tr></thead><tbody>'
       + "".join('<tr><td>%s</td><td class="n">%d</td><td class="n">%.1f%%</td></tr>'
-                % (ESC(t["label"]), t["count"], t["pct_of_cases"]) for t in tl["top"])
+                % (ESC(t["label"]), t["count"], t["pct_of_cases"]) for t in tl["top"][:10])
       + "</tbody></table></div>")
 
     A("<h3>Movement over time</h3>")
     if V["monthly"].get("computable"):
         m = V["monthly"]
-        ser = [{"name": k, "values": v} for k, v in
-               sorted(m["by_bucket"].items(), key=lambda kv: -sum(kv[1]))[:MAXSERIES]]
+        ser = fold_series(m["by_bucket"], DRV) if DRV else \
+            [{"name": k, "values": v} for k, v in
+             sorted(m["by_bucket"].items(), key=lambda kv: -sum(kv[1]))[:MAXSERIES]]
         A(svg_line(m["months"], ser))
         A('<div class="legend">' + "".join(
             '<span><span class="swatch" style="background:%s"></span>%s</span>' % (cvar(i), ESC(s["name"]))
@@ -672,7 +812,19 @@ def build(res, meta):
       '<th class="n">Occurrences</th></tr></thead><tbody>'
       + "".join('<tr><td class="mono">%s</td><td>%s</td><td class="n">%d</td></tr>'
                 % (ESC(i["label"]), ESC(i["bucket"]), i["count"]) for i in MAP["items"])
-      + "</tbody></table></div></section>")
+      + "</tbody></table></div>")
+    if INF.get("keywords"):
+        A("<h3>Subject-line inference (cases with no usable category)</h3>")
+        A("<p>Where the Category field was blank or unrecognised, the subject line was matched "
+          "against the same ordered rules. The keyword below is the exact text that triggered "
+          "each assignment — the subject itself is never shown, since it can carry identifying "
+          "detail.</p>")
+        A('<div class="scroll"><table><thead><tr><th>Matched keyword in subject</th>'
+          '<th>Assigned bucket</th><th class="n">Cases</th></tr></thead><tbody>'
+          + "".join('<tr><td class="mono">%s</td><td>%s</td><td class="n">%d</td></tr>'
+                    % (ESC(k["keyword"]), ESC(k["bucket"]), k["count"])
+                    for k in INF["keywords"]) + "</tbody></table></div>")
+    A("</section>")
 
     A('<section class="card"><h2>Appendix B — sources &amp; data handling</h2>')
     A('<div class="scroll"><table><thead><tr><th>File</th><th>Sheet</th><th>Status</th>'

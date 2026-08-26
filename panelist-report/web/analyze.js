@@ -9,6 +9,11 @@ export function makeEngine(RULES) {
   const MIN_PERIODS_FIT = G.min_periods_fit;
   const BUCKET_RULES = RULES.bucket_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
   const SIGNALS = Object.entries(RULES.signals).map(([k, p]) => [k, new RegExp(p, "i")]);
+  const SUBJECT_RULES = RULES.subject_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
+  const TOP_DRIVERS = G.top_drivers;
+  const VARIOUS = RULES.various_label;
+  const ANOM = RULES.anomaly;
+  const UNMAPPED = "Other / Unmapped";
   const norm = s => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const ws = s => String(s ?? "").replace(/\s+/g, " ").trim();
   const pct = (n, d) => (d ? Math.round(1000 * n / d) / 10 : 0);
@@ -77,6 +82,20 @@ export function makeEngine(RULES) {
     return "Other / Unmapped";
   }
 
+  /* Fallback when the Category field is blank or its primary label matches no
+     bucket rule: read the intent off the subject line instead. Only the matched
+     keyword is ever surfaced - never the subject text, which can carry
+     identifying detail. */
+  function bucketFromSubject(subject) {
+    const t = ws(subject).toLowerCase();
+    if (!t) return [null, null];
+    for (const [name, re] of SUBJECT_RULES) {
+      const m = re.exec(t);
+      if (m) return [name, ws(m[0]).slice(0, 40)];
+    }
+    return [null, null];
+  }
+
   function buildRecords(tables) {
     const recs = [], prov = [];
     for (const t of tables) {
@@ -127,7 +146,14 @@ export function makeEngine(RULES) {
     for (const r of recs) {
       r.tags = splitTags(r.category);
       r.primary_category = r.tags[0] || "";
-      r.bucket = r.primary_category ? bucketOf(r.primary_category) : "Other / Unmapped";
+      r.bucket = r.primary_category ? bucketOf(r.primary_category) : UNMAPPED;
+      r.bucket_source = "category";
+      r.inferred_keyword = "";
+      if (r.bucket === UNMAPPED) {
+        const [b, kw] = bucketFromSubject(r.subject);
+        if (b) { r.bucket = b; r.bucket_source = "subject"; r.inferred_keyword = kw; }
+        else r.bucket_source = "none";
+      }
       r.tag_count = r.tags.length;
       const hay = (r.tags.join(" | ") + " | " + (r.subject || "")).toLowerCase();
       r.sig = {};
@@ -384,6 +410,182 @@ export function makeEngine(RULES) {
           ? " Fitted on Modified On, which records last touch rather than case arrival." : "") };
   }
 
+  function inferenceAudit(recs) {
+    const n = recs.length;
+    let fromCat = 0, fromSub = 0, none = 0;
+    const kw = new Map(), byB = new Map();
+    for (const r of recs) {
+      if (r.bucket_source === "category") fromCat++;
+      else if (r.bucket_source === "subject") {
+        fromSub++;
+        const k = r.bucket + "\u0000" + r.inferred_keyword;
+        kw.set(k, (kw.get(k) || 0) + 1);
+        byB.set(r.bucket, (byB.get(r.bucket) || 0) + 1);
+      } else none++;
+    }
+    const keywords = [...kw.entries()].map(([k, count]) => {
+      const [bucket, keyword] = k.split("\u0000");
+      return { bucket, keyword, count };
+    }).sort((a, b) => b.count - a.count || a.bucket.localeCompare(b.bucket) ||
+      a.keyword.localeCompare(b.keyword)).slice(0, 40);
+    const by_bucket = [...byB.entries()].sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count, pct: pct(count, fromSub) }));
+    return { total: n, from_category: fromCat, from_subject: fromSub, unresolved: none,
+             pct_from_subject: pct(fromSub, n), pct_unresolved: pct(none, n),
+             keywords, by_bucket };
+  }
+
+  function topDrivers(V) {
+    const rows = V.bucket.rows;
+    const head = rows.slice(0, TOP_DRIVERS).map((r, i) => Object.assign({ rank: i + 1 }, r));
+    const tail = rows.slice(TOP_DRIVERS);
+    if (tail.length) head.push({ rank: head.length + 1, label: VARIOUS,
+      count: tail.reduce((a, b) => a + b.count, 0),
+      pct: Math.round(tail.reduce((a, b) => a + b.pct, 0) * 10) / 10,
+      rolled: tail.map(r => r.label) });
+    return head;
+  }
+
+  /* --- period helpers: complete calendar periods only, so a partial first or
+     last period cannot read as a collapse in volume that never happened. */
+  const dayMs = 86400000;
+  function weekBounds(d) {
+    const t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const dow = (new Date(t).getUTCDay() + 6) % 7;           // Monday = 0
+    return [t - dow * dayMs, t - dow * dayMs + 6 * dayMs];
+  }
+  function isoWeekLabel(d) {
+    const [start] = weekBounds(d);
+    const th = new Date(start + 3 * dayMs);                  // Thursday decides the ISO year
+    const y = th.getUTCFullYear();
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const [w1] = weekBounds(jan4);
+    const wk = Math.round((start - w1) / (7 * dayMs)) + 1;
+    return y + "-W" + String(wk).padStart(2, "0");
+  }
+  const monthBounds = d => [Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1),
+                            Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)];
+  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d) : monKey(d);
+  const pbounds = (d, freq) => freq === "W" ? weekBounds(d) : monthBounds(d);
+
+  function series(recs, freq) {
+    const withD = recs.filter(r => r._date);
+    if (!withD.length) return { keys: [], counts: {} };
+    const days = withD.map(r => Date.UTC(r._date.getUTCFullYear(), r._date.getUTCMonth(),
+                                         r._date.getUTCDate()));
+    const lo = Math.min(...days), hi = Math.max(...days);
+    const counts = new Map(), bounds = new Map();
+    for (const r of withD) {
+      const lab = plabel(r._date, freq);
+      counts.set(lab, (counts.get(lab) || 0) + 1);
+      if (!bounds.has(lab)) bounds.set(lab, pbounds(r._date, freq));
+    }
+    const keys = [...counts.keys()].filter(k => bounds.get(k)[0] >= lo && bounds.get(k)[1] <= hi).sort();
+    const out = {};
+    for (const k of keys) out[k] = counts.get(k);
+    return { keys, counts: out };
+  }
+
+  function bucketSeries(recs, freq, keys, buckets) {
+    const pos = new Map(keys.map((k, i) => [k, i]));
+    const out = {};
+    for (const b of buckets) out[b] = keys.map(() => 0);
+    for (const r of recs) {
+      if (!r._date || !out[r.bucket]) continue;
+      const i = pos.get(plabel(r._date, freq));
+      if (i !== undefined) out[r.bucket][i]++;
+    }
+    return out;
+  }
+
+  function anomalySection(recs, V) {
+    const out = { alerts: [], weekly: null, monthly: null };
+    if (!recs.some(r => r._date)) {
+      Object.assign(out, nc("no usable date column, so no period comparison is possible",
+                            ["a date column"]));
+      return out;
+    }
+    const block = (freq, label) => {
+      const { keys, counts } = series(recs, freq);
+      if (keys.length < 2) return { computable: false, periods: keys.length, label,
+        reason: "only " + keys.length + " complete " + label + "(s) in range; 2+ needed" };
+      const vals = keys.map(k => counts[k]);
+      const cur = vals[vals.length - 1], prev = vals[vals.length - 2];
+      const chg = cur - prev;
+      const b = { computable: true, label, keys, values: vals, current: cur, previous: prev,
+        change: chg, pct_change: prev ? Math.round(1000 * chg / prev) / 10 : null,
+        current_key: keys[keys.length - 1], previous_key: keys[keys.length - 2] };
+      if (vals.length >= ANOM.min_periods_for_z) {
+        const hist = vals.slice(0, -1);
+        const mu = hist.reduce((a, x) => a + x, 0) / hist.length;
+        const varr = hist.reduce((a, x) => a + (x - mu) ** 2, 0) / Math.max(hist.length - 1, 1);
+        const sd = Math.sqrt(varr);
+        b.mean_prior = Math.round(mu * 10) / 10;
+        b.z = sd ? Math.round(100 * (cur - mu) / sd) / 100 : null;
+      }
+      return b;
+    };
+    const wk = block("W", "week"), mo = block("M", "month");
+    out.weekly = wk; out.monthly = mo;
+
+    const flag = b => {
+      if (!b.computable || b.pct_change === null) return;
+      const pc = b.pct_change, chg = b.change;
+      if (Math.abs(pc) >= ANOM.pct_threshold && Math.abs(chg) >= ANOM.min_abs_change) {
+        out.alerts.push({ level: chg > 0 ? "up" : "down", scope: "total",
+          text: "Total volume " + (chg > 0 ? "rose " : "fell ") + Math.abs(pc).toFixed(1) +
+            "% to " + b.current + " cases in " + b.current_key + ", from " + b.previous +
+            " in " + b.previous_key + " (" + (chg > 0 ? "+" : "") + chg + " cases " +
+            b.label + "-over-" + b.label + ")." });
+      }
+      if (b.z !== null && b.z !== undefined && Math.abs(b.z) >= ANOM.z_threshold &&
+          Math.abs(chg) >= ANOM.min_abs_change) {
+        out.alerts.push({ level: b.z > 0 ? "up" : "down", scope: "total",
+          text: b.current_key + " sits " + Math.abs(b.z).toFixed(1) + " standard deviations " +
+            (b.z > 0 ? "above" : "below") + " the mean of the preceding " +
+            (b.values.length - 1) + " " + b.label + "s (" + b.mean_prior + " cases)." });
+      }
+    };
+    flag(wk); flag(mo);
+
+    for (const b of [mo, wk]) {
+      if (!b.computable) continue;
+      const names = V.bucket.rows.slice(0, TOP_DRIVERS + 2).map(r => r.label);
+      const ser = bucketSeries(recs, b.label === "month" ? "M" : "W", b.keys, names);
+      for (const name of names) {
+        const v = ser[name];
+        const cur = v[v.length - 1], prev = v[v.length - 2];
+        const chg = cur - prev;
+        if (!prev) continue;
+        const pc = 100 * chg / prev;
+        if (Math.abs(pc) >= ANOM.bucket_pct_threshold && Math.abs(chg) >= ANOM.bucket_min_abs) {
+          out.alerts.push({ level: chg > 0 ? "up" : "down", scope: "bucket",
+            text: name + (chg > 0 ? " rose " : " fell ") + Math.abs(pc).toFixed(0) + "% " +
+              b.label + "-over-" + b.label + " (" + prev + " to " + cur + " cases, " +
+              b.previous_key + " to " + b.current_key + ")." });
+        }
+      }
+      break;
+    }
+    return out;
+  }
+
+  function mostReceived(recs, V) {
+    if (!V.bucket.rows.length) return null;
+    const top = V.bucket.rows[0];
+    const sub = recs.filter(r => r.bucket === top.label);
+    const top_labels = counts(sub, "primary_category", sub.length).slice(0, 3)
+      .map(x => ({ label: x.label, count: x.count }));
+    let origin = null;
+    if (sub.some(r => (r.case_origin ?? "") !== "")) {
+      const o = counts(sub, "case_origin", sub.length)[0];
+      origin = { label: o.label, count: o.count, pct: pct(o.count, sub.length) };
+    }
+    return { label: top.label, count: top.count, pct: top.pct, top_labels, origin,
+             members: sub.some(r => r.mno)
+               ? new Set(sub.map(r => r.mno).filter(Boolean)).size : null };
+  }
+
   function mappingAudit(recs) {
     const m = new Map();
     for (const r of recs) {
@@ -404,7 +606,9 @@ export function makeEngine(RULES) {
       const dateCol = derive(recs);
       const volume = volumeSection(recs, dateCol);
       return { volume, correlation: correlationSection(recs),
-               forecast: forecastSection(volume), mapping: mappingAudit(recs) };
+               forecast: forecastSection(volume), mapping: mappingAudit(recs),
+               inference: inferenceAudit(recs), drivers: topDrivers(volume),
+               anomaly: anomalySection(recs, volume), most_received: mostReceived(recs, volume) };
     },
   };
 }

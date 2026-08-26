@@ -4,7 +4,8 @@
     "min_cases_lift": 30,
     "min_cooccurrence": 5,
     "min_periods_fit": 3,
-    "preview_below": 30
+    "preview_below": 30,
+    "top_drivers": 4
   },
   "aliases": {
     "mno": [
@@ -234,5 +235,57 @@
       "threat": "Unclassified demand",
       "owner": "Support Ops (taxonomy owner)"
     }
-  }
+  },
+  "various_label": "Various topics",
+  "anomaly": {
+    "_comment": "A period-over-period move is only flagged when it clears BOTH a percentage and an absolute-case threshold, so small counts cannot manufacture a scary percentage.",
+    "pct_threshold": 25,
+    "min_abs_change": 5,
+    "bucket_pct_threshold": 40,
+    "bucket_min_abs": 5,
+    "z_threshold": 2.0,
+    "min_periods_for_z": 4
+  },
+  "subject_rules": [
+    [
+      "Incentives & Rewards",
+      "reward|incentive|\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|\\bcash\\b|bonus|sweepstake|missing .*(reward|point|payment)|not (?:been )?paid"
+    ],
+    [
+      "Account Access & Security",
+      "password|passwd|\\bpwd\\b|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\bump\\b|google[ _-]?account|lock(?:ed)? out|credential|reset .*account|can(?:no|')?t (?:log|sign)"
+    ],
+    [
+      "Hardware & Meter",
+      "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\bchrome\\b|\\bdevice\\b|equipment|hardware|modem|set[- ]?top|\\bstb\\b|dongle|battery|firmware|wi-?fi|connectivity|offline|not working|won'?t (?:work|turn|connect|power)|stopped working|no longer works|broken|faulty|not connect|keeps? (?:disconnect|drop)"
+    ],
+    [
+      "Logistics & Returns",
+      "\\bars\\b|return|\\bship|deliver|tracking|\\brma\\b|pick[- ]?up|appointment|field service|technician|dispatch|not (?:yet )?(?:arrived|received)|where is my"
+    ],
+    [
+      "Activity & Reactivation",
+      "activity|reactivat|inactiv|dormant|\\bpurge|participation|not credited|no credit"
+    ],
+    [
+      "Onboarding & Setup",
+      "set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up|new (?:member|panelist|household)"
+    ],
+    [
+      "Outbound & Callbacks",
+      "outbound|call ?back|follow[- ]?up call|please call"
+    ],
+    [
+      "Communications & Contact",
+      "\\bemail|bounce|undeliver|\\bsms\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number"
+    ],
+    [
+      "Billing & Tax",
+      "\\btax\\b|w-?9|1099|invoice|billing"
+    ],
+    [
+      "Complaint & Escalation",
+      "complaint|escalat|supervisor|dissatisf|legal|\\bbbb\\b"
+    ]
+  ]
 }

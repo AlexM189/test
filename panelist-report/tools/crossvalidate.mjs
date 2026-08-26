@@ -23,5 +23,12 @@ const out={
   fc_hist:(F.history||[]).map(h=>[h.label,h.point]),
   fc_q:(F.quarters||[]).map(q=>[q.label,q.point,q.low,q.high,q.fitted_months]),
   map_distinct:r.mapping.distinct, map_unmapped:r.mapping.unmapped_count,
+  inf:[r.inference.from_category,r.inference.from_subject,r.inference.unresolved,r.inference.pct_from_subject],
+  inf_kw:r.inference.keywords.map(k=>[k.bucket,k.keyword,k.count]),
+  drivers:r.drivers.map(x=>[x.rank,x.label,x.count,x.pct]),
+  wk:r.anomaly.weekly&&r.anomaly.weekly.computable?[r.anomaly.weekly.keys.length,r.anomaly.weekly.current,r.anomaly.weekly.previous,r.anomaly.weekly.pct_change,r.anomaly.weekly.z??null]:'NC',
+  mo:r.anomaly.monthly&&r.anomaly.monthly.computable?[r.anomaly.monthly.keys.length,r.anomaly.monthly.current,r.anomaly.monthly.previous,r.anomaly.monthly.pct_change,r.anomaly.monthly.z??null]:'NC',
+  alerts:r.anomaly.alerts.map(a=>[a.level,a.scope,a.text]),
+  most:r.most_received?[r.most_received.label,r.most_received.count,r.most_received.top_labels.map(l=>l.label),r.most_received.origin?r.most_received.origin.label:null]:null,
 };
 console.log(JSON.stringify(out));

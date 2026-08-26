@@ -80,6 +80,22 @@ either engine. (Requires `node`.)
 - **Primary category = the first label in the Category field.** One bucket per case,
   so section 1 shares sum to 100%. Secondary tags are counted separately as topic
   load against a case denominator, deliberately summing above 100%.
+- **Subject-line fallback.** When the Category field is blank or its primary label
+  matches no bucket rule, the subject line is matched against `subject_rules`
+  instead ("missing 100% reward" -> Incentives & Rewards). The report states how
+  many cases were placed this way, which buckets they went to, and Appendix A
+  lists every triggering keyword. Cases neither field can place stay in
+  Other / Unmapped and are counted separately. Only the matched keyword is ever
+  shown - never the subject text, which can carry identifying detail.
+- **Five call drivers everywhere.** `gates.top_drivers` (default 4) named buckets
+  plus one rolled-up "Various topics" row. The same five appear in the exec-summary
+  driver chart, the donut, the cross-tab columns and the trend lines, so no chart
+  carries more series than a reader can follow.
+- **Movement watch.** Week-over-week and month-over-month change on complete
+  calendar periods only, plus per-driver moves. A move is only flagged when it
+  clears both a percentage and an absolute-case threshold, so small counts cannot
+  manufacture an alarming percentage. Thresholds live in `rules.json` under
+  `anomaly`.
 - **Nothing is estimated.** Any figure that cannot be computed renders as a
   `NOT COMPUTABLE` panel naming the missing field or the sample size required.
   Gates: 30+ cases and 5+ joint occurrences for a lift figure, 3+ months for a

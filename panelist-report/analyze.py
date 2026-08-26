@@ -12,6 +12,11 @@ MIN_PERIODS_FIT = RULES["gates"]["min_periods_fit"]
 BUCKET_RULES    = [(n, p) for n, p in RULES["bucket_rules"]]
 BUCKETS         = [b for b, _ in BUCKET_RULES] + ["Other / Unmapped"]
 SIGNALS         = RULES["signals"]
+SUBJECT_RULES   = [(n, p) for n, p in RULES["subject_rules"]]
+TOP_DRIVERS     = RULES["gates"]["top_drivers"]
+VARIOUS         = RULES["various_label"]
+ANOM            = RULES["anomaly"]
+UNMAPPED        = "Other / Unmapped"
 
 _ws = lambda s: re.sub(r"\s+", " ", str(s or "")).strip()
 
@@ -32,11 +37,37 @@ def bucket_of(tag):
     return "Other / Unmapped"
 
 
+def bucket_from_subject(subject):
+    """Fallback when the Category field is blank or its primary label matches no
+    bucket rule: read the intent off the subject line instead. Returns
+    (bucket, matched_keyword) or (None, None). Only the matched keyword is ever
+    surfaced - never the subject text itself, which can carry identifying detail."""
+    t = _ws(subject).lower()
+    if not t:
+        return None, None
+    for name, pat in SUBJECT_RULES:
+        m = re.search(pat, t)
+        if m:
+            return name, _ws(m.group(0))[:40]
+    return None, None
+
+
 def derive(df):
     df = df.copy()
     df["tags"] = df.get("category", "").apply(split_tags)
     df["primary_category"] = df["tags"].apply(lambda t: t[0] if t else "")
-    df["bucket"] = df["primary_category"].apply(lambda t: bucket_of(t) if t else "Other / Unmapped")
+    df["bucket"] = df["primary_category"].apply(lambda t: bucket_of(t) if t else UNMAPPED)
+    df["bucket_source"] = "category"
+    df["inferred_keyword"] = ""
+    # anything the category field could not place gets a second pass over the subject
+    needs = df["bucket"] == UNMAPPED
+    if needs.any() and "subject" in df:
+        got = df.loc[needs, "subject"].apply(bucket_from_subject)
+        df.loc[needs, "bucket"] = [b if b else UNMAPPED for b, _ in got]
+        df.loc[needs, "bucket_source"] = ["subject" if b else "none" for b, _ in got]
+        df.loc[needs, "inferred_keyword"] = [k or "" for _, k in got]
+    elif needs.any():
+        df.loc[needs, "bucket_source"] = "none"
     df["tag_count"] = df["tags"].apply(len)
     # signal flags evaluated over the whole tag list + subject (never the description body)
     hay = df.apply(lambda r: (" | ".join(r["tags"]) + " | " + str(r.get("subject", ""))).lower(), axis=1)
@@ -300,6 +331,171 @@ def forecast_section(vol, df):
                          if vol.get("date_field_is_proxy") else "")}
 
 
+def inference_audit(df):
+    """How each case got its bucket, and on what evidence."""
+    n = len(df)
+    src = df["bucket_source"].value_counts().to_dict()
+    from_cat = int(src.get("category", 0))
+    from_sub = int(src.get("subject", 0))
+    none = int(src.get("none", 0))
+    rows = []
+    if from_sub:
+        sub = df[df["bucket_source"] == "subject"]
+        for (b, kw), c in sub.groupby(["bucket", "inferred_keyword"]).size().items():
+            rows.append({"bucket": b, "keyword": kw, "count": int(c)})
+        rows.sort(key=lambda r: (-r["count"], r["bucket"], r["keyword"]))
+    by_bucket = []
+    if from_sub:
+        for b, c in df[df["bucket_source"] == "subject"]["bucket"].value_counts().items():
+            by_bucket.append({"label": b, "count": int(c), "pct": pct(int(c), from_sub)})
+    return {"total": n, "from_category": from_cat, "from_subject": from_sub,
+            "unresolved": none,
+            "pct_from_subject": pct(from_sub, n), "pct_unresolved": pct(none, n),
+            "keywords": rows[:40], "by_bucket": by_bucket}
+
+
+def top_drivers(V):
+    """Top N named buckets plus one rolled-up row - the exec-summary call drivers."""
+    rows = V["bucket"]["rows"]
+    head = [dict(r, rank=i + 1) for i, r in enumerate(rows[:TOP_DRIVERS])]
+    tail = rows[TOP_DRIVERS:]
+    if tail:
+        head.append({"rank": len(head) + 1, "label": VARIOUS,
+                     "count": sum(r["count"] for r in tail),
+                     "pct": round(sum(r["pct"] for r in tail), 1),
+                     "rolled": [r["label"] for r in tail]})
+    return head
+
+
+def _plabel(p, freq):
+    """Readable period label: 2026-W30 for weeks, 2026-06 for months."""
+    if freq == "W":
+        iso = p.start_time.isocalendar()
+        return "%d-W%02d" % (iso[0], iso[1])
+    return str(p)
+
+
+def _series(df, freq):
+    """Complete calendar periods only - a partial first or last period would
+    read as a collapse in volume that never happened."""
+    d = df.dropna(subset=["_date"])
+    if d.empty:
+        return [], {}
+    lo, hi = d["_date"].min().normalize(), d["_date"].max().normalize()
+    per = d["_date"].dt.to_period(freq)
+    keys, counts = [], {}
+    for k in sorted(per.unique()):
+        if k.start_time.normalize() >= lo and k.end_time.normalize() <= hi:
+            lab = _plabel(k, freq)
+            keys.append(lab)
+            counts[lab] = int((per == k).sum())
+    return keys, counts
+
+
+def _bucket_series(df, freq, keys, buckets):
+    d = df.dropna(subset=["_date"]).copy()
+    d["_p"] = d["_date"].dt.to_period(freq).map(lambda p: _plabel(p, freq))
+    return {b: [int(((d["_p"] == k) & (d["bucket"] == b)).sum()) for k in keys] for b in buckets}
+
+
+def anomaly_section(df, V):
+    """Week-over-week and month-over-month movement, with anything unusual flagged.
+    A move must clear a percentage AND an absolute-case threshold to be reported."""
+    out = {"alerts": [], "weekly": None, "monthly": None}
+    if not df["_date"].notna().any():
+        out.update(_nc("no usable date column, so no period comparison is possible",
+                       ["a date column"]))
+        return out
+
+    def block(freq, label):
+        keys, counts = _series(df, freq)
+        if len(keys) < 2:
+            return {"computable": False, "periods": len(keys), "label": label,
+                    "reason": f"only {len(keys)} complete {label}(s) in range; 2+ needed"}
+        vals = [counts[k] for k in keys]
+        cur, prev = vals[-1], vals[-2]
+        chg = cur - prev
+        pc = round(100.0 * chg / prev, 1) if prev else None
+        b = {"computable": True, "label": label, "keys": keys, "values": vals,
+             "current": cur, "previous": prev, "change": chg, "pct_change": pc,
+             "current_key": keys[-1], "previous_key": keys[-2]}
+        if len(vals) >= ANOM["min_periods_for_z"]:
+            hist = vals[:-1]
+            mu = sum(hist) / len(hist)
+            var = sum((v - mu) ** 2 for v in hist) / max(len(hist) - 1, 1)
+            sd = math.sqrt(var)
+            b["mean_prior"] = round(mu, 1)
+            b["z"] = round((cur - mu) / sd, 2) if sd else None
+        return b
+
+    wk = block("W", "week")
+    mo = block("M", "month")
+    out["weekly"], out["monthly"] = wk, mo
+
+    def flag(b):
+        if not b.get("computable") or b.get("pct_change") is None:
+            return
+        pc, chg = b["pct_change"], b["change"]
+        if abs(pc) >= ANOM["pct_threshold"] and abs(chg) >= ANOM["min_abs_change"]:
+            out["alerts"].append({
+                "level": "up" if chg > 0 else "down", "scope": "total",
+                "text": f"Total volume {'rose' if chg > 0 else 'fell'} {abs(pc):.1f}% "
+                        f"{'to' if chg > 0 else 'to'} {b['current']} cases in {b['current_key']}, "
+                        f"from {b['previous']} in {b['previous_key']} "
+                        f"({chg:+d} cases {b['label']}-over-{b['label']})."})
+        z = b.get("z")
+        if z is not None and abs(z) >= ANOM["z_threshold"] and abs(chg) >= ANOM["min_abs_change"]:
+            out["alerts"].append({
+                "level": "up" if z > 0 else "down", "scope": "total",
+                "text": f"{b['current_key']} sits {abs(z):.1f} standard deviations "
+                        f"{'above' if z > 0 else 'below'} the mean of the preceding "
+                        f"{len(b['values']) - 1} {b['label']}s ({b['mean_prior']} cases)."})
+
+    flag(wk)
+    flag(mo)
+
+    # which category moved, not just how much
+    for b in (mo, wk):
+        if not b.get("computable"):
+            continue
+        names = [r["label"] for r in V["bucket"]["rows"][:TOP_DRIVERS + 2]]
+        ser = _bucket_series(df, "M" if b["label"] == "month" else "W", b["keys"], names)
+        for name in names:
+            v = ser[name]
+            cur, prev = v[-1], v[-2]
+            chg = cur - prev
+            if not prev:
+                continue
+            pc = 100.0 * chg / prev
+            if abs(pc) >= ANOM["bucket_pct_threshold"] and abs(chg) >= ANOM["bucket_min_abs"]:
+                out["alerts"].append({
+                    "level": "up" if chg > 0 else "down", "scope": "bucket",
+                    "text": f"{name} {'rose' if chg > 0 else 'fell'} {abs(pc):.0f}% "
+                            f"{b['label']}-over-{b['label']} ({prev} to {cur} cases, "
+                            f"{b['previous_key']} to {b['current_key']})."})
+        break   # report the monthly view when available, else weekly - not both
+
+    return out
+
+
+def most_received(df, V):
+    """Detail on the single largest driver, for the executive summary."""
+    if not V["bucket"]["rows"]:
+        return None
+    top = V["bucket"]["rows"][0]
+    sub = df[df["bucket"] == top["label"]]
+    labels = [{"label": k, "count": int(v)} for k, v in
+              sub["primary_category"].replace("", "(blank)").value_counts().head(3).items()]
+    origin = None
+    if "case_origin" in sub and sub["case_origin"].astype(str).str.strip().any():
+        vc = sub["case_origin"].replace("", "(blank)").value_counts()
+        origin = {"label": vc.index[0], "count": int(vc.iloc[0]),
+                  "pct": pct(int(vc.iloc[0]), len(sub))}
+    return {"label": top["label"], "count": top["count"], "pct": top["pct"],
+            "top_labels": labels, "origin": origin,
+            "members": int(sub["mno"].nunique()) if "mno" in sub else None}
+
+
 def mapping_audit(df):
     rows = defaultdict(lambda: {"count": 0, "bucket": ""})
     for lst in df["tags"]:
@@ -318,4 +514,8 @@ def run(df):
             "correlation": correlation_section(df),
             "forecast": forecast_section(vol, df),
             "mapping": mapping_audit(df),
+            "inference": inference_audit(df),
+            "drivers": top_drivers(vol),
+            "anomaly": anomaly_section(df, vol),
+            "most_received": most_received(df, vol),
             "buckets": BUCKETS}

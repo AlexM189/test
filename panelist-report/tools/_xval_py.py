@@ -19,5 +19,12 @@ out={
  "fc_hist":[[h["label"],h["point"]] for h in F.get("history",[])],
  "fc_q":[[q["label"],q["point"],q["low"],q["high"],q["fitted_months"]] for q in F.get("quarters",[])],
  "map_distinct":r["mapping"]["distinct"],"map_unmapped":r["mapping"]["unmapped_count"],
+ "inf":[r["inference"]["from_category"],r["inference"]["from_subject"],r["inference"]["unresolved"],r["inference"]["pct_from_subject"]],
+ "inf_kw":[[k["bucket"],k["keyword"],k["count"]] for k in r["inference"]["keywords"]],
+ "drivers":[[x["rank"],x["label"],x["count"],x["pct"]] for x in r["drivers"]],
+ "wk":([len(r["anomaly"]["weekly"]["keys"]),r["anomaly"]["weekly"]["current"],r["anomaly"]["weekly"]["previous"],r["anomaly"]["weekly"]["pct_change"],r["anomaly"]["weekly"].get("z")] if r["anomaly"]["weekly"] and r["anomaly"]["weekly"].get("computable") else "NC"),
+ "mo":([len(r["anomaly"]["monthly"]["keys"]),r["anomaly"]["monthly"]["current"],r["anomaly"]["monthly"]["previous"],r["anomaly"]["monthly"]["pct_change"],r["anomaly"]["monthly"].get("z")] if r["anomaly"]["monthly"] and r["anomaly"]["monthly"].get("computable") else "NC"),
+ "alerts":[[a["level"],a["scope"],a["text"]] for a in r["anomaly"]["alerts"]],
+ "most":([r["most_received"]["label"],r["most_received"]["count"],[l["label"] for l in r["most_received"]["top_labels"]],(r["most_received"]["origin"]["label"] if r["most_received"]["origin"] else None)] if r["most_received"] else None),
 }
 print(json.dumps(out))

@@ -125,6 +125,25 @@ ol.find b{display:block;margin-bottom:.15em}
   a{color:#000;text-decoration:none}
   @page{margin:14mm}
 }
+.alerts{display:flex;flex-direction:column;gap:9px;margin:14px 0 4px}
+.alert{display:flex;gap:11px;align-items:flex-start;border-left:3px solid var(--warn);
+  background:var(--surface-2);border-radius:0 10px 10px 0;padding:11px 14px;font-size:.89rem}
+.alert.down{border-left-color:var(--accent)}
+.alert.calm{border-left-color:var(--good)}
+.alert .dir{font-weight:700;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;
+  padding:3px 8px;border-radius:5px;background:var(--warn);color:#fff;white-space:nowrap;flex:none}
+.alert.down .dir{background:var(--accent)}
+.alert.calm .dir{background:var(--good)}
+.drivers{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  align-items:start;margin-top:12px}
+.rankno{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;
+  border-radius:6px;background:var(--surface);border:1px solid var(--border-strong);
+  font-size:.72rem;font-weight:700;color:var(--text-2);margin-right:8px;flex:none}
+tr.various td{color:var(--text-2)}
+.mr{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;
+  padding:14px 16px;margin:14px 0 4px}
+.mr .lead{font-size:.95rem;margin-bottom:.4em}
+.mr ul{margin:.4em 0 0;padding-left:1.15em;font-size:.87rem;color:var(--text-2)}
 </style>
 <style>/* Chrome for the upload tool itself - the report body brings its own styles. */
 .tool{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
@@ -213,8 +232,8 @@ ol.find b{display:block;margin-bottom:.15em}
 
 <script type="module">
 /* --- shared configuration (rules.json) --- */
-const RULES = JSON.parse("{\n  \"_comment\": \"Single source of truth for header aliases, bucket rules and correlation signals. Consumed by the Python CLI (ingest.py/analyze.py) and inlined into the browser tool at build time. Edit here, rebuild, and both stay in step.\",\n  \"gates\": {\n    \"min_cases_lift\": 30,\n    \"min_cooccurrence\": 5,\n    \"min_periods_fit\": 3,\n    \"preview_below\": 30\n  },\n  \"aliases\": {\n    \"mno\": [\n      \"mno\",\n      \"memberno\",\n      \"membernumber\",\n      \"memberid\",\n      \"panelistid\",\n      \"panelid\",\n      \"accountid\",\n      \"accountno\",\n      \"hhid\",\n      \"householdid\",\n      \"contactid\"\n    ],\n    \"member_status\": [\n      \"memberstatus\",\n      \"panelistatus\",\n      \"paneliststatus\",\n      \"accountstatus\",\n      \"status\"\n    ],\n    \"case_status\": [\n      \"casestatus\",\n      \"ticketstatus\",\n      \"statusreason\",\n      \"state\"\n    ],\n    \"case_origin\": [\n      \"caseorigin\",\n      \"origin\",\n      \"channel\",\n      \"casechannel\",\n      \"source\",\n      \"casesource\",\n      \"contactchannel\",\n      \"medium\"\n    ],\n    \"modified_on\": [\n      \"modifiedon\",\n      \"lastmodified\",\n      \"modifieddate\",\n      \"lastupdated\",\n      \"updatedon\"\n    ],\n    \"created_on\": [\n      \"createdon\",\n      \"createddate\",\n      \"opened\",\n      \"openeddate\",\n      \"openedon\",\n      \"casecreated\",\n      \"datecreated\",\n      \"casedate\",\n      \"contactdate\"\n    ],\n    \"closed_on\": [\n      \"closedon\",\n      \"closeddate\",\n      \"resolvedon\",\n      \"resolveddate\"\n    ],\n    \"subject\": [\n      \"subject\",\n      \"title\",\n      \"casetitle\",\n      \"summary\",\n      \"casesubject\"\n    ],\n    \"category\": [\n      \"category\",\n      \"categories\",\n      \"casetype\",\n      \"type\",\n      \"reason\",\n      \"casereason\",\n      \"topic\",\n      \"topics\",\n      \"issuetype\",\n      \"subject2\"\n    ],\n    \"description\": [\n      \"description\",\n      \"notes\",\n      \"details\",\n      \"casenotes\",\n      \"body\",\n      \"comments\"\n    ],\n    \"site\": [\n      \"site\",\n      \"office\",\n      \"location\",\n      \"center\",\n      \"callcenter\",\n      \"queue\",\n      \"team\",\n      \"region\"\n    ],\n    \"agent\": [\n      \"agent\",\n      \"owner\",\n      \"assignedto\",\n      \"caseowner\",\n      \"rep\",\n      \"csr\",\n      \"handler\"\n    ],\n    \"member_type\": [\n      \"membertype\",\n      \"relationship\",\n      \"householdrole\",\n      \"primarysecondary\",\n      \"role\"\n    ],\n    \"enrolled_on\": [\n      \"enrolledon\",\n      \"enrollmentdate\",\n      \"joindate\",\n      \"joinedon\",\n      \"installdate\",\n      \"startdate\",\n      \"tenurestart\",\n      \"signupdate\"\n    ]\n  },\n  \"bucket_rules\": [\n    [\n      \"Account Access & Security\",\n      \"password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|account security|security question|lock(?:ed)? out|credential\"\n    ],\n    [\n      \"Incentives & Rewards\",\n      \"incentive|reward|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|sweepstake|bonus|blocked reward\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tag requested|\\\\brma\\\\b|pick[- ]?up|tracking|appointment|field service|technician|install visit|dispatch\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|\\\\bpurge|dormant|non[- ]?complian|participation\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"email|bounce|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number change\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|bbb\"\n    ]\n  ],\n  \"signals\": {\n    \"hardware_meter\": \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|chrome|equipment|hardware|modem|offline|wi-?fi\",\n    \"activity\": \"activity|participation|non[- ]?complian\",\n    \"reactivation\": \"reactivat|inactiv|dormant|\\\\bpurge\",\n    \"blocked_reward\": \"blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)\",\n    \"reward_any\": \"incentive|reward|\\\\bpoint|prepaid|visa|redeem\",\n    \"email_issue\": \"email|bounce|undeliver|mailing\",\n    \"password_access\": \"password|login|sign[- ]?in|\\\\bump\\\\b|credential|lock(?:ed)? out\",\n    \"google_account\": \"google[ _-]?account|google[ _-]?android|gmail|google chrome\",\n    \"outbound_cb\": \"outbound|call ?back\",\n    \"returns_ars\": \"\\\\bars\\\\b|return|tag requested|\\\\brma\\\\b\",\n    \"shipping\": \"\\\\bship|deliver|tracking\",\n    \"appointment\": \"appointment|field service|technician|dispatch|install visit\",\n    \"lost_stolen\": \"lost or stolen|lost/stolen|stolen\",\n    \"setup\": \"set[- ]?up|install|how to|onboard\"\n  },\n  \"risk_profile\": {\n    \"Hardware & Meter\": {\n      \"threat\": \"Panel data loss, cost-to-serve\",\n      \"owner\": \"Engineering / Product (metering)\"\n    },\n    \"Activity & Reactivation\": {\n      \"threat\": \"Panelist churn, panel representativeness\",\n      \"owner\": \"Panel Operations\"\n    },\n    \"Incentives & Rewards\": {\n      \"threat\": \"Trust and brand reputation, repeat contact\",\n      \"owner\": \"Rewards / Finance Ops\"\n    },\n    \"Account Access & Security\": {\n      \"threat\": \"Lockout-driven churn, onboarding failure\",\n      \"owner\": \"Identity / Engineering\"\n    },\n    \"Logistics & Returns\": {\n      \"threat\": \"Cost-to-serve, unrecovered assets\",\n      \"owner\": \"Field Service / Logistics\"\n    },\n    \"Onboarding & Setup\": {\n      \"threat\": \"Early-life churn\",\n      \"owner\": \"Panel Operations / Support Ops\"\n    },\n    \"Outbound & Callbacks\": {\n      \"threat\": \"Handling cost, channel breakdown\",\n      \"owner\": \"WFM / Support Ops\"\n    },\n    \"Communications & Contact\": {\n      \"threat\": \"Deliverability and contactability\",\n      \"owner\": \"CRM / Marketing Ops\"\n    },\n    \"Billing & Tax\": {\n      \"threat\": \"Compliance exposure\",\n      \"owner\": \"Finance\"\n    },\n    \"Complaint & Escalation\": {\n      \"threat\": \"Brand reputation\",\n      \"owner\": \"Support Ops leadership\"\n    },\n    \"Other / Unmapped\": {\n      \"threat\": \"Unclassified demand\",\n      \"owner\": \"Support Ops (taxonomy owner)\"\n    }\n  }\n}");
-const CSS = "*,*::before,*::after{box-sizing:border-box}\n:root{\n  color-scheme:light;\n  --bg:#f7f7f5; --surface:#fcfcfb; --surface-2:#f1f1ee; --border:#e0e0da; --border-strong:#c9c9c1;\n  --text:#111110; --text-2:#52514e; --text-3:#7a7973;\n  --accent:#2a78d6; --good:#1a7f4b; --warn:#b26a00; --bad:#c0392f; --na:#8a8a82;\n  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;\n  --seq0:#cde2fb;--seq1:#9ec5f4;--seq2:#6da7ec;--seq3:#3987e5;--seq4:#256abf;--seq5:#184f95;--seq6:#0d366b;\n  --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);\n}\n@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}}\n:root[data-theme=\"dark\"]{\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}\nhtml{-webkit-text-size-adjust:100%}\nbody{margin:0;background:var(--bg);color:var(--text);\n  font:16px/1.62 ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif;\n  font-feature-settings:\"tnum\" 0}\n.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}\nh1,h2,h3,h4{line-height:1.25;margin:0 0 .4em;font-weight:640;letter-spacing:-.01em}\nh1{font-size:clamp(1.6rem,4.4vw,2.3rem)}\nh2{font-size:clamp(1.25rem,3vw,1.6rem);margin-top:0}\nh3{font-size:1.06rem;margin-top:1.6em}\nh4{font-size:.95rem;margin-top:1.3em;color:var(--text-2)}\np{margin:0 0 1em}\na{color:var(--accent)}\n.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}\n.num{font-variant-numeric:tabular-nums}\nheader.rpt{border-bottom:2px solid var(--border-strong);padding-bottom:18px;margin-bottom:26px}\n.eyebrow{text-transform:uppercase;letter-spacing:.11em;font-size:.7rem;font-weight:700;color:var(--text-3);margin:0 0 .5em}\n.sub{color:var(--text-2);font-size:.95rem;margin:.3em 0 0}\n.toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px}\n.btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text-2);\n  border-radius:8px;padding:6px 11px;font-size:.8rem;cursor:pointer;font-family:inherit}\n.btn:hover{color:var(--text);border-color:var(--accent)}\nsection.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;\n  padding:22px 22px 26px;margin:0 0 22px;box-shadow:var(--shadow)}\n.secnum{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;\n  border-radius:7px;background:var(--accent);color:#fff;font-size:.8rem;font-weight:700;margin-right:9px}\n.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin:18px 0 6px}\n.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:13px 14px}\n.stat .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);font-weight:700}\n.stat .v{font-size:clamp(1.35rem,3.4vw,1.85rem);font-weight:680;letter-spacing:-.02em;margin:.16em 0 .05em;\n  font-variant-numeric:tabular-nums}\n.stat .d{font-size:.78rem;color:var(--text-2);line-height:1.35}\n.grid2{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:start}\nfigure{margin:0}\nfigcaption{font-size:.82rem;color:var(--text-3);margin-top:8px}\nsvg{display:block;width:100%;height:auto;overflow:visible}\ntable{border-collapse:collapse;width:100%;font-size:.855rem;margin:10px 0}\nth,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border)}\nth{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:700;\n  border-bottom:1px solid var(--border-strong);white-space:nowrap}\ntd.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}\ntbody tr:hover{background:var(--surface-2)}\n.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}\n.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:baseline}\n.legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin:12px 0 2px;font-size:.82rem;color:var(--text-2)}\n.na{border-left:3px solid var(--na);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0}\n.na .t{font-weight:680;color:var(--text);font-size:.9rem;display:flex;align-items:center;gap:7px}\n.na .t::before{content:\"NOT COMPUTABLE\";font-size:.62rem;letter-spacing:.08em;background:var(--na);\n  color:#fff;padding:2px 6px;border-radius:4px;font-weight:700}\n.na p{margin:.5em 0 0;font-size:.87rem;color:var(--text-2)}\n.na ul{margin:.5em 0 0;padding-left:1.2em;font-size:.87rem;color:var(--text-2)}\n.callout{border-left:3px solid var(--warn);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0;font-size:.89rem}\n.callout.info{border-left-color:var(--accent)}\n.callout .t{font-weight:680;font-size:.9rem;margin-bottom:.3em}\nol.find{counter-reset:f;list-style:none;padding:0;margin:14px 0 0}\nol.find li{counter-increment:f;position:relative;padding:0 0 0 40px;margin:0 0 15px}\nol.find li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;\n  border-radius:7px;background:var(--surface-2);border:1px solid var(--border-strong);\n  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;color:var(--text-2)}\nol.find b{display:block;margin-bottom:.15em}\n.rec{border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin:0 0 12px;background:var(--surface-2)}\n.rec .h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:.45em}\n.pill{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;\n  padding:3px 8px;border-radius:20px;border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}\n.pill.p1{background:var(--bad);border-color:var(--bad);color:#fff}\n.pill.p2{background:var(--warn);border-color:var(--warn);color:#fff}\n.pill.p3{background:var(--surface);color:var(--text-2)}\n.pill.v-supported{background:var(--good);border-color:var(--good);color:#fff}\n.pill.v-none{background:var(--surface);color:var(--text-3)}\n.pill.v-inverse{background:var(--surface);color:var(--text-3)}\n.rec .ties{font-size:.8rem;color:var(--text-3);margin-top:.5em}\n.tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--text);\n  color:var(--bg);padding:6px 9px;border-radius:7px;font-size:.78rem;font-weight:560;z-index:99;\n  white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.28)}\n.tip.on{opacity:1}\n.hit{cursor:default}\n.hit:hover{filter:brightness(1.08)}\n.foot{color:var(--text-3);font-size:.8rem;border-top:1px solid var(--border);padding-top:16px;margin-top:8px}\n@media (max-width:600px){.wrap{padding:16px 13px 60px}section.card{padding:17px 15px 20px;border-radius:11px}\n  .toolbar{position:static;justify-content:flex-end;margin-bottom:10px}}\n@media print{\n  :root{--bg:#fff;--surface:#fff;--surface-2:#f4f4f2;--border:#ccc;--border-strong:#888;\n        --text:#000;--text-2:#333;--text-3:#555;color-scheme:light}\n  body{background:#fff;font-size:10.5pt}\n  .wrap{max-width:none;padding:0}\n  .toolbar,.tip{display:none!important}\n  section.card{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border:1px solid #bbb;margin-bottom:14px}\n  h2{break-after:avoid}\n  figure,table,.rec,.na{break-inside:avoid}\n  a{color:#000;text-decoration:none}\n  @page{margin:14mm}\n}\n";
+const RULES = JSON.parse("{\n  \"_comment\": \"Single source of truth for header aliases, bucket rules and correlation signals. Consumed by the Python CLI (ingest.py/analyze.py) and inlined into the browser tool at build time. Edit here, rebuild, and both stay in step.\",\n  \"gates\": {\n    \"min_cases_lift\": 30,\n    \"min_cooccurrence\": 5,\n    \"min_periods_fit\": 3,\n    \"preview_below\": 30,\n    \"top_drivers\": 4\n  },\n  \"aliases\": {\n    \"mno\": [\n      \"mno\",\n      \"memberno\",\n      \"membernumber\",\n      \"memberid\",\n      \"panelistid\",\n      \"panelid\",\n      \"accountid\",\n      \"accountno\",\n      \"hhid\",\n      \"householdid\",\n      \"contactid\"\n    ],\n    \"member_status\": [\n      \"memberstatus\",\n      \"panelistatus\",\n      \"paneliststatus\",\n      \"accountstatus\",\n      \"status\"\n    ],\n    \"case_status\": [\n      \"casestatus\",\n      \"ticketstatus\",\n      \"statusreason\",\n      \"state\"\n    ],\n    \"case_origin\": [\n      \"caseorigin\",\n      \"origin\",\n      \"channel\",\n      \"casechannel\",\n      \"source\",\n      \"casesource\",\n      \"contactchannel\",\n      \"medium\"\n    ],\n    \"modified_on\": [\n      \"modifiedon\",\n      \"lastmodified\",\n      \"modifieddate\",\n      \"lastupdated\",\n      \"updatedon\"\n    ],\n    \"created_on\": [\n      \"createdon\",\n      \"createddate\",\n      \"opened\",\n      \"openeddate\",\n      \"openedon\",\n      \"casecreated\",\n      \"datecreated\",\n      \"casedate\",\n      \"contactdate\"\n    ],\n    \"closed_on\": [\n      \"closedon\",\n      \"closeddate\",\n      \"resolvedon\",\n      \"resolveddate\"\n    ],\n    \"subject\": [\n      \"subject\",\n      \"title\",\n      \"casetitle\",\n      \"summary\",\n      \"casesubject\"\n    ],\n    \"category\": [\n      \"category\",\n      \"categories\",\n      \"casetype\",\n      \"type\",\n      \"reason\",\n      \"casereason\",\n      \"topic\",\n      \"topics\",\n      \"issuetype\",\n      \"subject2\"\n    ],\n    \"description\": [\n      \"description\",\n      \"notes\",\n      \"details\",\n      \"casenotes\",\n      \"body\",\n      \"comments\"\n    ],\n    \"site\": [\n      \"site\",\n      \"office\",\n      \"location\",\n      \"center\",\n      \"callcenter\",\n      \"queue\",\n      \"team\",\n      \"region\"\n    ],\n    \"agent\": [\n      \"agent\",\n      \"owner\",\n      \"assignedto\",\n      \"caseowner\",\n      \"rep\",\n      \"csr\",\n      \"handler\"\n    ],\n    \"member_type\": [\n      \"membertype\",\n      \"relationship\",\n      \"householdrole\",\n      \"primarysecondary\",\n      \"role\"\n    ],\n    \"enrolled_on\": [\n      \"enrolledon\",\n      \"enrollmentdate\",\n      \"joindate\",\n      \"joinedon\",\n      \"installdate\",\n      \"startdate\",\n      \"tenurestart\",\n      \"signupdate\"\n    ]\n  },\n  \"bucket_rules\": [\n    [\n      \"Account Access & Security\",\n      \"password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|account security|security question|lock(?:ed)? out|credential\"\n    ],\n    [\n      \"Incentives & Rewards\",\n      \"incentive|reward|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|sweepstake|bonus|blocked reward\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tag requested|\\\\brma\\\\b|pick[- ]?up|tracking|appointment|field service|technician|install visit|dispatch\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|\\\\bpurge|dormant|non[- ]?complian|participation\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"email|bounce|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number change\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|bbb\"\n    ]\n  ],\n  \"signals\": {\n    \"hardware_meter\": \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|chrome|equipment|hardware|modem|offline|wi-?fi\",\n    \"activity\": \"activity|participation|non[- ]?complian\",\n    \"reactivation\": \"reactivat|inactiv|dormant|\\\\bpurge\",\n    \"blocked_reward\": \"blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)\",\n    \"reward_any\": \"incentive|reward|\\\\bpoint|prepaid|visa|redeem\",\n    \"email_issue\": \"email|bounce|undeliver|mailing\",\n    \"password_access\": \"password|login|sign[- ]?in|\\\\bump\\\\b|credential|lock(?:ed)? out\",\n    \"google_account\": \"google[ _-]?account|google[ _-]?android|gmail|google chrome\",\n    \"outbound_cb\": \"outbound|call ?back\",\n    \"returns_ars\": \"\\\\bars\\\\b|return|tag requested|\\\\brma\\\\b\",\n    \"shipping\": \"\\\\bship|deliver|tracking\",\n    \"appointment\": \"appointment|field service|technician|dispatch|install visit\",\n    \"lost_stolen\": \"lost or stolen|lost/stolen|stolen\",\n    \"setup\": \"set[- ]?up|install|how to|onboard\"\n  },\n  \"risk_profile\": {\n    \"Hardware & Meter\": {\n      \"threat\": \"Panel data loss, cost-to-serve\",\n      \"owner\": \"Engineering / Product (metering)\"\n    },\n    \"Activity & Reactivation\": {\n      \"threat\": \"Panelist churn, panel representativeness\",\n      \"owner\": \"Panel Operations\"\n    },\n    \"Incentives & Rewards\": {\n      \"threat\": \"Trust and brand reputation, repeat contact\",\n      \"owner\": \"Rewards / Finance Ops\"\n    },\n    \"Account Access & Security\": {\n      \"threat\": \"Lockout-driven churn, onboarding failure\",\n      \"owner\": \"Identity / Engineering\"\n    },\n    \"Logistics & Returns\": {\n      \"threat\": \"Cost-to-serve, unrecovered assets\",\n      \"owner\": \"Field Service / Logistics\"\n    },\n    \"Onboarding & Setup\": {\n      \"threat\": \"Early-life churn\",\n      \"owner\": \"Panel Operations / Support Ops\"\n    },\n    \"Outbound & Callbacks\": {\n      \"threat\": \"Handling cost, channel breakdown\",\n      \"owner\": \"WFM / Support Ops\"\n    },\n    \"Communications & Contact\": {\n      \"threat\": \"Deliverability and contactability\",\n      \"owner\": \"CRM / Marketing Ops\"\n    },\n    \"Billing & Tax\": {\n      \"threat\": \"Compliance exposure\",\n      \"owner\": \"Finance\"\n    },\n    \"Complaint & Escalation\": {\n      \"threat\": \"Brand reputation\",\n      \"owner\": \"Support Ops leadership\"\n    },\n    \"Other / Unmapped\": {\n      \"threat\": \"Unclassified demand\",\n      \"owner\": \"Support Ops (taxonomy owner)\"\n    }\n  },\n  \"various_label\": \"Various topics\",\n  \"anomaly\": {\n    \"_comment\": \"A period-over-period move is only flagged when it clears BOTH a percentage and an absolute-case threshold, so small counts cannot manufacture a scary percentage.\",\n    \"pct_threshold\": 25,\n    \"min_abs_change\": 5,\n    \"bucket_pct_threshold\": 40,\n    \"bucket_min_abs\": 5,\n    \"z_threshold\": 2.0,\n    \"min_periods_for_z\": 4\n  },\n  \"subject_rules\": [\n    [\n      \"Incentives & Rewards\",\n      \"reward|incentive|\\\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|\\\\bcash\\\\b|bonus|sweepstake|missing .*(reward|point|payment)|not (?:been )?paid\"\n    ],\n    [\n      \"Account Access & Security\",\n      \"password|passwd|\\\\bpwd\\\\b|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\\\bump\\\\b|google[ _-]?account|lock(?:ed)? out|credential|reset .*account|can(?:no|')?t (?:log|sign)\"\n    ],\n    [\n      \"Hardware & Meter\",\n      \"tv meter|\\\\bmeter\\\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\\\bchrome\\\\b|\\\\bdevice\\\\b|equipment|hardware|modem|set[- ]?top|\\\\bstb\\\\b|dongle|battery|firmware|wi-?fi|connectivity|offline|not working|won'?t (?:work|turn|connect|power)|stopped working|no longer works|broken|faulty|not connect|keeps? (?:disconnect|drop)\"\n    ],\n    [\n      \"Logistics & Returns\",\n      \"\\\\bars\\\\b|return|\\\\bship|deliver|tracking|\\\\brma\\\\b|pick[- ]?up|appointment|field service|technician|dispatch|not (?:yet )?(?:arrived|received)|where is my\"\n    ],\n    [\n      \"Activity & Reactivation\",\n      \"activity|reactivat|inactiv|dormant|\\\\bpurge|participation|not credited|no credit\"\n    ],\n    [\n      \"Onboarding & Setup\",\n      \"set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up|new (?:member|panelist|household)\"\n    ],\n    [\n      \"Outbound & Callbacks\",\n      \"outbound|call ?back|follow[- ]?up call|please call\"\n    ],\n    [\n      \"Communications & Contact\",\n      \"\\\\bemail|bounce|undeliver|\\\\bsms\\\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number\"\n    ],\n    [\n      \"Billing & Tax\",\n      \"\\\\btax\\\\b|w-?9|1099|invoice|billing\"\n    ],\n    [\n      \"Complaint & Escalation\",\n      \"complaint|escalat|supervisor|dissatisf|legal|\\\\bbbb\\\\b\"\n    ]\n  ]\n}");
+const CSS = "*,*::before,*::after{box-sizing:border-box}\n:root{\n  color-scheme:light;\n  --bg:#f7f7f5; --surface:#fcfcfb; --surface-2:#f1f1ee; --border:#e0e0da; --border-strong:#c9c9c1;\n  --text:#111110; --text-2:#52514e; --text-3:#7a7973;\n  --accent:#2a78d6; --good:#1a7f4b; --warn:#b26a00; --bad:#c0392f; --na:#8a8a82;\n  --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--s5:#e87ba4;--s6:#008300;--s7:#4a3aa7;--s8:#e34948;\n  --seq0:#cde2fb;--seq1:#9ec5f4;--seq2:#6da7ec;--seq3:#3987e5;--seq4:#256abf;--seq5:#184f95;--seq6:#0d366b;\n  --shadow:0 1px 2px rgba(0,0,0,.05),0 4px 14px rgba(0,0,0,.04);\n}\n@media (prefers-color-scheme:dark){:root:not([data-theme=\"light\"]){\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}}\n:root[data-theme=\"dark\"]{\n  color-scheme:dark;\n  --bg:#131312; --surface:#1a1a19; --surface-2:#232322; --border:#33332f; --border-strong:#4a4a45;\n  --text:#f5f5f2; --text-2:#c3c2b7; --text-3:#93938a;\n  --accent:#3987e5; --good:#3fa96f; --warn:#d99a24; --bad:#e66767; --na:#8a8a82;\n  --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--s5:#d55181;--s6:#008300;--s7:#9085e9;--s8:#e66767;\n  --seq0:#0d366b;--seq1:#184f95;--seq2:#256abf;--seq3:#3987e5;--seq4:#6da7ec;--seq5:#9ec5f4;--seq6:#cde2fb;\n  --shadow:0 1px 2px rgba(0,0,0,.3),0 4px 14px rgba(0,0,0,.25);\n}\nhtml{-webkit-text-size-adjust:100%}\nbody{margin:0;background:var(--bg);color:var(--text);\n  font:16px/1.62 ui-sans-serif,system-ui,-apple-system,\"Segoe UI\",Roboto,Helvetica,Arial,sans-serif;\n  font-feature-settings:\"tnum\" 0}\n.wrap{max-width:1180px;margin:0 auto;padding:28px 20px 80px}\nh1,h2,h3,h4{line-height:1.25;margin:0 0 .4em;font-weight:640;letter-spacing:-.01em}\nh1{font-size:clamp(1.6rem,4.4vw,2.3rem)}\nh2{font-size:clamp(1.25rem,3vw,1.6rem);margin-top:0}\nh3{font-size:1.06rem;margin-top:1.6em}\nh4{font-size:.95rem;margin-top:1.3em;color:var(--text-2)}\np{margin:0 0 1em}\na{color:var(--accent)}\n.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86em}\n.num{font-variant-numeric:tabular-nums}\nheader.rpt{border-bottom:2px solid var(--border-strong);padding-bottom:18px;margin-bottom:26px}\n.eyebrow{text-transform:uppercase;letter-spacing:.11em;font-size:.7rem;font-weight:700;color:var(--text-3);margin:0 0 .5em}\n.sub{color:var(--text-2);font-size:.95rem;margin:.3em 0 0}\n.toolbar{position:absolute;top:16px;right:16px;display:flex;gap:8px}\n.btn{background:var(--surface);border:1px solid var(--border-strong);color:var(--text-2);\n  border-radius:8px;padding:6px 11px;font-size:.8rem;cursor:pointer;font-family:inherit}\n.btn:hover{color:var(--text);border-color:var(--accent)}\nsection.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;\n  padding:22px 22px 26px;margin:0 0 22px;box-shadow:var(--shadow)}\n.secnum{display:inline-flex;align-items:center;justify-content:center;min-width:26px;height:26px;\n  border-radius:7px;background:var(--accent);color:#fff;font-size:.8rem;font-weight:700;margin-right:9px}\n.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));margin:18px 0 6px}\n.stat{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:13px 14px}\n.stat .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);font-weight:700}\n.stat .v{font-size:clamp(1.35rem,3.4vw,1.85rem);font-weight:680;letter-spacing:-.02em;margin:.16em 0 .05em;\n  font-variant-numeric:tabular-nums}\n.stat .d{font-size:.78rem;color:var(--text-2);line-height:1.35}\n.grid2{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));align-items:start}\nfigure{margin:0}\nfigcaption{font-size:.82rem;color:var(--text-3);margin-top:8px}\nsvg{display:block;width:100%;height:auto;overflow:visible}\ntable{border-collapse:collapse;width:100%;font-size:.855rem;margin:10px 0}\nth,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border)}\nth{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);font-weight:700;\n  border-bottom:1px solid var(--border-strong);white-space:nowrap}\ntd.n,th.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}\ntbody tr:hover{background:var(--surface-2)}\n.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%}\n.swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:7px;vertical-align:baseline}\n.legend{display:flex;flex-wrap:wrap;gap:7px 16px;margin:12px 0 2px;font-size:.82rem;color:var(--text-2)}\n.na{border-left:3px solid var(--na);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0}\n.na .t{font-weight:680;color:var(--text);font-size:.9rem;display:flex;align-items:center;gap:7px}\n.na .t::before{content:\"NOT COMPUTABLE\";font-size:.62rem;letter-spacing:.08em;background:var(--na);\n  color:#fff;padding:2px 6px;border-radius:4px;font-weight:700}\n.na p{margin:.5em 0 0;font-size:.87rem;color:var(--text-2)}\n.na ul{margin:.5em 0 0;padding-left:1.2em;font-size:.87rem;color:var(--text-2)}\n.callout{border-left:3px solid var(--warn);background:var(--surface-2);border-radius:0 10px 10px 0;\n  padding:13px 15px;margin:14px 0;font-size:.89rem}\n.callout.info{border-left-color:var(--accent)}\n.callout .t{font-weight:680;font-size:.9rem;margin-bottom:.3em}\nol.find{counter-reset:f;list-style:none;padding:0;margin:14px 0 0}\nol.find li{counter-increment:f;position:relative;padding:0 0 0 40px;margin:0 0 15px}\nol.find li::before{content:counter(f);position:absolute;left:0;top:1px;width:26px;height:26px;\n  border-radius:7px;background:var(--surface-2);border:1px solid var(--border-strong);\n  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.82rem;color:var(--text-2)}\nol.find b{display:block;margin-bottom:.15em}\n.rec{border:1px solid var(--border);border-radius:11px;padding:14px 15px;margin:0 0 12px;background:var(--surface-2)}\n.rec .h{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:.45em}\n.pill{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;font-weight:700;\n  padding:3px 8px;border-radius:20px;border:1px solid var(--border-strong);color:var(--text-2);white-space:nowrap}\n.pill.p1{background:var(--bad);border-color:var(--bad);color:#fff}\n.pill.p2{background:var(--warn);border-color:var(--warn);color:#fff}\n.pill.p3{background:var(--surface);color:var(--text-2)}\n.pill.v-supported{background:var(--good);border-color:var(--good);color:#fff}\n.pill.v-none{background:var(--surface);color:var(--text-3)}\n.pill.v-inverse{background:var(--surface);color:var(--text-3)}\n.rec .ties{font-size:.8rem;color:var(--text-3);margin-top:.5em}\n.tip{position:fixed;pointer-events:none;opacity:0;transition:opacity .1s;background:var(--text);\n  color:var(--bg);padding:6px 9px;border-radius:7px;font-size:.78rem;font-weight:560;z-index:99;\n  white-space:nowrap;box-shadow:0 3px 12px rgba(0,0,0,.28)}\n.tip.on{opacity:1}\n.hit{cursor:default}\n.hit:hover{filter:brightness(1.08)}\n.foot{color:var(--text-3);font-size:.8rem;border-top:1px solid var(--border);padding-top:16px;margin-top:8px}\n@media (max-width:600px){.wrap{padding:16px 13px 60px}section.card{padding:17px 15px 20px;border-radius:11px}\n  .toolbar{position:static;justify-content:flex-end;margin-bottom:10px}}\n@media print{\n  :root{--bg:#fff;--surface:#fff;--surface-2:#f4f4f2;--border:#ccc;--border-strong:#888;\n        --text:#000;--text-2:#333;--text-3:#555;color-scheme:light}\n  body{background:#fff;font-size:10.5pt}\n  .wrap{max-width:none;padding:0}\n  .toolbar,.tip{display:none!important}\n  section.card{break-inside:avoid;page-break-inside:avoid;box-shadow:none;border:1px solid #bbb;margin-bottom:14px}\n  h2{break-after:avoid}\n  figure,table,.rec,.na{break-inside:avoid}\n  a{color:#000;text-decoration:none}\n  @page{margin:14mm}\n}\n.alerts{display:flex;flex-direction:column;gap:9px;margin:14px 0 4px}\n.alert{display:flex;gap:11px;align-items:flex-start;border-left:3px solid var(--warn);\n  background:var(--surface-2);border-radius:0 10px 10px 0;padding:11px 14px;font-size:.89rem}\n.alert.down{border-left-color:var(--accent)}\n.alert.calm{border-left-color:var(--good)}\n.alert .dir{font-weight:700;font-size:.66rem;letter-spacing:.06em;text-transform:uppercase;\n  padding:3px 8px;border-radius:5px;background:var(--warn);color:#fff;white-space:nowrap;flex:none}\n.alert.down .dir{background:var(--accent)}\n.alert.calm .dir{background:var(--good)}\n.drivers{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));\n  align-items:start;margin-top:12px}\n.rankno{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;\n  border-radius:6px;background:var(--surface);border:1px solid var(--border-strong);\n  font-size:.72rem;font-weight:700;color:var(--text-2);margin-right:8px;flex:none}\ntr.various td{color:var(--text-2)}\n.mr{background:var(--surface-2);border:1px solid var(--border);border-radius:11px;\n  padding:14px 16px;margin:14px 0 4px}\n.mr .lead{font-size:.95rem;margin-bottom:.4em}\n.mr ul{margin:.4em 0 0;padding-left:1.15em;font-size:.87rem;color:var(--text-2)}\n";
 const RUNTIME_JS = "window.__reportInit = function(root){\n  root = root || document;\n  var r=document.documentElement, K='panelist-report-theme';\n  try{var s=localStorage.getItem(K); if(s) r.setAttribute('data-theme',s);}catch(e){}\n  var b=root.getElementById ? root.getElementById('themeBtn') : root.querySelector('#themeBtn');\n  if(b) b.addEventListener('click',function(){\n    var cur=r.getAttribute('data-theme');\n    if(!cur) cur = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark':'light';\n    var nxt = cur==='dark' ? 'light':'dark';\n    r.setAttribute('data-theme',nxt);\n    try{localStorage.setItem(K,nxt);}catch(e){}\n  });\n  var pb=root.getElementById ? root.getElementById('printBtn') : root.querySelector('#printBtn'); if(pb) pb.addEventListener('click',function(){window.print();});\n  var tip=document.querySelector('body > .tip');\n  if(!tip){ tip=document.createElement('div'); tip.className='tip'; document.body.appendChild(tip); }\n  function show(e){\n    var t=e.currentTarget.getAttribute('data-tip'); if(!t) return;\n    tip.textContent=t; tip.classList.add('on');\n    var x=e.clientX+14, y=e.clientY-34, w=tip.offsetWidth||140;\n    if(x+w>innerWidth-8) x=e.clientX-w-14; if(y<6) y=e.clientY+20;\n    tip.style.left=x+'px'; tip.style.top=y+'px';\n  }\n  function hide(){tip.classList.remove('on');}\n  root.querySelectorAll('[data-tip]').forEach(function(el){\n    if(el.__tipBound) return; el.__tipBound=true;\n    el.classList.add('hit');\n    el.addEventListener('mousemove',show); el.addEventListener('mouseenter',show);\n    el.addEventListener('mouseleave',hide);\n    el.addEventListener('touchstart',function(ev){show(ev.touches?{clientX:ev.touches[0].clientX,\n      clientY:ev.touches[0].clientY,currentTarget:el}:ev);},{passive:true});\n  });\n};\nif (document.readyState === 'loading')\n  document.addEventListener('DOMContentLoaded', function(){ window.__reportInit(document); });\nelse window.__reportInit(document);\n";
 
 /* --- report runtime (theme toggle, tooltips) --- */
@@ -530,6 +549,11 @@ function makeEngine(RULES) {
   const MIN_PERIODS_FIT = G.min_periods_fit;
   const BUCKET_RULES = RULES.bucket_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
   const SIGNALS = Object.entries(RULES.signals).map(([k, p]) => [k, new RegExp(p, "i")]);
+  const SUBJECT_RULES = RULES.subject_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
+  const TOP_DRIVERS = G.top_drivers;
+  const VARIOUS = RULES.various_label;
+  const ANOM = RULES.anomaly;
+  const UNMAPPED = "Other / Unmapped";
   const norm = s => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const ws = s => String(s ?? "").replace(/\s+/g, " ").trim();
   const pct = (n, d) => (d ? Math.round(1000 * n / d) / 10 : 0);
@@ -598,6 +622,20 @@ function makeEngine(RULES) {
     return "Other / Unmapped";
   }
 
+  /* Fallback when the Category field is blank or its primary label matches no
+     bucket rule: read the intent off the subject line instead. Only the matched
+     keyword is ever surfaced - never the subject text, which can carry
+     identifying detail. */
+  function bucketFromSubject(subject) {
+    const t = ws(subject).toLowerCase();
+    if (!t) return [null, null];
+    for (const [name, re] of SUBJECT_RULES) {
+      const m = re.exec(t);
+      if (m) return [name, ws(m[0]).slice(0, 40)];
+    }
+    return [null, null];
+  }
+
   function buildRecords(tables) {
     const recs = [], prov = [];
     for (const t of tables) {
@@ -648,7 +686,14 @@ function makeEngine(RULES) {
     for (const r of recs) {
       r.tags = splitTags(r.category);
       r.primary_category = r.tags[0] || "";
-      r.bucket = r.primary_category ? bucketOf(r.primary_category) : "Other / Unmapped";
+      r.bucket = r.primary_category ? bucketOf(r.primary_category) : UNMAPPED;
+      r.bucket_source = "category";
+      r.inferred_keyword = "";
+      if (r.bucket === UNMAPPED) {
+        const [b, kw] = bucketFromSubject(r.subject);
+        if (b) { r.bucket = b; r.bucket_source = "subject"; r.inferred_keyword = kw; }
+        else r.bucket_source = "none";
+      }
       r.tag_count = r.tags.length;
       const hay = (r.tags.join(" | ") + " | " + (r.subject || "")).toLowerCase();
       r.sig = {};
@@ -905,6 +950,182 @@ function makeEngine(RULES) {
           ? " Fitted on Modified On, which records last touch rather than case arrival." : "") };
   }
 
+  function inferenceAudit(recs) {
+    const n = recs.length;
+    let fromCat = 0, fromSub = 0, none = 0;
+    const kw = new Map(), byB = new Map();
+    for (const r of recs) {
+      if (r.bucket_source === "category") fromCat++;
+      else if (r.bucket_source === "subject") {
+        fromSub++;
+        const k = r.bucket + "\u0000" + r.inferred_keyword;
+        kw.set(k, (kw.get(k) || 0) + 1);
+        byB.set(r.bucket, (byB.get(r.bucket) || 0) + 1);
+      } else none++;
+    }
+    const keywords = [...kw.entries()].map(([k, count]) => {
+      const [bucket, keyword] = k.split("\u0000");
+      return { bucket, keyword, count };
+    }).sort((a, b) => b.count - a.count || a.bucket.localeCompare(b.bucket) ||
+      a.keyword.localeCompare(b.keyword)).slice(0, 40);
+    const by_bucket = [...byB.entries()].sort((a, b) => b[1] - a[1])
+      .map(([label, count]) => ({ label, count, pct: pct(count, fromSub) }));
+    return { total: n, from_category: fromCat, from_subject: fromSub, unresolved: none,
+             pct_from_subject: pct(fromSub, n), pct_unresolved: pct(none, n),
+             keywords, by_bucket };
+  }
+
+  function topDrivers(V) {
+    const rows = V.bucket.rows;
+    const head = rows.slice(0, TOP_DRIVERS).map((r, i) => Object.assign({ rank: i + 1 }, r));
+    const tail = rows.slice(TOP_DRIVERS);
+    if (tail.length) head.push({ rank: head.length + 1, label: VARIOUS,
+      count: tail.reduce((a, b) => a + b.count, 0),
+      pct: Math.round(tail.reduce((a, b) => a + b.pct, 0) * 10) / 10,
+      rolled: tail.map(r => r.label) });
+    return head;
+  }
+
+  /* --- period helpers: complete calendar periods only, so a partial first or
+     last period cannot read as a collapse in volume that never happened. */
+  const dayMs = 86400000;
+  function weekBounds(d) {
+    const t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const dow = (new Date(t).getUTCDay() + 6) % 7;           // Monday = 0
+    return [t - dow * dayMs, t - dow * dayMs + 6 * dayMs];
+  }
+  function isoWeekLabel(d) {
+    const [start] = weekBounds(d);
+    const th = new Date(start + 3 * dayMs);                  // Thursday decides the ISO year
+    const y = th.getUTCFullYear();
+    const jan4 = new Date(Date.UTC(y, 0, 4));
+    const [w1] = weekBounds(jan4);
+    const wk = Math.round((start - w1) / (7 * dayMs)) + 1;
+    return y + "-W" + String(wk).padStart(2, "0");
+  }
+  const monthBounds = d => [Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1),
+                            Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)];
+  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d) : monKey(d);
+  const pbounds = (d, freq) => freq === "W" ? weekBounds(d) : monthBounds(d);
+
+  function series(recs, freq) {
+    const withD = recs.filter(r => r._date);
+    if (!withD.length) return { keys: [], counts: {} };
+    const days = withD.map(r => Date.UTC(r._date.getUTCFullYear(), r._date.getUTCMonth(),
+                                         r._date.getUTCDate()));
+    const lo = Math.min(...days), hi = Math.max(...days);
+    const counts = new Map(), bounds = new Map();
+    for (const r of withD) {
+      const lab = plabel(r._date, freq);
+      counts.set(lab, (counts.get(lab) || 0) + 1);
+      if (!bounds.has(lab)) bounds.set(lab, pbounds(r._date, freq));
+    }
+    const keys = [...counts.keys()].filter(k => bounds.get(k)[0] >= lo && bounds.get(k)[1] <= hi).sort();
+    const out = {};
+    for (const k of keys) out[k] = counts.get(k);
+    return { keys, counts: out };
+  }
+
+  function bucketSeries(recs, freq, keys, buckets) {
+    const pos = new Map(keys.map((k, i) => [k, i]));
+    const out = {};
+    for (const b of buckets) out[b] = keys.map(() => 0);
+    for (const r of recs) {
+      if (!r._date || !out[r.bucket]) continue;
+      const i = pos.get(plabel(r._date, freq));
+      if (i !== undefined) out[r.bucket][i]++;
+    }
+    return out;
+  }
+
+  function anomalySection(recs, V) {
+    const out = { alerts: [], weekly: null, monthly: null };
+    if (!recs.some(r => r._date)) {
+      Object.assign(out, nc("no usable date column, so no period comparison is possible",
+                            ["a date column"]));
+      return out;
+    }
+    const block = (freq, label) => {
+      const { keys, counts } = series(recs, freq);
+      if (keys.length < 2) return { computable: false, periods: keys.length, label,
+        reason: "only " + keys.length + " complete " + label + "(s) in range; 2+ needed" };
+      const vals = keys.map(k => counts[k]);
+      const cur = vals[vals.length - 1], prev = vals[vals.length - 2];
+      const chg = cur - prev;
+      const b = { computable: true, label, keys, values: vals, current: cur, previous: prev,
+        change: chg, pct_change: prev ? Math.round(1000 * chg / prev) / 10 : null,
+        current_key: keys[keys.length - 1], previous_key: keys[keys.length - 2] };
+      if (vals.length >= ANOM.min_periods_for_z) {
+        const hist = vals.slice(0, -1);
+        const mu = hist.reduce((a, x) => a + x, 0) / hist.length;
+        const varr = hist.reduce((a, x) => a + (x - mu) ** 2, 0) / Math.max(hist.length - 1, 1);
+        const sd = Math.sqrt(varr);
+        b.mean_prior = Math.round(mu * 10) / 10;
+        b.z = sd ? Math.round(100 * (cur - mu) / sd) / 100 : null;
+      }
+      return b;
+    };
+    const wk = block("W", "week"), mo = block("M", "month");
+    out.weekly = wk; out.monthly = mo;
+
+    const flag = b => {
+      if (!b.computable || b.pct_change === null) return;
+      const pc = b.pct_change, chg = b.change;
+      if (Math.abs(pc) >= ANOM.pct_threshold && Math.abs(chg) >= ANOM.min_abs_change) {
+        out.alerts.push({ level: chg > 0 ? "up" : "down", scope: "total",
+          text: "Total volume " + (chg > 0 ? "rose " : "fell ") + Math.abs(pc).toFixed(1) +
+            "% to " + b.current + " cases in " + b.current_key + ", from " + b.previous +
+            " in " + b.previous_key + " (" + (chg > 0 ? "+" : "") + chg + " cases " +
+            b.label + "-over-" + b.label + ")." });
+      }
+      if (b.z !== null && b.z !== undefined && Math.abs(b.z) >= ANOM.z_threshold &&
+          Math.abs(chg) >= ANOM.min_abs_change) {
+        out.alerts.push({ level: b.z > 0 ? "up" : "down", scope: "total",
+          text: b.current_key + " sits " + Math.abs(b.z).toFixed(1) + " standard deviations " +
+            (b.z > 0 ? "above" : "below") + " the mean of the preceding " +
+            (b.values.length - 1) + " " + b.label + "s (" + b.mean_prior + " cases)." });
+      }
+    };
+    flag(wk); flag(mo);
+
+    for (const b of [mo, wk]) {
+      if (!b.computable) continue;
+      const names = V.bucket.rows.slice(0, TOP_DRIVERS + 2).map(r => r.label);
+      const ser = bucketSeries(recs, b.label === "month" ? "M" : "W", b.keys, names);
+      for (const name of names) {
+        const v = ser[name];
+        const cur = v[v.length - 1], prev = v[v.length - 2];
+        const chg = cur - prev;
+        if (!prev) continue;
+        const pc = 100 * chg / prev;
+        if (Math.abs(pc) >= ANOM.bucket_pct_threshold && Math.abs(chg) >= ANOM.bucket_min_abs) {
+          out.alerts.push({ level: chg > 0 ? "up" : "down", scope: "bucket",
+            text: name + (chg > 0 ? " rose " : " fell ") + Math.abs(pc).toFixed(0) + "% " +
+              b.label + "-over-" + b.label + " (" + prev + " to " + cur + " cases, " +
+              b.previous_key + " to " + b.current_key + ")." });
+        }
+      }
+      break;
+    }
+    return out;
+  }
+
+  function mostReceived(recs, V) {
+    if (!V.bucket.rows.length) return null;
+    const top = V.bucket.rows[0];
+    const sub = recs.filter(r => r.bucket === top.label);
+    const top_labels = counts(sub, "primary_category", sub.length).slice(0, 3)
+      .map(x => ({ label: x.label, count: x.count }));
+    let origin = null;
+    if (sub.some(r => (r.case_origin ?? "") !== "")) {
+      const o = counts(sub, "case_origin", sub.length)[0];
+      origin = { label: o.label, count: o.count, pct: pct(o.count, sub.length) };
+    }
+    return { label: top.label, count: top.count, pct: top.pct, top_labels, origin,
+             members: sub.some(r => r.mno)
+               ? new Set(sub.map(r => r.mno).filter(Boolean)).size : null };
+  }
+
   function mappingAudit(recs) {
     const m = new Map();
     for (const r of recs) {
@@ -925,7 +1146,9 @@ function makeEngine(RULES) {
       const dateCol = derive(recs);
       const volume = volumeSection(recs, dateCol);
       return { volume, correlation: correlationSection(recs),
-               forecast: forecastSection(volume), mapping: mappingAudit(recs) };
+               forecast: forecastSection(volume), mapping: mappingAudit(recs),
+               inference: inferenceAudit(recs), drivers: topDrivers(volume),
+               anomaly: anomalySection(recs, volume), most_received: mostReceived(recs, volume) };
     },
   };
 }
@@ -1147,6 +1370,56 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
   const legend = rows => '<div class="legend">' + rows.map((r, i) =>
     `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(r.label)}</span>`).join("") + "</div>";
 
+  /* Collapse a {bucket: [values]} map onto the driver set, rolling every
+     non-driver bucket into the single Various row - so every chart in the
+     report shows the same five things. */
+  function foldSeries(byBucket, drivers) {
+    const names = drivers.filter(d => !d.rolled).map(d => d.label);
+    const rolled = drivers.find(d => d.rolled);
+    const out = names.filter(nm => byBucket[nm]).map(nm => ({ name: nm, values: byBucket[nm] }));
+    if (rolled) {
+      const first = Object.values(byBucket)[0] || [];
+      const acc = first.map(() => 0);
+      for (const b of rolled.rolled)
+        (byBucket[b] || []).forEach((v, i) => { acc[i] += v; });
+      if (acc.some(v => v)) out.push({ name: rolled.label, values: acc });
+    }
+    return out;
+  }
+
+  function foldCrosstab(ct, drivers) {
+    const names = drivers.filter(d => !d.rolled).map(d => d.label);
+    const rolled = drivers.find(d => d.rolled);
+    const idx = new Map(ct.buckets.map((b, i) => [b, i]));
+    let cols = names.filter(b => idx.has(b));
+    let M = ct.matrix.map(row => cols.map(b => row[idx.get(b)]));
+    if (rolled) {
+      const extra = rolled.rolled.filter(b => idx.has(b)).map(b => idx.get(b));
+      if (extra.length) {
+        cols = cols.concat([rolled.label]);
+        M = M.map((row, r) => row.concat([extra.reduce((a, i) => a + ct.matrix[r][i], 0)]));
+      }
+    }
+    return { computable: true, origins: ct.origins, buckets: cols, matrix: M,
+             row_totals: M.map(r => r.reduce((a, b) => a + b, 0)),
+             col_totals: cols.map((_, j) => M.reduce((a, r) => a + r[j], 0)) };
+  }
+
+  function driversTable(drivers, total) {
+    const h = ['<div class="scroll"><table><thead><tr><th>#</th><th>Call driver</th>' +
+      '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>'];
+    drivers.forEach((d, i) => {
+      const tip = d.rolled ? ` title="${ESC(d.rolled.join(", "))}"` : "";
+      h.push(`<tr${d.rolled ? ' class="various"' : ""}><td class="n">${d.rank}</td>` +
+        `<td${tip}><span class="swatch" style="background:${cvar(i)}"></span>${ESC(d.label)}` +
+        (d.rolled ? ` <span style='color:var(--text-3)'>(${d.rolled.length} categories)</span>` : "") +
+        `</td><td class="n">${d.count}</td><td class="n">${f1(d.pct)}%</td></tr>`);
+    });
+    h.push(`<tr><td></td><td><b>Total</b></td><td class="n"><b>${total}</b></td>` +
+      `<td class="n"><b>100.0%</b></td></tr></tbody></table></div>`);
+    return h.join("");
+  }
+
   function naBlock(title, rec) {
     const needs = rec.needs || rec.missing_fields || [];
     const h = [`<div class="na"><div class="t">${ESC(title)}</div><p>${ESC(rec.reason || "")}</p>`];
@@ -1320,6 +1593,59 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
       `<div class="stat"><div class="k">${ESC(k)}</div><div class="v num">${ESC(v)}</div>` +
       `<div class="d">${ESC(d)}</div></div>`).join("") + "</div>");
 
+    const MR = res.most_received;
+    if (MR) {
+      A("<h3>Most received cases</h3>");
+      const bits = [`<div class="mr"><div class="lead"><b>${ESC(MR.label)}</b> is the largest ` +
+        `driver at <b>${MR.count} cases</b> (${f1(MR.pct)}% of all volume)` +
+        (MR.members ? ` raised by ${MR.members} distinct members` : "") + ".</div>"];
+      bits.push("<ul>");
+      if (MR.top_labels.length) bits.push("<li>Most common labels inside it: " +
+        MR.top_labels.map(l => `${ESC(l.label)} (${l.count})`).join("; ") + "</li>");
+      if (MR.origin) bits.push(`<li>Arrives mainly on <b>${ESC(MR.origin.label)}</b> — ` +
+        `${MR.origin.count} of its ${MR.count} cases (${f1(MR.origin.pct)}%)</li>`);
+      bits.push("</ul></div>");
+      A(bits.join(""));
+    }
+
+    const AN = res.anomaly || {};
+    A("<h3>Movement watch</h3>");
+    if ((AN.alerts || []).length) {
+      A('<div class="alerts">' + AN.alerts.map(a =>
+        `<div class="alert ${a.level === "down" ? "down" : "up"}"><span class="dir">` +
+        `${a.level === "up" ? "increase" : "decrease"}</span><span>${ESC(a.text)}</span></div>`)
+        .join("") + "</div>");
+    } else if ((AN.weekly || {}).computable || (AN.monthly || {}).computable) {
+      const parts = [];
+      for (const b of [AN.weekly, AN.monthly]) {
+        if (b && b.computable) parts.push(`${b.label}-over-${b.label} ` +
+          `${b.change >= 0 ? "+" : ""}${b.change} case(s) (${b.previous_key} to ${b.current_key})`);
+      }
+      A('<div class="alerts"><div class="alert calm"><span class="dir">steady</span><span>' +
+        `Nothing crossed the alert thresholds (a move must be at least ` +
+        `${RULES.anomaly.pct_threshold}% <i>and</i> at least ${RULES.anomaly.min_abs_change} ` +
+        `cases): ${parts.length ? parts.join("; ") : "no complete period pair to compare"}.` +
+        "</span></div></div>");
+    } else {
+      const wk = AN.weekly || {}, mo = AN.monthly || {};
+      A(naBlock("Week-over-week and month-over-month movement", {
+        reason: AN.reason || wk.reason || mo.reason ||
+          "not enough complete periods to compare",
+        needs: AN.needs || ["a date column covering 2+ complete periods"] }));
+    }
+
+    const DR = res.drivers || [];
+    if (DR.length) {
+      A("<h3>Top 5 call drivers</h3>");
+      A('<p class="sub">Ranked by primary category. Positions 1–' + RULES.gates.top_drivers +
+        " are the named drivers; position " + DR.length + " rolls up every remaining category " +
+        "so the five add to 100%.</p>");
+      const chartRows = DR.map(d => ({ label: d.rank + ". " + d.label,
+                                       count: d.count, pct: d.pct }));
+      A('<div class="drivers"><figure>' + svgHbar(chartRows, n, null, 196, 560) +
+        "</figure><div>" + driversTable(DR, n) + "</div></div>");
+    }
+
     A("<h3>Top findings</h3>");
     const finds = buildFindings(V, C);
     A(finds.length
@@ -1335,17 +1661,35 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
 
     // 1. volume
     A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>');
+    const INF = res.inference || {};
+    if (INF.from_subject || INF.unresolved) {
+      A('<div class="callout info"><div class="t">Cases bucketed from the subject line</div>' +
+        `<b>${INF.from_subject} of ${INF.total} cases (${f1(INF.pct_from_subject)}%)</b> had no ` +
+        "usable Category value — blank, or a label that matched no bucket rule — so their bucket " +
+        "was inferred from the subject line instead. " +
+        ((INF.by_bucket || []).length ? "They landed in: " +
+          INF.by_bucket.map(b => `${ESC(b.label)} (${b.count})`).join("; ") + ". " : "") +
+        `A further <b>${INF.unresolved} case(s) (${f1(INF.pct_unresolved)}%)</b> could not be ` +
+        "placed from either field and stay in Other / Unmapped. Every inferred assignment, and " +
+        "the keyword that triggered it, is listed in Appendix A.</div>");
+    }
     A("<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its " +
       "Category field — and that primary label is mapped to a reporting bucket. Shares therefore " +
       "sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are " +
       "counted separately in the topic-load table so multi-issue demand is not lost.</p>");
 
+    const brows = DR.length
+      ? DR.map(d => ({ label: d.label, count: d.count, pct: d.pct }))
+      : capSeries(V.bucket.rows.slice())[0];
+    const rolledDrv = DR.find(d => d.rolled);
     A('<div class="grid2">');
-    const [brows, folded] = capSeries(V.bucket.rows.slice());
     A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>' + svgDonut(brows, n) +
       legend(brows) + "<figcaption>One bucket per case; shares sum to 100%." +
-      (folded ? " Lowest-volume buckets folded into Other." : "") + "</figcaption></figure>");
-    A("<div>" + distTable(brows, n, "Category bucket") + "</div>");
+      (rolledDrv ? ` ${ESC(rolledDrv.label)} rolls up ${rolledDrv.rolled.length} lower-volume ` +
+        "categories, itemised in the table." : "") + "</figcaption></figure>");
+    A("<div>" + distTable(brows, n, "Category bucket") +
+      (rolledDrv ? `<p class='sub'>${ESC(rolledDrv.label)} contains: ` +
+        `${ESC(rolledDrv.rolled.join(", "))}.</p>` : "") + "</div>");
     A("</div>");
 
     A('<div class="grid2" style="margin-top:26px">');
@@ -1357,15 +1701,18 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
     } else A(naBlock("Origin breakdown", V.origin));
     A("</div>");
 
-    A("<h3>Most frequent primary categories (raw labels, before bucketing)</h3>");
-    const [prows] = capSeries(V.primary_raw.rows.slice(), 10);
+    A("<h3>Top 5 primary category labels (raw, before bucketing)</h3>");
+    const prows = V.primary_raw.rows.slice(0, 5);
     A(svgHbar(prows, n, "var(--s1)", 240));
+    A('<p class="sub">The five most-used raw labels out of ' + V.tag_load.distinct_tags +
+      " distinct labels seen in the Category field; the remainder are in the Appendix A mapping " +
+      "table. Percentages are of all " + n + " cases, so these five do not sum to 100%.</p>");
 
     A("<h3>Origin × category cross-tab</h3>");
     if (V.crosstab.computable) {
-      A(heatTable(V.crosstab));
-      A('<p class="sub">Cell shading is a single-hue sequential ramp on case count; exact counts ' +
-        "are printed in every cell.</p>");
+      A(heatTable(DR.length ? foldCrosstab(V.crosstab, DR) : V.crosstab));
+      A('<p class="sub">Columns are the same five call drivers used throughout; cell shading is ' +
+        "a single-hue sequential ramp on case count and exact counts are printed in every cell.</p>");
     } else A(naBlock("Origin × category cross-tab", V.crosstab));
 
     A("<h3>Topic load (all tags, not just the primary)</h3>");
@@ -1374,15 +1721,15 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
       `<b>${tl.multi_tag_cases}</b> of ${n} cases (${f1(tl.multi_tag_pct)}%) carry more than one, ` +
       `across <b>${tl.distinct_tags}</b> distinct labels. The denominator below is cases, so ` +
       "these shares deliberately sum above 100%.</p>");
-    A('<div class="scroll"><table><thead><tr><th>Topic tag (any position)</th>' +
+    A('<div class="scroll"><table><thead><tr><th>Top 10 topic tags (any position)</th>' +
       '<th class="n">Cases</th><th class="n">% of cases</th></tr></thead><tbody>' +
-      tl.top.map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
+      tl.top.slice(0, 10).map(t => `<tr><td>${ESC(t.label)}</td><td class="n">${t.count}</td>` +
         `<td class="n">${f1(t.pct_of_cases)}%</td></tr>`).join("") + "</tbody></table></div>");
 
     A("<h3>Movement over time</h3>");
     if (V.monthly.computable) {
       const m = V.monthly;
-      const ser = Object.entries(m.by_bucket)
+      const ser = DR.length ? foldSeries(m.by_bucket, DR) : Object.entries(m.by_bucket)
         .sort((a, b) => b[1].reduce((x, y) => x + y, 0) - a[1].reduce((x, y) => x + y, 0))
         .slice(0, MAXSERIES).map(([k, v]) => ({ name: k, values: v }));
       A(svgLine(m.months, ser));
@@ -1559,7 +1906,19 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A('<div class="scroll"><table><thead><tr><th>Raw label</th><th>Assigned bucket</th>' +
       '<th class="n">Occurrences</th></tr></thead><tbody>' + MAP.items.map(i =>
         `<tr><td class="mono">${ESC(i.label)}</td><td>${ESC(i.bucket)}</td>` +
-        `<td class="n">${i.count}</td></tr>`).join("") + "</tbody></table></div></section>");
+        `<td class="n">${i.count}</td></tr>`).join("") + "</tbody></table></div>");
+    if ((INF.keywords || []).length) {
+      A("<h3>Subject-line inference (cases with no usable category)</h3>");
+      A("<p>Where the Category field was blank or unrecognised, the subject line was matched " +
+        "against the same ordered rules. The keyword below is the exact text that triggered each " +
+        "assignment — the subject itself is never shown, since it can carry identifying detail.</p>");
+      A('<div class="scroll"><table><thead><tr><th>Matched keyword in subject</th>' +
+        '<th>Assigned bucket</th><th class="n">Cases</th></tr></thead><tbody>' +
+        INF.keywords.map(k => `<tr><td class="mono">${ESC(k.keyword)}</td>` +
+          `<td>${ESC(k.bucket)}</td><td class="n">${k.count}</td></tr>`).join("") +
+        "</tbody></table></div>");
+    }
+    A("</section>");
 
     A('<section class="card"><h2>Appendix B — sources &amp; data handling</h2>');
     A('<div class="scroll"><table><thead><tr><th>File</th><th>Sheet</th><th>Status</th>' +
