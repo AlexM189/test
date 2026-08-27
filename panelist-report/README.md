@@ -53,10 +53,14 @@ twice (`render.py` and `web/render.js`), so:
 python3 tools/crossvalidate.py sample/sample_cases.csv       # any CSV(s)
 ```
 
-runs both engines over the same input and compares 20 headline metrics — volume,
-mix, cross-tab totals, every correlation chain, repeat contact, discovered pairs
-and the full forecast. It exits non-zero on any difference. Run it after touching
-either engine. (Requires `node`.)
+runs both engines over the same input and compares ~37 headline metrics — volume,
+mix, cross-tab totals, every correlation chain, repeat contact, discovered pairs,
+the deep dives and the full forecast — **and then renders the report with both and
+diffs every number in the output**. The second step matters: a metric can agree while
+the two renderers format it differently, which is how several one-digit divergences
+were found (Python's `round()` and `%.1f` are half-to-even; JavaScript's `Math.round`
+and `toFixed` are half-up). It exits non-zero on any difference. Run it after touching
+either engine or either renderer. (Requires `node`.)
 
 ## Files
 
@@ -130,8 +134,10 @@ specialised set to a driver; everything else uses the generic `default` set:
 | `incentives` | Incentives & Rewards | Issue raised · Reward type · Action or next step |
 | `default` | every other driver | What the panelist wanted · Action or next step · Contact outcome |
 
-Each renders stat tiles, the KB categories inside the family, a bar per facet, a
-cross-tab between the two facets named in `cross`, and a monthly trend.
+Each renders trend KPIs — month over month, movement across the window against the
+movement of all cases, peak month and its ratio to the family's own average, share of
+all cases at each end of the window — plus the KB categories inside the family, a bar
+per facet, a cross-tab between the two facets named in `cross`, and a monthly chart.
 
 A case placed by the **subject fallback** has no meaningful value in its Category cell -
 that is why the fallback ran. Those cases belong in the family (their subject says so)
@@ -161,6 +167,16 @@ appending `[label, pattern]` to a facet's `terms`, rebuild, and re-run
   lists every triggering keyword. Cases neither field can place stay in
   Other / Unmapped and are counted separately. Only the matched keyword is ever
   shown - never the subject text, which can carry identifying detail.
+- **Placeholder tokens never become categories.** The Category cell is split on commas;
+  a token that is not a category (a bare number, `N/A`, a single character) is dropped
+  before anything is counted, so `1, Withdraw/Member/No Answer Uncooperative` is one
+  Attrition case, not a case in a category called `1`. The stripped tokens are still
+  reported in the data-quality panel, against the raw cell they came from.
+- **Pinned drivers.** `pinned_drivers` names drivers that must always appear as their
+  own row, never folded into the roll-up, however far down they rank — with their true
+  rank by case count shown beside them. `Troubleshooting & Technical` is pinned by
+  default. The pin holds in the interactive block too, so filtering by origin can never
+  make it disappear.
 - **The roll-up is never a driver.** "Various topics" collects the leftover drivers
   so the five add to 100%, but it can never be named "the largest driver", and it
   never earns a peak or growth insight — those are computed over real drivers only.

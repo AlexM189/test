@@ -333,6 +333,21 @@ def deep_dive_block(dd):
         tiles.append(("Placed by subject", "%.1f%%" % pct_of(bsrc["subject"], n),
                       "%s case(s) had no usable category value"
                       % "{:,}".format(bsrc["subject"])))
+    T = dd.get("trend") or {}
+    if T.get("computable"):
+        mp = T.get("mom_pct")
+        tiles.append(("Month over month",
+                      ("%+d" % T["mom_change"]) + (" (%+.1f%%)" % mp if mp is not None else ""),
+                      "%s vs %s" % (T["cur_key"], T["prev_key"])))
+        wp = T.get("window_pct")
+        tw = T.get("total_window_pct")
+        tiles.append(("Across %d months" % T["months"],
+                      "%+.1f%%" % wp if wp is not None else "—",
+                      ("all cases moved %+.1f%% over the same window" % tw)
+                      if tw is not None else "first to last complete month"))
+        tiles.append(("Peak month", T["peak_key"],
+                      "%s cases, %.1fx this family's monthly average"
+                      % ("{:,}".format(T["peak_value"]), T["peak_ratio"] or 0)))
     rp = dd.get("repeat") or {}
     if rp.get("computable"):
         tiles.append(("Repeat contact", "%.1f%%" % rp["pct_cases_from_repeat"],
@@ -343,8 +358,17 @@ def deep_dive_block(dd):
                       f0(t["pct"]) + "%", "%s (%s cases)" % (t["label"], "{:,}".format(t["count"]))))
     h.append('<div class="stats">' + "".join(
         '<div class="stat"><div class="k">%s</div><div class="v num">%s</div>'
-        '<div class="d">%s</div></div>' % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:4])
+        '<div class="d">%s</div></div>' % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:6])
         + "</div>")
+    if T.get("computable"):
+        sc = T["share_change"]
+        word = "gained" if sc > 0 else "lost" if sc < 0 else "held"
+        h.append('<p class="sub">Share of all cases moved from <b>%.1f%%</b> in %s to '
+                 '<b>%.1f%%</b> in %s — %s <b>%.1f</b> percentage point(s). Share matters '
+                 'separately from volume: a family can shrink while the operation shrinks '
+                 'faster, which is a rising share, not a win.</p>'
+                 % (T["share_first"], ESC(T["first_key"]), T["share_last"], ESC(T["cur_key"]),
+                    word, abs(sc)))
 
     bs = dd.get("by_source") or {}
     inferred = bs.get("subject", 0)
@@ -488,19 +512,26 @@ def fold_crosstab(ct, drivers):
 
 def drivers_table(drivers, total):
     h = ['<div class="scroll"><table><thead><tr><th>#</th><th>Call driver</th>'
-         '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>']
+         '<th class="n">Rank by volume</th><th class="n">Cases</th>'
+         '<th class="n">% of total</th></tr></thead><tbody>']
     for i, d in enumerate(drivers):
         rolled = d.get("rolled")
         det = d.get("rolled_detail") or []
         tip = (' title="%s"' % ESC("; ".join("%s (%s)" % (x["label"], "{:,}".format(x["count"]))
                                              for x in det))) if det else ""
-        h.append('<tr%s><td class="n">%d</td><td%s><span class="swatch" style="background:%s">'
-                 '</span>%s%s</td><td class="n">%d</td><td class="n">%.1f%%</td></tr>'
-                 % (' class="various"' if rolled else "", d["rank"], tip, cvar(i),
-                    ESC(d["label"]),
+        vr = ("#%d of %d" % (d["volume_rank"], d.get("driver_count", 0))
+              if d.get("volume_rank") else "—")
+        h.append('<tr%s><td class="n">%s</td><td%s><span class="swatch" style="background:%s">'
+                 '</span>%s%s%s</td><td class="n">%s</td><td class="n">%d</td>'
+                 '<td class="n">%.1f%%</td></tr>'
+                 % (' class="various"' if rolled else "",
+                    ("—" if rolled else str(d["rank"])), tip, cvar(i), ESC(d["label"]),
                     (" <span style='color:var(--text-3)'>(%d categories)</span>" % len(rolled))
-                    if rolled else "", d["count"], d["pct"]))
-    h.append('<tr><td></td><td><b>Total</b></td><td class="n"><b>%d</b></td>'
+                    if rolled else "",
+                    ' <span class="pill p3" style="font-size:.6rem">always shown</span>'
+                    if d.get("pinned") else "",
+                    vr, d["count"], d["pct"]))
+    h.append('<tr><td></td><td><b>Total</b></td><td></td><td class="n"><b>%d</b></td>'
              '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>' % total)
     return "".join(h)
 
@@ -762,9 +793,13 @@ def build(res, meta):
     DR = res.get("drivers") or []
     if DR:
         A("<h3>Top 5 call drivers</h3>")
-        A('<p class="sub">Ranked by primary category. Positions 1–%d are the named drivers; '
-          'position %d rolls up every remaining category so the five add to 100%%.</p>'
-          % (RULES["gates"]["top_drivers"], len(DR)))
+        pins = [d for d in DR if d.get("pinned")]
+        A('<p class="sub">Ranked by primary category. The first %d are the largest by volume; '
+          'the last row rolls up everything else so the list adds to 100%%.%s</p>'
+          % (RULES["gates"]["top_drivers"],
+             (" " + "; ".join(
+                 "<b>%s</b> is always shown even though it ranks <b>#%d</b> by volume"
+                 % (ESC(p["label"]), p["volume_rank"]) for p in pins) + ".") if pins else ""))
         chart_rows = []
         for d in DR:
             row = {"label": "%d. %s" % (d["rank"], d["label"]),
@@ -863,15 +898,19 @@ def build(res, meta):
                 ("Mapped from the KB", "%.1f%%" % (res["inference"]["pct_from_kb"]),
                  "%s cases matched a real category exactly"
                  % "{:,}".format(res["inference"]["from_kb"])),
-                ("Placeholder primary", "%.1f%%" % Q["primary_junk_pct"],
-                 "%s cases whose primary value is a number or placeholder"
+                ("Placeholder tokens stripped", "%.1f%%" % Q.get("pct_with_junk_token", 0),
+                 "%s cases carried a value that is not a category; it was ignored and the "
+                 "case counted under its real one"
+                 % "{:,}".format(Q.get("cases_with_junk_token", 0))),
+                ("No category at all", "%.1f%%" % Q["primary_junk_pct"],
+                 "%s cases where every value was a placeholder"
                  % "{:,}".format(Q["primary_junk_cases"])),
                 ("Unknown to the KB", "%.1f%%" % Q["primary_unknown_pct"],
                  "%s cases using a label the KB does not list"
                  % "{:,}".format(Q["primary_unknown_cases"])),
                 ("Distinct problems", "{:,}".format(Q["junk_distinct"] + Q["unknown_distinct"]),
                  "%d placeholder + %d unknown label(s)"
-                 % (Q["junk_distinct"], Q["unknown_distinct"]))]) + "</div>")
+                 % (Q["junk_distinct"], Q["unknown_distinct"]))][:5]) + "</div>")
         if Q.get("junk_labels") or Q.get("unknown_labels"):
             A("<h4>Where these values come from</h4>")
             A('<p class="sub">The Category cell is split on commas, so a single cell can '

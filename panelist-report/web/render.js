@@ -319,6 +319,21 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     if (bsrc.subject) tiles.push(["Placed by subject",
       f1(100 * bsrc.subject / n) + "%",
       th(bsrc.subject) + " case(s) had no usable category value"]);
+    const T = dd.trend || {};
+    if (T.computable) {
+      tiles.push(["Month over month",
+        (T.mom_change >= 0 ? "+" : "") + T.mom_change +
+        (T.mom_pct === null ? "" : " (" + (T.mom_pct >= 0 ? "+" : "") + f1(T.mom_pct) + "%)"),
+        T.cur_key + " vs " + T.prev_key]);
+      tiles.push(["Across " + T.months + " months",
+        T.window_pct === null ? "—" : (T.window_pct >= 0 ? "+" : "") + f1(T.window_pct) + "%",
+        T.total_window_pct === null ? "first to last complete month"
+          : "all cases moved " + (T.total_window_pct >= 0 ? "+" : "") +
+            f1(T.total_window_pct) + "% over the same window"]);
+      tiles.push(["Peak month", T.peak_key,
+        th(T.peak_value) + " cases, " + f1(T.peak_ratio || 0) +
+        "x this family's monthly average"]);
+    }
     const rp = dd.repeat || {};
     if (rp.computable) tiles.push(["Repeat contact", f1(rp.pct_cases_from_repeat) + "%",
       "of this family's cases come from members with 2+ cases here"]);
@@ -327,9 +342,18 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       tiles.push(["Top " + dd.facets[0].name.split("/")[0].trim().toLowerCase(),
         f0(t.pct) + "%", t.label + " (" + th(t.count) + " cases)"]);
     }
-    h.push('<div class="stats">' + tiles.slice(0, 4).map(([k, v, d]) =>
+    h.push('<div class="stats">' + tiles.slice(0, 6).map(([k, v, d]) =>
       `<div class="stat"><div class="k">${ESC(k)}</div><div class="v num">${ESC(v)}</div>` +
       `<div class="d">${ESC(d)}</div></div>`).join("") + "</div>");
+    if (T.computable) {
+      const sc = T.share_change;
+      const word = sc > 0 ? "gained" : sc < 0 ? "lost" : "held";
+      h.push('<p class="sub">Share of all cases moved from <b>' + f1(T.share_first) +
+        "%</b> in " + ESC(T.first_key) + " to <b>" + f1(T.share_last) + "%</b> in " +
+        ESC(T.cur_key) + " — " + word + " <b>" + f1(Math.abs(sc)) + "</b> percentage " +
+        "point(s). Share matters separately from volume: a family can shrink while the " +
+        "operation shrinks faster, which is a rising share, not a win.</p>");
+    }
 
     const bs = dd.by_source || {};
     const inferred = bs.subject || 0;
@@ -459,17 +483,22 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
 
   function driversTable(drivers, total) {
     const h = ['<div class="scroll"><table><thead><tr><th>#</th><th>Call driver</th>' +
-      '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>'];
+      '<th class="n">Rank by volume</th><th class="n">Cases</th>' +
+      '<th class="n">% of total</th></tr></thead><tbody>'];
     drivers.forEach((d, i) => {
       const det = d.rolled_detail || [];
       const tip = det.length
         ? ` title="${ESC(det.map(x => x.label + " (" + th(x.count) + ")").join("; "))}"` : "";
-      h.push(`<tr${d.rolled ? ' class="various"' : ""}><td class="n">${d.rank}</td>` +
+      const vr = d.volume_rank ? `#${d.volume_rank} of ${d.driver_count || 0}` : "—";
+      h.push(`<tr${d.rolled ? ' class="various"' : ""}>` +
+        `<td class="n">${d.rolled ? "—" : d.rank}</td>` +
         `<td${tip}><span class="swatch" style="background:${cvar(i)}"></span>${ESC(d.label)}` +
         (d.rolled ? ` <span style='color:var(--text-3)'>(${d.rolled.length} categories)</span>` : "") +
-        `</td><td class="n">${d.count}</td><td class="n">${f1(d.pct)}%</td></tr>`);
+        (d.pinned ? ' <span class="pill p3" style="font-size:.6rem">always shown</span>' : "") +
+        `</td><td class="n">${vr}</td><td class="n">${d.count}</td>` +
+        `<td class="n">${f1(d.pct)}%</td></tr>`);
     });
-    h.push(`<tr><td></td><td><b>Total</b></td><td class="n"><b>${total}</b></td>` +
+    h.push(`<tr><td></td><td><b>Total</b></td><td></td><td class="n"><b>${total}</b></td>` +
       `<td class="n"><b>100.0%</b></td></tr></tbody></table></div>`);
     return h.join("");
   }
@@ -702,9 +731,12 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     const DR = res.drivers || [];
     if (DR.length) {
       A("<h3>Top 5 call drivers</h3>");
-      A('<p class="sub">Ranked by primary category. Positions 1–' + RULES.gates.top_drivers +
-        " are the named drivers; position " + DR.length + " rolls up every remaining category " +
-        "so the five add to 100%.</p>");
+      const pins = DR.filter(d => d.pinned);
+      A('<p class="sub">Ranked by primary category. The first ' + RULES.gates.top_drivers +
+        " are the largest by volume; the last row rolls up everything else so the list adds " +
+        "to 100%." + (pins.length ? " " + pins.map(p =>
+          `<b>${ESC(p.label)}</b> is always shown even though it ranks <b>#${p.volume_rank}</b> ` +
+          "by volume").join("; ") + "." : "") + "</p>");
       const chartRows = DR.map(d => {
         const row = { label: d.rank + ". " + d.label, count: d.count, pct: d.pct };
         const t = rolledTip(d);
@@ -791,13 +823,16 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       A('<div class="stats">' + [
         ["Mapped from the KB", f1(res.inference.pct_from_kb) + "%",
          th(res.inference.from_kb) + " cases matched a real category exactly"],
-        ["Placeholder primary", f1(Q.primary_junk_pct) + "%",
-         th(Q.primary_junk_cases) + " cases whose primary value is a number or placeholder"],
+        ["Placeholder tokens stripped", f1(Q.pct_with_junk_token || 0) + "%",
+         th(Q.cases_with_junk_token || 0) + " cases carried a value that is not a category; " +
+         "it was ignored and the case counted under its real one"],
+        ["No category at all", f1(Q.primary_junk_pct) + "%",
+         th(Q.primary_junk_cases) + " cases where every value was a placeholder"],
         ["Unknown to the KB", f1(Q.primary_unknown_pct) + "%",
          th(Q.primary_unknown_cases) + " cases using a label the KB does not list"],
         ["Distinct problems", th(Q.junk_distinct + Q.unknown_distinct),
          Q.junk_distinct + " placeholder + " + Q.unknown_distinct + " unknown label(s)"],
-      ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
+      ].slice(0, 5).map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
         `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
       if ((Q.junk_labels || []).length || (Q.unknown_labels || []).length) {
         A("<h4>Where these values come from</h4>");
@@ -910,7 +945,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
           ["Also show downstream", f1(ch.pct_of_a_with_b) + "%", ch.joint + " joint cases"],
           ["Base rate", f1(ch.base_rate_b) + "%", "downstream signal, all cases"],
           ["Lift", f2(ch.lift || 0) + "x", "vs. base rate"],
-        ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
+        ].slice(0, 5).map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
           `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
         if (ch.note) A(`<div class="callout info"><div class="t">Scope limit</div>${ESC(ch.note)}</div>`);
       } else {

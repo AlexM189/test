@@ -99,11 +99,26 @@ window.__explorerInit = function (root) {
     var rows = cube.drivers.map(function (n, i) { return { label: n, count: tot[i] }; })
       .filter(function (r) { return r.count > 0; })
       .sort(function (a, b) { return b.count - a.count || a.label.localeCompare(b.label); });
+    rows.forEach(function (r, i) { r.volume_rank = i + 1; });
     var sum = rows.reduce(function (a, r) { return a + r.count; }, 0);
-    var head = rows.slice(0, TOP).map(function (r, i) {
-      return { rank: i + 1, label: r.label, count: r.count, pct: sum ? 100 * r.count / sum : 0 };
+    // pinned drivers are always named, never folded into the roll-up - the same rule
+    // the static report uses, so filtering cannot make a pinned driver disappear
+    var pinned = cube.pinned || [];
+    var head = rows.slice(0, TOP).slice();
+    var namedSet = {};
+    head.forEach(function (r) { namedSet[r.label] = 1; });
+    pinned.forEach(function (p) {
+      if (namedSet[p]) return;
+      for (var i = 0; i < rows.length; i++) {
+        if (rows[i].label === p) { head.push(rows[i]); namedSet[p] = 1; break; }
+      }
     });
-    var tail = rows.slice(TOP);
+    head = head.map(function (r, i) {
+      return { rank: i + 1, label: r.label, count: r.count, volume_rank: r.volume_rank,
+               pinned: pinned.indexOf(r.label) >= 0 && i >= TOP,
+               pct: sum ? 100 * r.count / sum : 0 };
+    });
+    var tail = rows.filter(function (r) { return !namedSet[r.label]; });
     if (tail.length) {
       var c = tail.reduce(function (a, r) { return a + r.count; }, 0);
       head.push({ rank: head.length + 1, label: VARIOUS, count: c,
@@ -165,6 +180,7 @@ window.__explorerInit = function (root) {
         '<span class="bar" style="width:' + w.toFixed(1) + 'px;background:var(--s' +
         ((i % 8) + 1) + ')"></span><span class="t">' + esc(r.label) +
         (r.rolled ? ' <span style="color:var(--text-3)">(' + r.rolled.length + ')</span>' : '') +
+        (r.pinned ? ' <span style="color:var(--text-3)">#' + r.volume_rank + ' by volume</span>' : '') +
         '</span></span><span class="vl">' + th(r.count) + ' · ' + f1(r.pct) + '%</span></li>';
     }).join('') + '</ul>';
   }

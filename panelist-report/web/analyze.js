@@ -15,6 +15,7 @@ export function makeEngine(RULES) {
   const SUBJECT_RULES = RULES.subject_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
   const TOP_DRIVERS = G.top_drivers;
   const VARIOUS = RULES.various_label;
+  const PINNED = RULES.pinned_drivers || [];
   const ANOM = RULES.anomaly;
   const UNMAPPED = "Other / Unmapped";
   const FACET_SETS = {};
@@ -186,7 +187,12 @@ export function makeEngine(RULES) {
     else if (recs.some(r => r.modified_on)) dateCol = "modified_on";
     for (const r of recs) {
       r.tags = splitTags(r.category);
-      r.primary_category = r.tags[0] || "";
+      // A cell like "1, Withdraw/Member/No Answer Uncooperative" is one case with one
+      // real category and an export artefact in front of it. Placeholder tokens are
+      // dropped before anything is counted - they stay visible only in the data-quality
+      // panel, which reports them against the raw cell they came from.
+      r.tags_clean = r.tags.filter(t => !isJunkLabel(t));
+      r.primary_category = r.tags_clean[0] || "";
       const [b0, s0] = r.primary_category ? bucketSrc(r.primary_category) : [UNMAPPED, "none"];
       r.bucket = b0;
       r.bucket_source = s0;
@@ -196,8 +202,8 @@ export function makeEngine(RULES) {
         if (b) { r.bucket = b; r.bucket_source = "subject"; r.inferred_keyword = kw; }
         else r.bucket_source = "none";
       }
-      r.tag_count = r.tags.length;
-      const hay = (r.tags.join(" | ") + " | " + (r.subject || "")).toLowerCase();
+      r.tag_count = r.tags_clean.length;
+      const hay = (r.tags_clean.join(" | ") + " | " + (r.subject || "")).toLowerCase();
       r.sig = {};
       for (const [k, re] of SIGNALS) r.sig[k] = re.test(hay);
       r._date = dateCol ? parseDate(r[dateCol]) : null;
@@ -253,7 +259,7 @@ export function makeEngine(RULES) {
     for (const r of recs) {
       totalTags += r.tag_count;
       if (r.tag_count > 1) multi++;
-      for (const t of r.tags) tagC.set(t, (tagC.get(t) || 0) + 1);
+      for (const t of r.tags_clean) tagC.set(t, (tagC.get(t) || 0) + 1);
     }
     V.tag_load = {
       total_tags: totalTags,
@@ -498,7 +504,7 @@ export function makeEngine(RULES) {
     const n = recs.length;
     const unknown = new Map(), junk = new Map();
     const ex = new Map();          // label -> example raw Category cells
-    let primJunk = 0, primUnknown = 0;
+    let primJunk = 0, primUnknown = 0, touched = 0;
     for (const r of recs) {
       for (const t of r.tags) {
         const lab = ws(t) || "(blank)";
@@ -513,9 +519,13 @@ export function makeEngine(RULES) {
           e.push({ cell, position: ws(r.primary_category) === lab ? "primary" : "secondary tag" });
         }
       }
+      // cases carrying at least one placeholder token that was stripped before counting
+      const hadJunk = r.tags.length !== r.tags_clean.length;
+      if (hadJunk) touched++;
+      // cases where every token was a placeholder - these have no category at all
+      if (hadJunk && !r.tags_clean.length) primJunk++;
       const p = r.primary_category;
-      if (isJunkLabel(p)) primJunk++;
-      else if (ws(p) && !CATEGORY_MAP.has(catnorm(p))) primUnknown++;
+      if (ws(p) && !CATEGORY_MAP.has(catnorm(p))) primUnknown++;
     }
     const top = m => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .slice(0, 25).map(([label, count]) => ({ label, count, examples: ex.get(label) || [] }));
@@ -524,6 +534,7 @@ export function makeEngine(RULES) {
              junk_labels: top(junk), junk_distinct: junk.size, junk_tag_total: sum(junk),
              unknown_labels: top(unknown), unknown_distinct: unknown.size,
              unknown_tag_total: sum(unknown),
+             cases_with_junk_token: touched, pct_with_junk_token: pct(touched, n),
              primary_junk_cases: primJunk, primary_junk_pct: pct(primJunk, n),
              primary_unknown_cases: primUnknown, primary_unknown_pct: pct(primUnknown, n) };
   }
@@ -641,7 +652,8 @@ export function makeEngine(RULES) {
                      cases_from_repeat: cs, pct_cases_from_repeat: pct(cs, n) };
     } else out.repeat = nc("no member identifier column", ["MNO"]);
 
-    const { keys } = series(recs, "M");
+    out.trend = nc("fewer than 2 complete months", ["a longer date range"]);
+    const { keys, counts: tot } = series(recs, "M");
     if (V.months_spanned >= 2 && keys.length >= 2 && fam.some(r => r._date)) {
       const pos = new Map(keys.map((k, i) => [k, i]));
       const vals = keys.map(() => 0);
@@ -651,6 +663,30 @@ export function makeEngine(RULES) {
         if (i !== undefined) vals[i]++;
       }
       out.monthly = { computable: true, keys, values: vals };
+      const totals = keys.map(k => tot[k]);
+      const cur = vals[vals.length - 1], prev = vals[vals.length - 2];
+      const first = vals[0], last = vals[vals.length - 1];
+      let pi = 0;
+      vals.forEach((v, i) => { if (v > vals[pi]) pi = i; });
+      const mu = vals.reduce((a, b) => a + b, 0) / vals.length;
+      // share of all cases at each end, so a family can be shrinking while the
+      // operation shrinks faster - that is a rising share, not a win
+      const shF = totals[0] ? pct(first, totals[0]) : 0;
+      const shL = totals[totals.length - 1] ? pct(last, totals[totals.length - 1]) : 0;
+      const tw = totals[0]
+        ? 100 * (totals[totals.length - 1] - totals[0]) / totals[0] : null;
+      out.trend = { computable: true,
+        cur_key: keys[keys.length - 1], prev_key: keys[keys.length - 2], first_key: keys[0],
+        current: cur, previous: prev, mom_change: cur - prev,
+        mom_pct: prev ? Math.round(1000 * (cur - prev) / prev) / 10 : null,
+        first, last,
+        window_pct: first ? Math.round(1000 * (last - first) / first) / 10 : null,
+        total_window_pct: tw === null ? null : Math.round(tw * 10) / 10,
+        peak_key: keys[pi], peak_value: vals[pi],
+        peak_ratio: mu ? Math.round(10 * vals[pi] / mu) / 10 : null,
+        share_first: shF, share_last: shL,
+        share_change: Math.round((shL - shF) * 10) / 10,
+        months: keys.length };
     } else out.monthly = nc("fewer than 2 complete months", ["a longer date range"]);
     return out;
   }
@@ -661,7 +697,7 @@ export function makeEngine(RULES) {
     const di = new Map(drivers.map((d, i) => [d, i]));
     const oi = new Map(origins.map((o, i) => [o, i]));
     const out = { origins, drivers, periods: {}, counts: {},
-                  top_drivers: TOP_DRIVERS, various_label: VARIOUS };
+                  top_drivers: TOP_DRIVERS, various_label: VARIOUS, pinned: PINNED };
     // every case, regardless of whether it falls in a complete week - so the driver
     // ranking agrees with the case total quoted everywhere else in the report
     const tot = origins.map(() => drivers.map(() => 0));
@@ -692,15 +728,26 @@ export function makeEngine(RULES) {
     return out;
   }
 
+  /* Top N named buckets, plus any pinned driver wherever it ranks, plus one rolled-up
+     row. Every row carries its true rank by case count, so a pinned driver shows where
+     it actually sits rather than pretending to be top five. */
   function topDrivers(V) {
-    const rows = V.bucket.rows;
-    const head = rows.slice(0, TOP_DRIVERS).map((r, i) => Object.assign({ rank: i + 1 }, r));
-    const tail = rows.slice(TOP_DRIVERS);
-    if (tail.length) head.push({ rank: head.length + 1, label: VARIOUS,
+    const rows = V.bucket.rows.map((r, i) => Object.assign({}, r, { volume_rank: i + 1 }));
+    let head = rows.slice(0, TOP_DRIVERS).map(r => Object.assign({}, r));
+    const named = new Set(head.map(r => r.label));
+    for (const p of PINNED) {
+      if (named.has(p)) continue;
+      const hit = rows.find(r => r.label === p);
+      if (hit) { head.push(Object.assign({}, hit, { pinned: true })); named.add(p); }
+    }
+    head = head.map((r, i) => Object.assign({}, r, { rank: i + 1, driver_count: rows.length }));
+    const tail = rows.filter(r => !named.has(r.label));
+    if (tail.length) head.push({ rank: head.length + 1, driver_count: rows.length, label: VARIOUS,
       count: tail.reduce((a, b) => a + b.count, 0),
       pct: Math.round(tail.reduce((a, b) => a + b.pct, 0) * 10) / 10,
       rolled: tail.map(r => r.label),
-      rolled_detail: tail.map(r => ({ label: r.label, count: r.count, pct: r.pct })) });
+      rolled_detail: tail.map(r => ({ label: r.label, count: r.count, pct: r.pct,
+                                      volume_rank: r.volume_rank })) });
     return head;
   }
 
@@ -797,7 +844,8 @@ export function makeEngine(RULES) {
       const pc = b.pct_change, chg = b.change;
       if (Math.abs(pc) >= ANOM.pct_threshold && Math.abs(chg) >= ANOM.min_abs_change) {
         out.alerts.push({ level: chg > 0 ? "up" : "down", scope: "total",
-          text: "Total volume " + (chg > 0 ? "rose " : "fell ") + Math.abs(pc).toFixed(1) +
+          text: "Total volume " + (chg > 0 ? "rose " : "fell ") +
+            (Math.round(Math.abs(pc) * 10) / 10).toFixed(1) +
             "% to " + b.current + " cases in " + b.current_key + ", from " + b.previous +
             " in " + b.previous_key + " (" + (chg > 0 ? "+" : "") + chg + " cases " +
             b.label + "-over-" + b.label + ")." });
@@ -805,7 +853,8 @@ export function makeEngine(RULES) {
       if (b.z !== null && b.z !== undefined && Math.abs(b.z) >= ANOM.z_threshold &&
           Math.abs(chg) >= ANOM.min_abs_change) {
         out.alerts.push({ level: b.z > 0 ? "up" : "down", scope: "total",
-          text: b.current_key + " sits " + Math.abs(b.z).toFixed(1) + " standard deviations " +
+          text: b.current_key + " sits " + (Math.round(Math.abs(b.z) * 10) / 10).toFixed(1) +
+            " standard deviations " +
             (b.z > 0 ? "above" : "below") + " the mean of the preceding " +
             (b.values.length - 1) + " " + b.label + "s (" + b.mean_prior + " cases)." });
       }
@@ -824,7 +873,7 @@ export function makeEngine(RULES) {
         const pc = 100 * chg / prev;
         if (Math.abs(pc) >= ANOM.bucket_pct_threshold && Math.abs(chg) >= ANOM.bucket_min_abs) {
           out.alerts.push({ level: chg > 0 ? "up" : "down", scope: "bucket",
-            text: name + (chg > 0 ? " rose " : " fell ") + Math.abs(pc).toFixed(0) + "% " +
+            text: name + (chg > 0 ? " rose " : " fell ") + Math.round(Math.abs(pc)) + "% " +
               b.label + "-over-" + b.label + " (" + prev + " to " + cur + " cases, " +
               b.previous_key + " to " + b.current_key + ")." });
         }
@@ -882,7 +931,7 @@ export function makeEngine(RULES) {
         : move <= -ANOM.trend_pct ? "fell" : "held roughly flat";
       ins.push({ kind: move >= ANOM.trend_pct ? "up" : move <= -ANOM.trend_pct ? "down" : "flat",
         text: "Across " + keys.length + " " + label + "s volume " + dir +
-          (Math.abs(move) < ANOM.trend_pct ? "" : " " + Math.abs(move).toFixed(0) + "%") +
+          (Math.abs(move) < ANOM.trend_pct ? "" : " " + Math.round(Math.abs(move)) + "%") +
           ", from " + first + " in " + keys[0] + " to " + last + " in " + keys[keys.length - 1] + "." });
     }
     const lastRow = rows[rows.length - 1];
@@ -891,7 +940,7 @@ export function makeEngine(RULES) {
         text: "Latest " + label + " (" + keys[keys.length - 1] + ") is " +
           (lastRow.delta >= 0 ? "+" : "") + lastRow.delta + " case(s) on " +
           keys[keys.length - 2] + ", " + (lastRow.pct >= 0 ? "+" : "") +
-          lastRow.pct.toFixed(1) + "%." });
+          (Math.round(lastRow.pct * 10) / 10).toFixed(1) + "%." });
     }
     const peaks = [], moves = [];
     for (const s2 of named) {
@@ -901,15 +950,15 @@ export function makeEngine(RULES) {
       v.forEach((x, i) => { if (x > v[pi]) pi = i; });
       if (mu && v[pi] >= ANOM.peak_min && v[pi] >= ANOM.peak_ratio * mu) {
         peaks.push({ kind: "peak", text: s2.name + " peaked in " + keys[pi] + " at " + v[pi] +
-          " cases — " + (v[pi] / mu).toFixed(1) + "x its " + label + " average of " +
-          mu.toFixed(1) + "." });
+          " cases — " + (Math.round(10 * v[pi] / mu) / 10).toFixed(1) + "x its " + label +
+          " average of " + (Math.round(10 * mu) / 10).toFixed(1) + "." });
       }
       if (v.length >= 2 && v[0]) {
         const mv = 100 * (v[v.length - 1] - v[0]) / v[0];
         if (Math.abs(mv) >= ANOM.bucket_pct_threshold &&
             Math.abs(v[v.length - 1] - v[0]) >= ANOM.bucket_min_abs) {
           moves.push({ kind: mv > 0 ? "up" : "down", text: s2.name + (mv > 0 ? " grew " : " shrank ") +
-            Math.abs(mv).toFixed(0) + "% across the window (" + v[0] + " in " + keys[0] + " to " +
+            Math.round(Math.abs(mv)) + "% across the window (" + v[0] + " in " + keys[0] + " to " +
             v[v.length - 1] + " in " + keys[keys.length - 1] + ")." });
         }
       }
@@ -937,7 +986,7 @@ export function makeEngine(RULES) {
   function mappingAudit(recs) {
     const m = new Map();
     for (const r of recs) {
-      for (const t of r.tags) {
+      for (const t of r.tags_clean) {
         if (!m.has(t)) m.set(t, { label: t, bucket: bucketOf(t), count: 0 });
         m.get(t).count++;
       }

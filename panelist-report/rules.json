@@ -1183,5 +1183,9 @@
       "Action or next step"
     ],
     "expanded": 3
-  }
+  },
+  "pinned_drivers": [
+    "Troubleshooting & Technical"
+  ],
+  "_pinned_comment": "Drivers that must always appear as a named row, never folded into the roll-up, however far down the volume ranking they fall. Their true rank by case count is shown beside them."
 }

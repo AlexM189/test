@@ -8,10 +8,44 @@ volume, mix, cross-tab totals, every correlation chain, repeat contact, the
 discovered pairs and the full four-quarter forecast. Exits non-zero on any
 difference, so it can gate a commit. Requires node.
 """
-import json, os, subprocess, sys
+import json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
+
+
+def numbers(html):
+    body = re.sub(r"<[^>]+>", " ", html)
+    return re.findall(r"-?\d+\.?\d*%?", re.sub(r"\s+", " ", body))
+
+
+def render_diff(path):
+    """Diff every number in the two rendered documents, not just the metrics.
+    Formatting divergence - a different rounding mode, a different number of
+    decimals - only shows up here."""
+    js = subprocess.run(["node", os.path.join(HERE, "renderdiff.mjs"), path],
+                        capture_output=True, text=True)
+    if js.returncode:
+        return ["renderer failed: " + js.stderr.strip()[:400]]
+    sys.path.insert(0, ROOT)
+    import ingest, analyze, render
+    df, prov = ingest.load_paths([path])
+    df, stats = ingest.clean(df)
+    res = analyze.run(df)
+    doc = render.build(res, {"prov": prov, "stats": stats, "file_count": 1})
+    m = re.search(r"<body>(.*)</body>", doc, re.S)     # skip the stylesheet
+    py = m.group(1) if m else doc
+    py = re.sub(r"<script[^>]*>.*?</script>", " ", py, flags=re.S)
+    js_body = re.sub(r"<script[^>]*>.*?</script>", " ", js.stdout, flags=re.S)
+    a, b = numbers(js_body), numbers(py)
+    if a == b:
+        return []
+    out = ["rendered documents differ: %d numbers vs %d" % (len(a), len(b))]
+    for i, (x, y) in enumerate(zip(a, b)):
+        if x != y:
+            out.append("  first difference at position %d: js=%s py=%s" % (i, x, y))
+            break
+    return out
 
 
 def main(paths):
@@ -38,8 +72,15 @@ def main(paths):
             for k in diff:
                 print("   %-16s js=%s" % (k, json.dumps(js[k])[:160]))
                 print("   %-16s py=%s" % ("", json.dumps(py.get(k))[:160]))
+            continue
+        rd = render_diff(p)
+        if rd:
+            failed += 1
+            print("FAIL %s - metrics agree but the rendered output does not" % name)
+            for line in rd:
+                print("   " + line)
         else:
-            print("OK   %s - all %d metrics identical" % (name, len(js)))
+            print("OK   %s - %d metrics and every rendered number identical" % (name, len(js)))
     return 1 if failed else 0
 
 

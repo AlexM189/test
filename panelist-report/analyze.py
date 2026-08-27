@@ -19,6 +19,7 @@ SIGNALS         = RULES["signals"]
 SUBJECT_RULES   = [(n, p) for n, p in RULES["subject_rules"]]
 TOP_DRIVERS     = RULES["gates"]["top_drivers"]
 VARIOUS         = RULES["various_label"]
+PINNED          = RULES.get("pinned_drivers", [])
 ANOM            = RULES["anomaly"]
 UNMAPPED        = "Other / Unmapped"
 FACET_SETS      = RULES.get("facet_sets", {})
@@ -26,6 +27,14 @@ DRIVER_FACETS   = RULES.get("driver_facets", {})
 DD_DEFAULTS     = RULES.get("deep_dive_defaults", {"set": "default", "cross": [], "expanded": 3})
 
 _ws = lambda s: re.sub(r"\s+", " ", str(s or "")).strip()
+
+
+def _r(x, nd=1):
+    """Half-up rounding, toward +infinity on a tie - exactly what Math.round does in
+    the JS engine. Python's built-in round() is banker's rounding, which silently
+    disagrees on any value landing on a .5 boundary (6.25 -> 6.2 there, 6.3 here)."""
+    f = 10 ** nd
+    return math.floor(x * f + 0.5) / f
 
 
 def split_tags(cell):
@@ -87,7 +96,13 @@ def bucket_from_subject(subject):
 def derive(df):
     df = df.copy()
     df["tags"] = df.get("category", "").apply(split_tags)
-    df["primary_category"] = df["tags"].apply(lambda t: t[0] if t else "")
+    # A cell like "1, Withdraw/Member/No Answer Uncooperative" is one case with one real
+    # category and an export artefact in front of it. Placeholder tokens are dropped
+    # before anything is counted - they stay visible only in the data-quality panel,
+    # which reports them against the raw cell they came from.
+    df["tags_clean"] = df["tags"].apply(lambda ts: [t for t in ts if not is_junk_label(t)])
+    df["junk_tokens"] = df["tags"].apply(lambda ts: [t for t in ts if is_junk_label(t)])
+    df["primary_category"] = df["tags_clean"].apply(lambda t: t[0] if t else "")
     src = df["primary_category"].apply(lambda t: bucket_src(t) if t else (UNMAPPED, "none"))
     df["bucket"] = [b for b, _ in src]
     df["bucket_source"] = [s2 if s2 != "none" else "none" for _, s2 in src]
@@ -101,9 +116,10 @@ def derive(df):
         df.loc[needs, "inferred_keyword"] = [k or "" for _, k in got]
     elif needs.any():
         df.loc[needs, "bucket_source"] = "none"
-    df["tag_count"] = df["tags"].apply(len)
+    df["tag_count"] = df["tags_clean"].apply(len)
     # signal flags evaluated over the whole tag list + subject (never the description body)
-    hay = df.apply(lambda r: (" | ".join(r["tags"]) + " | " + str(r.get("subject", ""))).lower(), axis=1)
+    hay = df.apply(lambda r: (" | ".join(r["tags_clean"]) + " | "
+                              + str(r.get("subject", ""))).lower(), axis=1)
     for sig, pat in SIGNALS.items():
         df["sig_" + sig] = hay.str.contains(pat, regex=True, na=False)
     # best available date
@@ -118,7 +134,7 @@ def _nc(reason, needs):
 
 
 def pct(n, d):
-    return round(100.0 * n / d, 1) if d else 0.0
+    return _r(100.0 * n / d, 1) if d else 0.0
 
 
 # ------------------------------------------------------------------ sections
@@ -161,9 +177,9 @@ def volume_section(df, date_col):
     out["agent"] = dist("agent") if "agent" in df else _nc("no agent/owner column in the export", ["agent / owner"])
 
     # tag load (multi-label view, denominator = cases)
-    tags = Counter(t for lst in df["tags"] for t in lst)
+    tags = Counter(t for lst in df["tags_clean"] for t in lst)
     out["tag_load"] = {"total_tags": int(df["tag_count"].sum()),
-                       "mean_tags_per_case": round(float(df["tag_count"].mean()), 2) if n else 0,
+                       "mean_tags_per_case": _r(float(df["tag_count"].mean()), 2) if n else 0,
                        "multi_tag_cases": int((df["tag_count"] > 1).sum()),
                        "multi_tag_pct": pct(int((df["tag_count"] > 1).sum()), n),
                        "distinct_tags": len(tags),
@@ -215,9 +231,9 @@ def _lift(df, a, b):
     base = nb / n if n else 0
     cond = joint / na if na else 0
     return {"n": n, "n_a": na, "n_b": nb, "joint": joint,
-            "pct_of_a_with_b": round(100 * cond, 1),
-            "base_rate_b": round(100 * base, 1),
-            "lift": round(cond / base, 2) if base else None}
+            "pct_of_a_with_b": _r(100 * cond, 1),
+            "base_rate_b": _r(100 * base, 1),
+            "lift": _r(cond / base, 2) if base else None}
 
 
 def correlation_section(df):
@@ -360,13 +376,13 @@ def forecast_section(vol, df):
                                           k - 1 + (m - last_m).n), 0)
                 fitted_var += 1
         band = 1.96 * sd * math.sqrt(fitted_var) if fitted_var else 0.0
-        qs.append({"label": str(q), "point": int(round(pt)),
-                   "low": int(round(max(pt - band, 0))), "high": int(round(pt + band)),
+        qs.append({"label": str(q), "point": int(_r(pt, 0)),
+                   "low": int(_r(max(pt - band, 0), 0)), "high": int(_r(pt + band, 0)),
                    "observed_months": n_obs, "fitted_months": fitted_var,
                    "partial": n_obs > 0})
     return {"method": "ols_linear_on_monthly_volume", "computable": True, "history": hist,
-            "months_fitted": k, "slope_cases_per_month": round(slope, 2),
-            "intercept": round(icpt, 2), "residual_sd": round(sd, 2),
+            "months_fitted": k, "slope_cases_per_month": _r(slope, 2),
+            "intercept": _r(icpt, 2), "residual_sd": _r(sd, 2),
             "quarters": qs,
             "partial_note": any(q["partial"] for q in qs),
             "caveat": ("Mix is held at the observed share for each bucket.")
@@ -424,9 +440,12 @@ def data_quality(df):
             if len(e) < 3 and not any(x["cell"] == cell for x in e):
                 e.append({"cell": cell[:160], "position": "primary" if _ws(pr) == lab
                           else "secondary tag"})
-    prim_junk = int(df["primary_category"].apply(is_junk_label).sum())
+    # cases carrying at least one placeholder token that was stripped before counting
+    touched = int(df["junk_tokens"].apply(bool).sum())
+    # cases where every token was a placeholder - these have no category at all
+    prim_junk = int((df["junk_tokens"].apply(bool) & ~df["tags_clean"].apply(bool)).sum())
     prim_unknown = int(df["primary_category"].apply(
-        lambda t: bool(_ws(t)) and not is_junk_label(t) and _catnorm(t) not in CATEGORY_MAP).sum())
+        lambda t: bool(_ws(t)) and _catnorm(t) not in CATEGORY_MAP).sum())
     top = lambda c: [{"label": k, "count": v, "examples": ex.get(k, [])}
                      for k, v in sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))[:25]]
     return {"kb_size": len(CATEGORY_MAP),
@@ -434,6 +453,7 @@ def data_quality(df):
             "junk_distinct": len(junk), "junk_tag_total": sum(junk.values()),
             "unknown_labels": top(unknown),
             "unknown_distinct": len(unknown), "unknown_tag_total": sum(unknown.values()),
+            "cases_with_junk_token": touched, "pct_with_junk_token": pct(touched, n),
             "primary_junk_cases": prim_junk, "primary_junk_pct": pct(prim_junk, n),
             "primary_unknown_cases": prim_unknown, "primary_unknown_pct": pct(prim_unknown, n)}
 
@@ -553,13 +573,36 @@ def deep_dive(df, V, cfg):
     else:
         out["repeat"] = _nc("no member identifier column", ["MNO"])
 
+    out["trend"] = _nc("fewer than 2 complete months", ["a longer date range"])
     if V["months_spanned"] >= 2 and fam["_date"].notna().any():
-        keys, _ = _series(df, "M")
+        keys, tot = _series(df, "M")
         if len(keys) >= 2:
             lab = fam.dropna(subset=["_date"])["_date"].map(
                 lambda x: _plabel(pd.Period(x, freq="M"), "M"))
             vals = [int((lab == k).sum()) for k in keys]
             out["monthly"] = {"computable": True, "keys": keys, "values": vals}
+            totals = [tot[k] for k in keys]
+            cur, prev = vals[-1], vals[-2]
+            first, last = vals[0], vals[-1]
+            pi = max(range(len(vals)), key=lambda i: vals[i])
+            mu = sum(vals) / len(vals)
+            # share of all cases at each end, so a family can be shrinking while the
+            # operation shrinks faster - that is a rising share, not a win
+            sh_f = pct(first, totals[0]) if totals[0] else 0.0
+            sh_l = pct(last, totals[-1]) if totals[-1] else 0.0
+            tw = (100.0 * (totals[-1] - totals[0]) / totals[0]) if totals[0] else None
+            out["trend"] = {"computable": True,
+                "cur_key": keys[-1], "prev_key": keys[-2], "first_key": keys[0],
+                "current": cur, "previous": prev, "mom_change": cur - prev,
+                "mom_pct": (_r(100.0 * (cur - prev) / prev, 1) if prev else None),
+                "first": first, "last": last,
+                "window_pct": (_r(100.0 * (last - first) / first, 1) if first else None),
+                "total_window_pct": (_r(tw, 1) if tw is not None else None),
+                "peak_key": keys[pi], "peak_value": vals[pi],
+                "peak_ratio": _r(vals[pi] / mu, 1) if mu else None,
+                "share_first": sh_f, "share_last": sh_l,
+                "share_change": _r(sh_l - sh_f, 1),
+                "months": len(keys)}
         else:
             out["monthly"] = _nc("fewer than 2 complete months", ["a longer date range"])
     else:
@@ -576,7 +619,7 @@ def build_cube(df, V):
     di = {d: i for i, d in enumerate(drivers)}
     oi = {o: i for i, o in enumerate(origins)}
     out = {"origins": origins, "drivers": drivers, "periods": {}, "counts": {},
-           "top_drivers": TOP_DRIVERS, "various_label": VARIOUS}
+           "top_drivers": TOP_DRIVERS, "various_label": VARIOUS, "pinned": PINNED}
     # every case, regardless of whether it falls in a complete week - so the driver
     # ranking agrees with the case total quoted everywhere else in the report
     tot = [[0] * len(drivers) for _ in origins]
@@ -608,17 +651,29 @@ def build_cube(df, V):
 
 
 def top_drivers(V):
-    """Top N named buckets plus one rolled-up row - the exec-summary call drivers."""
-    rows = V["bucket"]["rows"]
-    head = [dict(r, rank=i + 1) for i, r in enumerate(rows[:TOP_DRIVERS])]
-    tail = rows[TOP_DRIVERS:]
+    """Top N named buckets, plus any pinned driver wherever it ranks, plus one
+    rolled-up row. Every row carries its true rank by case count, so a pinned
+    driver shows where it actually sits rather than pretending to be top five."""
+    rows = [dict(r, volume_rank=i + 1) for i, r in enumerate(V["bucket"]["rows"])]
+    head = [dict(r) for r in rows[:TOP_DRIVERS]]
+    named = {r["label"] for r in head}
+    for p in PINNED:
+        if p in named:
+            continue
+        hit = next((r for r in rows if r["label"] == p), None)
+        if hit:
+            head.append(dict(hit, pinned=True))
+            named.add(p)
+    head = [dict(r, rank=i + 1, driver_count=len(rows)) for i, r in enumerate(head)]
+    tail = [r for r in rows if r["label"] not in named]
     if tail:
-        head.append({"rank": len(head) + 1, "label": VARIOUS,
+        head.append({"rank": len(head) + 1, "driver_count": len(rows), "label": VARIOUS,
                      "count": sum(r["count"] for r in tail),
-                     "pct": round(sum(r["pct"] for r in tail), 1),
+                     "pct": _r(sum(r["pct"] for r in tail), 1),
                      "rolled": [r["label"] for r in tail],
                      "rolled_detail": [{"label": r["label"], "count": r["count"],
-                                        "pct": r["pct"]} for r in tail]})
+                                        "pct": r["pct"],
+                                        "volume_rank": r["volume_rank"]} for r in tail]})
     return head
 
 
@@ -670,7 +725,7 @@ def anomaly_section(df, V):
         vals = [counts[k] for k in keys]
         cur, prev = vals[-1], vals[-2]
         chg = cur - prev
-        pc = round(100.0 * chg / prev, 1) if prev else None
+        pc = _r(100.0 * chg / prev, 1) if prev else None
         b = {"computable": True, "label": label, "keys": keys, "values": vals,
              "current": cur, "previous": prev, "change": chg, "pct_change": pc,
              "current_key": keys[-1], "previous_key": keys[-2]}
@@ -679,8 +734,8 @@ def anomaly_section(df, V):
             mu = sum(hist) / len(hist)
             var = sum((v - mu) ** 2 for v in hist) / max(len(hist) - 1, 1)
             sd = math.sqrt(var)
-            b["mean_prior"] = round(mu, 1)
-            b["z"] = round((cur - mu) / sd, 2) if sd else None
+            b["mean_prior"] = _r(mu, 1)
+            b["z"] = _r((cur - mu) / sd, 2) if sd else None
         return b
 
     wk = block("W", "week")
@@ -694,7 +749,7 @@ def anomaly_section(df, V):
         if abs(pc) >= ANOM["pct_threshold"] and abs(chg) >= ANOM["min_abs_change"]:
             out["alerts"].append({
                 "level": "up" if chg > 0 else "down", "scope": "total",
-                "text": f"Total volume {'rose' if chg > 0 else 'fell'} {abs(pc):.1f}% "
+                "text": f"Total volume {'rose' if chg > 0 else 'fell'} {_r(abs(pc), 1):.1f}% "
                         f"{'to' if chg > 0 else 'to'} {b['current']} cases in {b['current_key']}, "
                         f"from {b['previous']} in {b['previous_key']} "
                         f"({chg:+d} cases {b['label']}-over-{b['label']})."})
@@ -767,7 +822,7 @@ def period_movement(df, V, freq, label, drivers):
         delta = (totals[i] - prev) if prev is not None else None
         top = max(named, key=lambda s: s["values"][i]) if named else None
         rows.append({"key": k, "total": totals[i], "delta": delta,
-                     "pct": (round(100.0 * delta / prev, 1) if prev else None),
+                     "pct": (_r(100.0 * delta / prev, 1) if prev else None),
                      "top_bucket": top["name"] if top else None,
                      "top_count": top["values"][i] if top else None,
                      "top_pct": pct(top["values"][i], totals[i]) if top and totals[i] else None})
@@ -787,13 +842,14 @@ def period_movement(df, V, freq, label, drivers):
                             "down" if move <= -ANOM["trend_pct"] else "flat",
                     "text": "Across %d %ss volume %s%s, from %d in %s to %d in %s."
                             % (len(keys), label, direction,
-                               "" if abs(move) < ANOM["trend_pct"] else " %.0f%%" % abs(move),
+                               "" if abs(move) < ANOM["trend_pct"] else " %d%%" % int(abs(move) + 0.5),
                                first, keys[0], last, keys[-1])})
     d, p = rows[-1]["delta"], rows[-1]["pct"]
     if d is not None and p is not None:
         ins.append({"kind": "up" if d > 0 else "down" if d < 0 else "flat",
-                    "text": "Latest %s (%s) is %+d case(s) on %s, %+.1f%%."
-                            % (label, keys[-1], d, keys[-2], p)})
+                    "text": "Latest %s (%s) is %+d case(s) on %s, %s%s%%."
+                            % (label, keys[-1], d, keys[-2], "+" if p >= 0 else "",
+                               "%.1f" % _r(p, 1))})
     peaks, moves = [], []
     for s_ in named:
         v = s_["values"]
@@ -801,14 +857,16 @@ def period_movement(df, V, freq, label, drivers):
         pi = max(range(len(v)), key=lambda i: v[i])
         if mu and v[pi] >= ANOM["peak_min"] and v[pi] >= ANOM["peak_ratio"] * mu:
             peaks.append({"kind": "peak",
-                        "text": "%s peaked in %s at %d cases — %.1fx its %s average of %.1f."
-                                % (s_["name"], keys[pi], v[pi], v[pi] / mu, label, mu)})
+                        "text": "%s peaked in %s at %d cases — %sx its %s average of %s."
+                                % (s_["name"], keys[pi], v[pi], "%.1f" % _r(v[pi] / mu, 1),
+                                   label, "%.1f" % _r(mu, 1))})
         if len(v) >= 2 and v[0]:
             mv = 100.0 * (v[-1] - v[0]) / v[0]
             if abs(mv) >= ANOM["bucket_pct_threshold"] and abs(v[-1] - v[0]) >= ANOM["bucket_min_abs"]:
                 moves.append({"kind": "up" if mv > 0 else "down",
-                            "text": "%s %s %.0f%% across the window (%d in %s to %d in %s)."
-                                    % (s_["name"], "grew" if mv > 0 else "shrank", abs(mv),
+                            "text": "%s %s %d%% across the window (%d in %s to %d in %s)."
+                                    % (s_["name"], "grew" if mv > 0 else "shrank",
+                                       int(abs(mv) + 0.5),
                                        v[0], keys[0], v[-1], keys[-1])})
     ins.extend(peaks); ins.extend(moves)
     return {"computable": True, "label": label, "keys": keys, "totals": totals,
@@ -835,7 +893,7 @@ def most_received(df, V):
 
 def mapping_audit(df):
     rows = defaultdict(lambda: {"count": 0, "bucket": ""})
-    for lst in df["tags"]:
+    for lst in df["tags_clean"]:
         for t in lst:
             r = rows[t]; r["count"] += 1; r["bucket"] = bucket_of(t)
     items = [{"label": k, "bucket": v["bucket"], "count": v["count"]} for k, v in rows.items()]
