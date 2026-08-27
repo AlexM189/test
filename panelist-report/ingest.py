@@ -10,33 +10,41 @@ _norm = lambda s: re.sub(r"[^a-z0-9]", "", str(s).lower())
 
 
 def map_columns(cols):
-    """Return {raw_col: canonical} plus the list of unmapped raw columns."""
+    """Return {raw_col: canonical} plus the list of unmapped raw columns.
+
+    Two passes on purpose. An exact header match always beats a substring one, so a
+    sheet carrying both "Category" and "Category Count" maps Category and leaves the
+    count alone - a single greedy pass would let whichever came first win and feed
+    the analysis a column of numbers."""
     lookup = {}
     for canon, alist in ALIASES.items():
         for a in alist:
             lookup.setdefault(a, canon)
-    mapping, unmapped = {}, []
-    for c in cols:
-        n = _norm(c)
-        if n in lookup:
-            mapping[c] = lookup[n]
+
+    final, claimed, unmapped = {}, set(), []
+    norms = [(c, _norm(c)) for c in cols]
+
+    # pass 1: exact header matches
+    for c, n in norms:
+        canon = lookup.get(n)
+        if canon and canon not in claimed:
+            claimed.add(canon); final[c] = canon
+
+    # pass 2: substring fallback, only for fields nothing matched exactly
+    for c, n in norms:
+        if c in final:
             continue
         hit = None
-        for a, canon in lookup.items():          # substring fallback, longest alias wins
-            if len(a) >= 5 and a in n:
+        for a, canon in lookup.items():
+            if len(a) >= 5 and a in n and canon not in claimed:
                 if hit is None or len(a) > len(hit[0]):
                     hit = (a, canon)
         if hit:
-            mapping[c] = hit[1]
-        else:
+            claimed.add(hit[1]); final[c] = hit[1]
+
+    for c, _n in norms:
+        if c not in final and str(c).strip() != "":
             unmapped.append(c)
-    # keep the first column claiming each canonical name
-    seen, final = set(), {}
-    for raw, canon in mapping.items():
-        if canon in seen:
-            unmapped.append(raw)
-        else:
-            seen.add(canon); final[raw] = canon
     return final, unmapped
 
 
@@ -129,6 +137,8 @@ def load_paths(paths):
                          "sheet": df.attrs.get("sheet", ""),
                          "status": "loaded", "rows": len(sub),
                          "mapped": sorted(set(mapping.values())),
+                         # which header actually fed each field, so a wrong column shows
+                         "headers": sorted((v, str(k)) for k, v in mapping.items()),
                          "unmapped": unmapped})
     if not frames:
         return pd.DataFrame(), prov

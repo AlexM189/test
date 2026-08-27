@@ -872,18 +872,28 @@ def build(res, meta):
                 ("Distinct problems", "{:,}".format(Q["junk_distinct"] + Q["unknown_distinct"]),
                  "%d placeholder + %d unknown label(s)"
                  % (Q["junk_distinct"], Q["unknown_distinct"]))]) + "</div>")
-        if Q.get("junk_labels"):
-            A('<div class="callout"><div class="t">These values are not categories</div>'
-              "They pass straight through to Other / Unmapped and inflate it. Fixing the "
-              "picklist at source removes them from every chart in this report: "
-              + "; ".join("<b>%s</b> (%s cases)" % (ESC(j["label"]), "{:,}".format(j["count"]))
-                          for j in Q["junk_labels"][:8]) + ".</div>")
-        if Q.get("unknown_labels"):
-            A('<div class="callout info"><div class="t">Labels the knowledge base does not list'
-              "</div>Real-looking values with no KB entry — either retired categories still in "
-              "use, or new ones not yet documented: "
-              + "; ".join("<b>%s</b> (%s)" % (ESC(u["label"]), "{:,}".format(u["count"]))
-                          for u in Q["unknown_labels"][:8]) + ".</div>")
+        if Q.get("junk_labels") or Q.get("unknown_labels"):
+            A("<h4>Where these values come from</h4>")
+            A('<p class="sub">The Category cell is split on commas, so a single cell can '
+              "produce several labels. The <b>raw cell</b> column below is the untouched "
+              "Category value for a case that produced the label — search your export for that "
+              "text to find the rows. <b>Position</b> says whether the label was the first "
+              "token in the cell (the primary category) or a later one.</p>")
+            A('<div class="scroll"><table><thead><tr><th>Label</th><th>Kind</th>'
+              '<th class="n">Cases</th><th>Position</th><th>Raw Category cell it came from</th>'
+              "</tr></thead><tbody>")
+            for kind, items in (("not a category", Q.get("junk_labels", [])),
+                                ("not in the KB", Q.get("unknown_labels", []))):
+                for it in items[:10]:
+                    exs = it.get("examples") or [{"position": "—", "cell": "—"}]
+                    for k, e in enumerate(exs):
+                        A("<tr>"
+                          + ('<td class="mono"><b>%s</b></td><td>%s</td><td class="n">%s</td>'
+                             % (ESC(it["label"]), ESC(kind), "{:,}".format(it["count"]))
+                             if k == 0 else "<td></td><td></td><td></td>")
+                          + '<td>%s</td><td class="mono">%s</td></tr>'
+                          % (ESC(e["position"]), ESC(e["cell"] or "(blank)")))
+            A("</tbody></table></div>")
 
     A("<h3>Origin × category cross-tab</h3>")
     if V["crosstab"].get("computable"):
@@ -1143,6 +1153,17 @@ def build(res, meta):
                 % (ESC(p["file"]), ESC(p.get("sheet", "") or "—"), ESC(p["status"]), p["rows"],
                    ESC(", ".join(p.get("unmapped", [])) or "—")) for p in meta["prov"])
       + "</tbody></table></div>")
+    hdrs = [(f, h, p["file"]) for p in meta["prov"] for f, h in (p.get("headers") or [])]
+    if hdrs:
+        A("<h3>Which column fed which field</h3>")
+        A('<p class="sub">An exact header match always wins; a partial match is only used for '
+          "a field nothing matched exactly. If a column here looks wrong, that is the first "
+          "thing to check when a figure looks wrong.</p>")
+        A('<div class="scroll"><table><thead><tr><th>Report field</th>'
+          '<th>Column used</th><th>File</th></tr></thead><tbody>'
+          + "".join('<tr><td>%s</td><td class="mono">%s</td><td class="mono">%s</td></tr>'
+                    % (ESC(f), ESC(h), ESC(fl)) for f, h, fl in hdrs)
+          + "</tbody></table></div>")
     A("<p>Records read: <b>%d</b>. Exact duplicates removed: <b>%d</b>. Records analysed: <b>%d</b>.</p>"
       % (meta["stats"].get("rows_read", 0), meta["stats"].get("exact_duplicates_removed", 0),
          meta["stats"].get("rows_after_dedupe", 0)))

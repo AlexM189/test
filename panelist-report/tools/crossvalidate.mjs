@@ -5,7 +5,7 @@ const RULES=JSON.parse(readFileSync(new URL('../rules.json', import.meta.url),'u
 const eng=makeEngine(RULES);
 const file=process.argv[2];
 const rows=readDelimited(readFileSync(file,'utf8'));
-const {recs,stats}=eng.buildRecords([{file:'x',sheet:'',rows}]);
+const {recs,stats,prov}=eng.buildRecords([{file:'x',sheet:'',rows}]);
 const r=eng.run(recs);
 const V=r.volume,C=r.correlation,F=r.forecast;
 const out={
@@ -33,7 +33,9 @@ const out={
   mv_m:r.movement.monthly.computable?[r.movement.monthly.keys,r.movement.monthly.totals,r.movement.monthly.stack.map(s=>[s.name,s.values]),r.movement.monthly.insights.map(i=>[i.kind,i.text]),r.movement.monthly.rows.map(x=>[x.key,x.total,x.delta,x.pct,x.top_bucket,x.top_count,x.top_pct])]:['NC',r.movement.monthly.reason],
   mv_q:r.movement.quarterly.computable?[r.movement.quarterly.keys,r.movement.quarterly.totals,r.movement.quarterly.stack.map(s=>[s.name,s.values]),r.movement.quarterly.insights.map(i=>[i.kind,i.text]),r.movement.quarterly.rows.map(x=>[x.key,x.total,x.delta,x.pct,x.top_bucket,x.top_count,x.top_pct])]:['NC',r.movement.quarterly.reason],
   q:[r.quality.kb_size,r.quality.junk_distinct,r.quality.junk_tag_total,r.quality.unknown_distinct,r.quality.unknown_tag_total,r.quality.primary_junk_cases,r.quality.primary_junk_pct,r.quality.primary_unknown_cases,r.quality.primary_unknown_pct],
-  q_junk:r.quality.junk_labels.map(x=>[x.label,x.count]), q_unk:r.quality.unknown_labels.map(x=>[x.label,x.count]),
+  q_junk:r.quality.junk_labels.map(x=>[x.label,x.count,(x.examples||[]).map(e=>[e.position,e.cell])]),
+  q_unk:r.quality.unknown_labels.map(x=>[x.label,x.count,(x.examples||[]).map(e=>[e.position,e.cell])]),
+  hdrs:prov.map(p=>[p.headers||[],p.unmapped||[]]),
   inf2:[r.inference.from_kb,r.inference.from_rule,r.inference.pct_from_kb,r.inference.pct_from_rule],
   cube:[r.cube.origins,r.cube.drivers,r.cube.periods.week.length,r.cube.periods.month.length,r.cube.periods.quarter.length,
         (r.cube.counts.week||[]).map(o=>o.map(p=>p.reduce((a,b)=>a+b,0)).reduce((a,b)=>a+b,0))],

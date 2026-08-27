@@ -177,6 +177,15 @@ appending `[label, pattern]` to a facet's `terms`, rebuild, and re-run
 - **Data quality panel.** Every category value is checked against the KB. Values that
   are not categories at all (numbers, `N/A`, single characters) and values the KB does
   not list are counted and named, so the cleanup list is sized rather than described.
+  Each one shows the **raw Category cell it came from** and whether it was the first
+  token in that cell or a later one — the Category cell is split on commas, so one cell
+  can produce several labels and the offending text is often not what you would search
+  for. Appendix B lists **which column fed which report field**, so a mis-mapped column
+  is visible rather than silent.
+- **Header mapping is two-pass.** An exact header match always wins; a partial match is
+  only used for a field nothing matched exactly. A sheet carrying both `Category` and
+  `Category Count` maps `Category`; a single greedy pass would let whichever came first
+  win and feed the analysis a column of numbers.
 - **Monthly and quarterly movement.** When the export spans two or more complete
   calendar months (or quarters), section 1 renders a stacked bar per period — bar
   height is volume, segments are the five drivers — with generated insights above

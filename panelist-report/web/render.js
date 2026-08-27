@@ -799,19 +799,31 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
          Q.junk_distinct + " placeholder + " + Q.unknown_distinct + " unknown label(s)"],
       ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
         `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
-      if ((Q.junk_labels || []).length) {
-        A('<div class="callout"><div class="t">These values are not categories</div>' +
-          "They pass straight through to Other / Unmapped and inflate it. Fixing the picklist " +
-          "at source removes them from every chart in this report: " +
-          Q.junk_labels.slice(0, 8).map(j => `<b>${ESC(j.label)}</b> (${th(j.count)} cases)`)
-            .join("; ") + ".</div>");
-      }
-      if ((Q.unknown_labels || []).length) {
-        A('<div class="callout info"><div class="t">Labels the knowledge base does not list' +
-          "</div>Real-looking values with no KB entry — either retired categories still in use, " +
-          "or new ones not yet documented: " +
-          Q.unknown_labels.slice(0, 8).map(u => `<b>${ESC(u.label)}</b> (${th(u.count)})`)
-            .join("; ") + ".</div>");
+      if ((Q.junk_labels || []).length || (Q.unknown_labels || []).length) {
+        A("<h4>Where these values come from</h4>");
+        A('<p class="sub">The Category cell is split on commas, so a single cell can produce ' +
+          "several labels. The <b>raw cell</b> column below is the untouched Category value " +
+          "for a case that produced the label — search your export for that text to find the " +
+          "rows. <b>Position</b> says whether the label was the first token in the cell (the " +
+          "primary category) or a later one.</p>");
+        const rowsOut = [];
+        for (const [kind, items] of [["not a category", Q.junk_labels || []],
+                                     ["not in the KB", Q.unknown_labels || []]]) {
+          for (const it of items.slice(0, 10)) {
+            const exs = (it.examples && it.examples.length)
+              ? it.examples : [{ position: "—", cell: "—" }];
+            exs.forEach((e, k) => {
+              rowsOut.push("<tr>" + (k === 0
+                ? `<td class="mono"><b>${ESC(it.label)}</b></td><td>${ESC(kind)}</td>` +
+                  `<td class="n">${th(it.count)}</td>`
+                : "<td></td><td></td><td></td>") +
+                `<td>${ESC(e.position)}</td><td class="mono">${ESC(e.cell || "(blank)")}</td></tr>`);
+            });
+          }
+        }
+        A('<div class="scroll"><table><thead><tr><th>Label</th><th>Kind</th>' +
+          '<th class="n">Cases</th><th>Position</th><th>Raw Category cell it came from</th>' +
+          "</tr></thead><tbody>" + rowsOut.join("") + "</tbody></table></div>");
       }
     }
 
@@ -1055,6 +1067,17 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         `<td>${ESC(p.sheet || "—")}</td><td>${ESC(p.status)}</td><td class="n">${p.rows}</td>` +
         `<td class="mono">${ESC((p.unmapped || []).join(", ") || "—")}</td></tr>`).join("") +
       "</tbody></table></div>");
+    const hdrs = meta.prov.flatMap(p => (p.headers || []).map(([f, h]) => [f, h, p.file]));
+    if (hdrs.length) {
+      A("<h3>Which column fed which field</h3>");
+      A('<p class="sub">An exact header match always wins; a partial match is only used for a ' +
+        "field nothing matched exactly. If a column here looks wrong, that is the first thing " +
+        "to check when a figure looks wrong.</p>");
+      A('<div class="scroll"><table><thead><tr><th>Report field</th><th>Column used</th>' +
+        "<th>File</th></tr></thead><tbody>" +
+        hdrs.map(([f, h, fl]) => `<tr><td>${ESC(f)}</td><td class="mono">${ESC(h)}</td>` +
+          `<td class="mono">${ESC(fl)}</td></tr>`).join("") + "</tbody></table></div>");
+    }
     A(`<p>Records read: <b>${meta.stats.rows_read}</b>. Exact duplicates removed: ` +
       `<b>${meta.stats.exact_duplicates_removed}</b>. Records analysed: ` +
       `<b>${meta.stats.rows_after_dedupe}</b>.</p>`);

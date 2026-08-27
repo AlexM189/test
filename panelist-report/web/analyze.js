@@ -35,19 +35,28 @@ export function makeEngine(RULES) {
   for (const [canon, list] of Object.entries(RULES.aliases))
     for (const a of list) if (!lookup.has(a)) lookup.set(a, canon);
 
+  /* Two passes on purpose. An exact header match always beats a substring one, so a
+     sheet carrying both "Category" and "Category Count" maps Category and leaves the
+     count alone - a single greedy pass would let whichever came first win and feed
+     the analysis a column of numbers. */
   function mapColumns(cols) {
-    const mapping = {}, unmapped = [], seen = new Set();
+    const mapping = {}, unmapped = [], claimed = new Set();
+    const norms = cols.map(c => norm(c));
     cols.forEach((c, i) => {
-      const n = norm(c);
-      let canon = lookup.get(n) || null;
-      if (!canon) {
-        let best = null;
-        for (const [a, cn] of lookup)
-          if (a.length >= 5 && n.includes(a) && (!best || a.length > best[0].length)) best = [a, cn];
-        if (best) canon = best[1];
+      const canon = lookup.get(norms[i]);
+      if (canon && !claimed.has(canon)) { claimed.add(canon); mapping[i] = canon; }
+    });
+    cols.forEach((c, i) => {
+      if (mapping[i]) return;
+      let best = null;
+      for (const [a, cn] of lookup) {
+        if (a.length >= 5 && norms[i].includes(a) && !claimed.has(cn) &&
+            (!best || a.length > best[0].length)) best = [a, cn];
       }
-      if (canon && !seen.has(canon)) { seen.add(canon); mapping[i] = canon; }
-      else if (String(c).trim() !== "") unmapped.push(c);
+      if (best) { claimed.add(best[1]); mapping[i] = best[1]; }
+    });
+    cols.forEach((c, i) => {
+      if (!mapping[i] && String(c).trim() !== "") unmapped.push(c);
     });
     return { mapping, unmapped };
   }
@@ -145,8 +154,11 @@ export function makeEngine(RULES) {
         for (const ci of Object.keys(mapping)) r[mapping[ci]] = ws(row[+ci]);
         recs.push(r); n++;
       }
+      // which header actually fed each field, so a wrong column shows
+      const headers = Object.keys(mapping)
+        .map(ci => [mapping[ci], String(header[+ci])]).sort();
       prov.push({ file: t.file, sheet: t.sheet, status: "loaded", rows: n,
-                  mapped: [...canon].sort(), unmapped });
+                  mapped: [...canon].sort(), headers, unmapped });
     }
     // De-duplicate on the same key the Python path uses. Dates are normalised
     // first: the identical case exported as .xlsx and as .csv carries different
@@ -485,14 +497,20 @@ export function makeEngine(RULES) {
   function dataQuality(recs) {
     const n = recs.length;
     const unknown = new Map(), junk = new Map();
+    const ex = new Map();          // label -> example raw Category cells
     let primJunk = 0, primUnknown = 0;
     for (const r of recs) {
       for (const t of r.tags) {
-        if (isJunkLabel(t)) {
-          const k = ws(t) || "(blank)";
-          junk.set(k, (junk.get(k) || 0) + 1);
-        } else if (!CATEGORY_MAP.has(catnorm(t))) {
-          unknown.set(ws(t), (unknown.get(ws(t)) || 0) + 1);
+        const lab = ws(t) || "(blank)";
+        const bad = isJunkLabel(t);
+        if (bad) junk.set(lab, (junk.get(lab) || 0) + 1);
+        else if (!CATEGORY_MAP.has(catnorm(t))) unknown.set(lab, (unknown.get(lab) || 0) + 1);
+        else continue;
+        const cell = ws(r.category).slice(0, 160);
+        if (!ex.has(lab)) ex.set(lab, []);
+        const e = ex.get(lab);
+        if (e.length < 3 && !e.some(x => x.cell === cell)) {
+          e.push({ cell, position: ws(r.primary_category) === lab ? "primary" : "secondary tag" });
         }
       }
       const p = r.primary_category;
@@ -500,7 +518,7 @@ export function makeEngine(RULES) {
       else if (ws(p) && !CATEGORY_MAP.has(catnorm(p))) primUnknown++;
     }
     const top = m => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-      .slice(0, 25).map(([label, count]) => ({ label, count }));
+      .slice(0, 25).map(([label, count]) => ({ label, count, examples: ex.get(label) || [] }));
     const sum = m => [...m.values()].reduce((a, b) => a + b, 0);
     return { kb_size: CATEGORY_MAP.size,
              junk_labels: top(junk), junk_distinct: junk.size, junk_tag_total: sum(junk),

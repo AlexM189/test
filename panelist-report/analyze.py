@@ -405,18 +405,30 @@ def data_quality(df):
     carry no meaning at all. This is the cleanup list, sized."""
     n = len(df)
     unknown, junk = Counter(), Counter()
-    for lst in df["tags"]:
+    ex = defaultdict(list)          # label -> example raw Category cells
+    raw_col = df["category"] if "category" in df else pd.Series([""] * n, index=df.index)
+    prim = df["primary_category"]
+    for lst, raw, pr in zip(df["tags"], raw_col, prim):
         for t in lst:
             key = _catnorm(t)
-            if is_junk_label(t):
-                junk[_ws(t) or "(blank)"] += 1
+            lab = _ws(t) or "(blank)"
+            bad = is_junk_label(t)
+            if bad:
+                junk[lab] += 1
             elif key not in CATEGORY_MAP:
-                unknown[_ws(t)] += 1
+                unknown[lab] += 1
+            else:
+                continue
+            cell = _ws(raw)
+            e = ex[lab]
+            if len(e) < 3 and not any(x["cell"] == cell for x in e):
+                e.append({"cell": cell[:160], "position": "primary" if _ws(pr) == lab
+                          else "secondary tag"})
     prim_junk = int(df["primary_category"].apply(is_junk_label).sum())
     prim_unknown = int(df["primary_category"].apply(
         lambda t: bool(_ws(t)) and not is_junk_label(t) and _catnorm(t) not in CATEGORY_MAP).sum())
-    top = lambda c: [{"label": k, "count": v} for k, v in
-                     sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))[:25]]
+    top = lambda c: [{"label": k, "count": v, "examples": ex.get(k, [])}
+                     for k, v in sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))[:25]]
     return {"kb_size": len(CATEGORY_MAP),
             "junk_labels": top(junk),
             "junk_distinct": len(junk), "junk_tag_total": sum(junk.values()),
