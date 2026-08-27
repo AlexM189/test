@@ -58,6 +58,7 @@ def main():
         "/* --- web/parse.js --- */",   strip_module(read(WEB, "parse.js")),
         "/* --- web/analyze.js --- */", strip_module(read(WEB, "analyze.js")),
         "/* --- web/render.js --- */",  strip_module(read(WEB, "render.js")),
+        "/* --- web/pptx.js --- */",    strip_module(read(WEB, "pptx.js")),
         "/* --- web/app.js --- */",     strip_module(read(WEB, "app.js")),
     ])
 

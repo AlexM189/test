@@ -10,6 +10,19 @@ window.__reportInit = function(root){
     r.setAttribute('data-theme',nxt);
     try{localStorage.setItem(K,nxt);}catch(e){}
   });
+  if(!window.__ddPrintBound){
+    window.__ddPrintBound=true;
+    window.addEventListener('beforeprint',function(){
+      document.querySelectorAll('details.dd').forEach(function(d){
+        if(!d.open){ d.open=true; d.setAttribute('data-reopened','1'); }
+      });
+    });
+    window.addEventListener('afterprint',function(){
+      document.querySelectorAll('details.dd[data-reopened]').forEach(function(d){
+        d.open=false; d.removeAttribute('data-reopened');
+      });
+    });
+  }
   var pb=root.getElementById ? root.getElementById('printBtn') : root.querySelector('#printBtn'); if(pb) pb.addEventListener('click',function(){window.print();});
   var tip=document.querySelector('body > .tip');
   if(!tip){ tip=document.createElement('div'); tip.className='tip'; document.body.appendChild(tip); }

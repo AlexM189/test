@@ -176,3 +176,15 @@ td.delta-down{color:var(--accent);font-weight:640}
 .mini .track{display:flex;align-items:center;gap:8px;min-width:0}
 .nojs{color:var(--text-3);font-size:.85rem}
 @media print{.slicer{display:none}}
+details.dd{border:1px solid var(--border);border-radius:11px;margin:0 0 10px;background:var(--surface)}
+details.dd > summary{cursor:pointer;list-style:none;padding:12px 15px;display:flex;flex-wrap:wrap;
+  gap:10px;align-items:baseline;border-radius:11px}
+details.dd > summary::-webkit-details-marker{display:none}
+details.dd > summary::before{content:"▸";color:var(--text-3);font-size:.85rem;flex:none}
+details.dd[open] > summary::before{content:"▾"}
+details.dd > summary:hover{background:var(--surface-2)}
+details.dd > summary .nm{font-weight:660;font-size:.98rem}
+details.dd > summary .mt{color:var(--text-3);font-size:.83rem;margin-left:auto;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+details.dd .body{padding:2px 15px 16px}
+@media print{details.dd{break-inside:avoid}details.dd > summary::before{content:""}}

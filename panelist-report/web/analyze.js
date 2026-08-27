@@ -17,11 +17,13 @@ export function makeEngine(RULES) {
   const VARIOUS = RULES.various_label;
   const ANOM = RULES.anomaly;
   const UNMAPPED = "Other / Unmapped";
-  const DEEP_DIVES = (RULES.deep_dives || []).map(d => ({
-    id: d.id, title: d.title, drivers: d.drivers, cross: d.cross,
-    facets: d.facets.map(f => ({ name: f.name,
-      terms: f.terms.map(([label, pat]) => [label, new RegExp(pat, "i")]) })),
-  }));
+  const FACET_SETS = {};
+  for (const [k, fs] of Object.entries(RULES.facet_sets || {})) {
+    FACET_SETS[k] = fs.map(f => ({ name: f.name,
+      terms: f.terms.map(([label, pat]) => [label, new RegExp(pat, "i")]) }));
+  }
+  const DRIVER_FACETS = RULES.driver_facets || {};
+  const DD_DEFAULTS = RULES.deep_dive_defaults || { set: "default", cross: [], expanded: 3 };
   const SCRUB = [[/[\w.+-]+@[\w-]+\.[\w.]+/g, " "], [/https?:\/\/\S+/g, " "],
                  [/\b\d{7,}\b/g, " "]];
   const norm = s => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -521,6 +523,30 @@ export function makeEngine(RULES) {
   /* Drill-down for one family of drivers. Facets are matched against the free text
      only, so they add information the category field does not already carry. Output
      is a fixed vocabulary of facet labels - never text from a case. */
+  /* Facet set for one driver: an override where configured, otherwise the generic
+     set, so every family gets a drill-down without hand-writing 14 of them. */
+  function diveConfig(driver) {
+    const o = DRIVER_FACETS[driver] || {};
+    const name = o.set || DD_DEFAULTS.set || "default";
+    return { id: driver.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
+             title: driver, drivers: [driver],
+             cross: o.cross || DD_DEFAULTS.cross || [],
+             facet_set: name, facets: FACET_SETS[name] || [] };
+  }
+
+  /* One dive per driver present in the data, biggest first. */
+  function allDeepDives(recs, V) {
+    const out = [];
+    for (const row of V.bucket.rows) {
+      if (!row.count) continue;
+      const cfg = diveConfig(row.label);
+      const d = deepDive(recs, V, cfg);
+      d.facet_set = cfg.facet_set;
+      out.push(d);
+    }
+    return out;
+  }
+
   function deepDive(recs, V, cfg) {
     const fam = recs.filter(r => cfg.drivers.indexOf(r.bucket) >= 0);
     const nAll = recs.length, n = fam.length;
@@ -655,7 +681,8 @@ export function makeEngine(RULES) {
     if (tail.length) head.push({ rank: head.length + 1, label: VARIOUS,
       count: tail.reduce((a, b) => a + b.count, 0),
       pct: Math.round(tail.reduce((a, b) => a + b.pct, 0) * 10) / 10,
-      rolled: tail.map(r => r.label) });
+      rolled: tail.map(r => r.label),
+      rolled_detail: tail.map(r => ({ label: r.label, count: r.count, pct: r.pct })) });
     return head;
   }
 
@@ -810,12 +837,15 @@ export function makeEngine(RULES) {
       for (const b of rolled.rolled) (ser[b] || []).forEach((v, i) => { acc[i] += v; });
       if (acc.some(v => v)) stack.push({ name: rolled.label, values: acc });
     }
+    // the rolled-up row is a bag of leftover drivers, not a driver - it can never be
+    // "the largest driver" and never earns a peak or growth insight of its own
+    const named = stack.filter(s2 => s2.name !== VARIOUS);
     const totals = keys.map(k => counts[k]);
     const rows = keys.map((k, i) => {
       const prev = i ? totals[i - 1] : null;
       const delta = prev === null ? null : totals[i] - prev;
       let top = null;
-      for (const s2 of stack) if (!top || s2.values[i] > top.values[i]) top = s2;
+      for (const s2 of named) if (!top || s2.values[i] > top.values[i]) top = s2;
       return { key: k, total: totals[i], delta,
         pct: prev ? Math.round(1000 * delta / prev) / 10 : null,
         top_bucket: top ? top.name : null, top_count: top ? top.values[i] : null,
@@ -846,7 +876,7 @@ export function makeEngine(RULES) {
           lastRow.pct.toFixed(1) + "%." });
     }
     const peaks = [], moves = [];
-    for (const s2 of stack) {
+    for (const s2 of named) {
       const v = s2.values;
       const mu = v.reduce((a, b) => a + b, 0) / v.length;
       let pi = 0;
@@ -914,7 +944,7 @@ export function makeEngine(RULES) {
                  quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
                },
                quality: dataQuality(recs), cube: buildCube(recs, volume),
-               deep_dives: DEEP_DIVES.map(c => deepDive(recs, volume, c)) };
+               deep_dives: allDeepDives(recs, volume) };
     },
   };
 }

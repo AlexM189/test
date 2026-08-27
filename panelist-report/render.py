@@ -54,8 +54,9 @@ def svg_donut(rows, total, cx=132, r_out=118, r_in=72):
         x3, y3 = cx + r_in * math.cos(a0), H / 2 + r_in * math.sin(a0)
         d = ("M%.2f %.2f A%.2f %.2f 0 %d 1 %.2f %.2f L%.2f %.2f A%.2f %.2f 0 %d 0 %.2f %.2f Z"
              % (x0, y0, r_out, r_out, big, x1, y1, x2, y2, r_in, r_in, big, x3, y3))
-        parts.append('<path d="%s" fill="%s" data-tip="%s"/>'
-                     % (d, cvar(i), ESC("%s — %d cases (%.1f%%)" % (rrow["label"], rrow["count"], rrow["pct"]))))
+        tip = rrow.get("tip") or ("%s — %d cases (%.1f%%)"
+                                  % (rrow["label"], rrow["count"], rrow["pct"]))
+        parts.append('<path d="%s" fill="%s" data-tip="%s"/>' % (d, cvar(i), ESC(tip)))
     parts.append('<text x="%d" y="%d" text-anchor="middle" font-size="30" font-weight="700" '
                  'fill="var(--text)" style="font-variant-numeric:tabular-nums">%d</text>'
                  % (cx, H / 2 + 2, total))
@@ -82,9 +83,9 @@ def svg_hbar(rows, total, series_color=None, label_w=178, W=720):
         short = lbl if len(lbl) <= 30 else lbl[:29] + "…"
         p.append('<text x="%d" y="%.1f" text-anchor="end" font-size="12.5" fill="var(--text-2)">%s'
                  '<title>%s</title></text>' % (label_w, y + rowh * .68, ESC(short), ESC(lbl)))
+        tip = rrow.get("tip") or ("%s — %d cases (%.1f%%)" % (lbl, rrow["count"], rrow["pct"]))
         p.append('<rect x="%d" y="%.1f" width="%.2f" height="%d" rx="4" fill="%s" data-tip="%s"/>'
-                 % (bar_x, y, w, rowh, col,
-                    ESC("%s — %d cases (%.1f%%)" % (lbl, rrow["count"], rrow["pct"]))))
+                 % (bar_x, y, w, rowh, col, ESC(tip)))
         p.append('<text x="%.1f" y="%.1f" font-size="12.5" font-weight="640" fill="var(--text)" '
                  'style="font-variant-numeric:tabular-nums">%d <tspan fill="var(--text-3)" '
                  'font-weight="400">(%.1f%%)</tspan></text>'
@@ -274,6 +275,11 @@ def movement_block(mv, drivers):
     return "".join(out)
 
 
+def f0(x):
+    """Half-up rounding to a whole percent - matches Math.round in the JS renderer."""
+    return "%d" % int(float(x) + 0.5)
+
+
 def pct_of(a, b):
     return round(100.0 * a / b, 1) if b else 0.0
 
@@ -334,7 +340,7 @@ def deep_dive_block(dd):
     if dd["facets"] and dd["facets"][0]["rows"]:
         t = dd["facets"][0]["rows"][0]
         tiles.append(("Top %s" % dd["facets"][0]["name"].split("/")[0].strip().lower(),
-                      "%.0f%%" % t["pct"], "%s (%s cases)" % (t["label"], "{:,}".format(t["count"]))))
+                      f0(t["pct"]) + "%", "%s (%s cases)" % (t["label"], "{:,}".format(t["count"]))))
     h.append('<div class="stats">' + "".join(
         '<div class="stat"><div class="k">%s</div><div class="v num">%s</div>'
         '<div class="d">%s</div></div>' % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:4])
@@ -419,6 +425,29 @@ def legend(rows):
         for i, r in enumerate(rows)) + "</div>")
 
 
+def rolled_tip(d, top=5):
+    """Tooltip for the rolled-up row: name what is actually inside it."""
+    det = d.get("rolled_detail") or []
+    if not det:
+        return None
+    head = "; ".join("%s %s" % (x["label"], "{:,}".format(x["count"])) for x in det[:top])
+    more = ("; +%d more" % (len(det) - top)) if len(det) > top else ""
+    return ("%s — %s cases (%.1f%%) across %d categories: %s%s"
+            % (d["label"], "{:,}".format(d["count"]), d["pct"], len(det), head, more))
+
+
+def with_tips(drivers):
+    """Chart rows for the driver list, with the roll-up carrying its contents."""
+    out = []
+    for d in drivers:
+        row = {"label": d["label"], "count": d["count"], "pct": d["pct"]}
+        t = rolled_tip(d)
+        if t:
+            row["tip"] = t
+        out.append(row)
+    return out
+
+
 def driver_labels(drivers):
     return [d["label"] for d in drivers]
 
@@ -462,7 +491,9 @@ def drivers_table(drivers, total):
          '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>']
     for i, d in enumerate(drivers):
         rolled = d.get("rolled")
-        tip = (' title="%s"' % ESC(", ".join(rolled))) if rolled else ""
+        det = d.get("rolled_detail") or []
+        tip = (' title="%s"' % ESC("; ".join("%s (%s)" % (x["label"], "{:,}".format(x["count"]))
+                                             for x in det))) if det else ""
         h.append('<tr%s><td class="n">%d</td><td%s><span class="swatch" style="background:%s">'
                  '</span>%s%s</td><td class="n">%d</td><td class="n">%.1f%%</td></tr>'
                  % (' class="various"' if rolled else "", d["rank"], tip, cvar(i),
@@ -657,15 +688,15 @@ def build(res, meta):
                       "%.2f cases per member" % (n / V["unique_members"])))
     if V["bucket"]["rows"]:
         t = V["bucket"]["rows"][0]
-        tiles.append(("Top category", "%.0f%%" % t["pct"], "%s (%d cases)" % (t["label"], t["count"])))
+        tiles.append(("Top category", f0(t["pct"]) + "%", "%s (%d cases)" % (t["label"], t["count"])))
     if V["origin"].get("computable") and V["origin"]["rows"]:
         t = V["origin"]["rows"][0]
-        tiles.append(("Top origin", "%.0f%%" % t["pct"], "%s (%d cases)" % (t["label"], t["count"])))
+        tiles.append(("Top origin", f0(t["pct"]) + "%", "%s (%d cases)" % (t["label"], t["count"])))
     tiles.append(("Topics per case", "%.2f" % V["tag_load"]["mean_tags_per_case"],
-                  "%.0f%% of cases carry 2+ topic tags" % V["tag_load"]["multi_tag_pct"]))
+                  f0(V["tag_load"]["multi_tag_pct"]) + "% of cases carry 2+ topic tags"))
     rc = C.get("repeat_contact", {})
     if rc.get("computable"):
-        tiles.append(("Repeat contacts", "%.0f%%" % rc["pct_cases_from_repeat"],
+        tiles.append(("Repeat contacts", f0(rc["pct_cases_from_repeat"]) + "%",
                       "of cases come from members with 2+ cases"))
     A('<div class="stats">' + "".join(
         '<div class="stat"><div class="k">%s</div><div class="v num">%s</div><div class="d">%s</div></div>'
@@ -734,8 +765,14 @@ def build(res, meta):
         A('<p class="sub">Ranked by primary category. Positions 1–%d are the named drivers; '
           'position %d rolls up every remaining category so the five add to 100%%.</p>'
           % (RULES["gates"]["top_drivers"], len(DR)))
-        chart_rows = [{"label": "%d. %s" % (d["rank"], d["label"]),
-                       "count": d["count"], "pct": d["pct"]} for d in DR]
+        chart_rows = []
+        for d in DR:
+            row = {"label": "%d. %s" % (d["rank"], d["label"]),
+                   "count": d["count"], "pct": d["pct"]}
+            t = rolled_tip(d)
+            if t:
+                row["tip"] = t
+            chart_rows.append(row)
         A('<div id="driverBlock">')
         A('<div class="drivers"><figure>' + svg_hbar(chart_rows, n, label_w=196, W=560)
           + "</figure><div>" + drivers_table(DR, n) + "</div></div>")
@@ -777,8 +814,7 @@ def build(res, meta):
       'counted separately in the topic-load table so multi-issue demand is not lost.</p>')
 
     DRV = res.get("drivers") or []
-    brows = [{"label": d["label"], "count": d["count"], "pct": d["pct"]} for d in DRV] \
-        or cap_series(list(V["bucket"]["rows"]))[0]
+    brows = with_tips(DRV) or cap_series(list(V["bucket"]["rows"]))[0]
     rolled = next((d for d in DRV if d.get("rolled")), None)
     A('<div class="grid2">')
     A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>'
@@ -787,8 +823,11 @@ def build(res, meta):
       % (" %s rolls up %d lower-volume categories, itemised in the table."
          % (rolled["label"], len(rolled["rolled"])) if rolled else ""))
     A("<div>" + dist_table(brows, n, "Category bucket")
-      + (("<p class='sub'>%s contains: %s.</p>"
-          % (ESC(rolled["label"]), ESC(", ".join(rolled["rolled"])))) if rolled else "")
+      + (("<p class='sub'><b>%s</b> is a roll-up of %d smaller drivers, biggest first: %s.</p>"
+          % (ESC(rolled["label"]), len(rolled.get("rolled_detail") or rolled["rolled"]),
+             ESC("; ".join("%s (%s)" % (x["label"], "{:,}".format(x["count"]))
+                           for x in (rolled.get("rolled_detail") or [])[:6]))))
+         if rolled else "")
       + "</div>")
     A("</div>")
 
@@ -888,15 +927,27 @@ def build(res, meta):
     DD = res.get("deep_dives") or []
     if DD:
         A('<section class="card"><h2><span class="secnum">2</span>Category deep dives</h2>')
-        A('<p>Two families get a drill-down: the category tells you <i>what</i> the case was '
-          'filed as, and the free text tells you <i>what actually happened</i>. Each facet '
-          'below is a fixed vocabulary matched against the subject and description; '
-          '<b>no text from any case is reproduced anywhere</b> — only the facet label and a '
-          'count. Email addresses, links and long digit strings are stripped before matching. '
-          'Coverage is reported per facet so the vocabulary can be judged and extended.</p>')
-        for dd in DD:
-            A("<h3>%s</h3>" % dd["title"])
+        A('<p>Every driver family gets a drill-down, biggest first: the category tells you '
+          '<i>what</i> the case was filed as, and the free text tells you <i>what actually '
+          'happened</i>. Each facet is a fixed vocabulary matched against the subject and '
+          'description; <b>no text from any case is reproduced anywhere</b> — only the facet '
+          'label and a count. Email addresses, links and long digit strings are stripped before '
+          'matching. Coverage is reported per facet, so a family whose notes do not use this '
+          'vocabulary says so rather than under-counting quietly. '
+          'Hardware, troubleshooting and incentives use specialised facet sets; the rest use a '
+          'general intent / action / outcome set. Sections open on print.</p>')
+        expanded = (_R.get("deep_dive_defaults") or {}).get("expanded", 3)
+        for i, dd in enumerate(DD):
+            cov = ""
+            if dd.get("facets") and dd["facets"][0]["rows"]:
+                t = dd["facets"][0]["rows"][0]
+                cov = " · top %s: %s" % (dd["facets"][0]["name"].lower(), t["label"])
+            A('<details class="dd"%s><summary><span class="nm">%s</span>'
+              '<span class="mt">%s cases · %.1f%%%s</span></summary><div class="body">'
+              % (" open" if i < expanded else "", ESC(dd["title"]),
+                 "{:,}".format(dd["cases"]), dd["pct_of_total"], ESC(cov)))
             A(deep_dive_block(dd))
+            A("</div></details>")
         A("</section>")
 
     # ---------------- 3. correlation

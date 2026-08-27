@@ -37,7 +37,7 @@ const out={
   inf2:[r.inference.from_kb,r.inference.from_rule,r.inference.pct_from_kb,r.inference.pct_from_rule],
   cube:[r.cube.origins,r.cube.drivers,r.cube.periods.week.length,r.cube.periods.month.length,r.cube.periods.quarter.length,
         (r.cube.counts.week||[]).map(o=>o.map(p=>p.reduce((a,b)=>a+b,0)).reduce((a,b)=>a+b,0))],
-  dd:r.deep_dives.map(d=>[d.id,d.cases,d.pct_of_total,d.with_free_text,
+  dd:r.deep_dives.map(d=>[d.id,d.facet_set,d.cases,d.pct_of_total,d.with_free_text,
       (d.facets||[]).map(f=>[f.name,f.coverage_pct,f.unmatched,f.rows.map(x=>[x.label,x.count,x.pct])]),
       d.cross?[d.cross.a,d.cross.b,d.cross.matrix,d.cross.row_totals,d.cross.col_totals]:null,
       [d.by_source,d.categories_charted,d.categories_excluded],

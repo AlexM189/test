@@ -96,8 +96,14 @@ async function run() {
 
     // full standalone document for download
     state.doc = renderer.buildDocument(res, meta);
-    const btn = $("downloadBtn");
-    btn.classList.remove("hidden");
+    // the deck reuses the report's own findings and recommendations verbatim
+    state.res = Object.assign({}, res, {
+      __findings: renderer.buildFindings(res.volume, res.correlation).map(f => f[0]),
+      __recs: renderer.buildRecs(res.volume, res.correlation),
+    });
+    state.meta = meta;
+    $("downloadBtn").classList.remove("hidden");
+    $("pptBtn").classList.remove("hidden");
 
     const skipped = prov.filter(p => p.status !== "loaded").length;
     setStatus("Done — " + recs.length.toLocaleString("en-US") + " case(s) analysed from " +
@@ -114,16 +120,34 @@ async function run() {
   }
 }
 
-function download() {
-  const blob = new Blob([state.doc], { type: "text/html;charset=utf-8" });
+function downloadPpt() {
+  try {
+    setStatus("Building the deck …");
+    const bytes = buildDeck(state.res, state.meta);
+    saveBlob(bytes,
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "panelist-support-deck-" + new Date().toISOString().slice(0, 10) + ".pptx");
+    setStatus("Deck downloaded — " + (bytes.length / 1024).toFixed(0) + " KB.");
+  } catch (e) {
+    showError("Could not build the deck", e && e.message ? e.message : String(e));
+  }
+}
+
+function saveBlob(data, type, filename) {
+  const blob = new Blob([data], { type });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "panelist-support-report-" + new Date().toISOString().slice(0, 10) + ".html";
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function download() {
+  saveBlob(state.doc, "text/html;charset=utf-8",
+    "panelist-support-report-" + new Date().toISOString().slice(0, 10) + ".html");
 }
 
 /* ------------------------------------------------------------ wiring */
@@ -144,12 +168,14 @@ drop.addEventListener("drop", e => {
 });
 $("runBtn").addEventListener("click", run);
 $("downloadBtn").addEventListener("click", download);
+$("pptBtn").addEventListener("click", downloadPpt);
 $("resetBtn").addEventListener("click", () => {
   state.files = []; state.doc = null;
   renderFileList(); clearError(); setStatus("");
   $("reportHost").classList.add("hidden");
   $("reportHost").innerHTML = "";
   $("downloadBtn").classList.add("hidden");
+  $("pptBtn").classList.add("hidden");
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 $("toolThemeBtn").addEventListener("click", () => {

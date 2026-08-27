@@ -34,7 +34,7 @@ out={
  "inf2":[r["inference"]["from_kb"],r["inference"]["from_rule"],r["inference"]["pct_from_kb"],r["inference"]["pct_from_rule"]],
  "cube":[r["cube"]["origins"],r["cube"]["drivers"],len(r["cube"]["periods"]["week"]),len(r["cube"]["periods"]["month"]),len(r["cube"]["periods"]["quarter"]),
          [sum(sum(p) for p in o) for o in r["cube"]["counts"]["week"]]],
- "dd":[[d["id"],d["cases"],d["pct_of_total"],d.get("with_free_text"),
+ "dd":[[d["id"],d.get("facet_set"),d["cases"],d["pct_of_total"],d.get("with_free_text"),
        [[f["name"],f["coverage_pct"],f["unmatched"],[[x["label"],x["count"],x["pct"]] for x in f["rows"]]] for f in d.get("facets",[])],
        ([d["cross"]["a"],d["cross"]["b"],d["cross"]["matrix"],d["cross"]["row_totals"],d["cross"]["col_totals"]] if d.get("cross") else None),
        [d.get("by_source"),d.get("categories_charted"),d.get("categories_excluded")],

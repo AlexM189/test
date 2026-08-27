@@ -820,247 +820,368 @@
       "^update profile|^add a member|primary member switch|primary subscriber|password|^2fa|terms of service|program change|primary didnt signed|^letter sent"
     ]
   ],
-  "deep_dives": [
-    {
-      "id": "hardware",
-      "title": "Troubleshooting &amp; hardware deep dive",
-      "drivers": [
-        "Troubleshooting & Technical",
-        "Hardware & Equipment"
-      ],
+  "facet_sets": {
+    "default": [
+      {
+        "name": "What the panelist wanted",
+        "terms": [
+          [
+            "Report a problem",
+            "not working|won'?t|doesn'?t work|does not work|broken|error|\\bissue\\b|problem|fault|fail|unable to"
+          ],
+          [
+            "Ask a question",
+            "\\bask(?:ed|ing|s)?\\b|question|inquir|wanted to know|how (?:do|can|to)|what is|\\bwhy\\b"
+          ],
+          [
+            "Request a change",
+            "\\bchange\\b|\\bupdate\\b|correct|amend|\\bedit\\b|switch|add (?:a )?(?:member|member)|remove (?:a )?member"
+          ],
+          [
+            "Chase a status",
+            "\\bstatus\\b|still waiting|following up|follow[- ]?up|any update|when will|how long"
+          ],
+          [
+            "Cancel or stop",
+            "cancel|\\bstop\\b|withdraw|opt[- ]?out|unsubscribe|no longer|remove me|\\bquit\\b|leave the panel"
+          ],
+          [
+            "Report non-receipt",
+            "not received|haven'?t received|have not received|never received|didn'?t (?:get|receive)|\\bmissing\\b|not arrived"
+          ],
+          [
+            "Complain",
+            "complain|complaint|unhappy|frustrat|\\bangry\\b|disappointed|\\bupset\\b|dissatisf"
+          ],
+          [
+            "Give praise",
+            "compliment|thank|\\bgreat\\b|excellent|happy with|appreciate|\\bkind\\b"
+          ]
+        ]
+      },
+      {
+        "name": "Action or next step",
+        "terms": [
+          [
+            "Information given",
+            "advised|explained|informed|told (?:the|her|him|them)|walked (?:her|him|them)|provided"
+          ],
+          [
+            "Record updated",
+            "updated|amended|corrected|changed (?:the|her|his|their)|added to|\\bset\\b"
+          ],
+          [
+            "Replacement or reissue sent",
+            "replacement|re-?issue|re-?sent|resend|new (?:unit|device|card|check)|\\baer\\b|shipped"
+          ],
+          [
+            "Return arranged",
+            "\\breturn\\b|\\bars\\b|call tag|\\brma\\b|send (?:it )?back|pick ?up"
+          ],
+          [
+            "Reset or reinstall guided",
+            "reset|reboot|restart|power cycle|re-?install|reconfigur|walk[- ]?through"
+          ],
+          [
+            "Escalated",
+            "escalat|case manager|supervisor|tier ?2|engineering|finance|privacy officer"
+          ],
+          [
+            "Callback or follow-up set",
+            "call ?back|follow[- ]?up call|will call|scheduled a call"
+          ],
+          [
+            "Appointment booked",
+            "appointment|technician|field service|in[- ]?home|site visit"
+          ],
+          [
+            "Status changed on the panel",
+            "suspend|withdraw|reactivat|retire|off[- ]?panel|re-?recruit"
+          ],
+          [
+            "Advised to wait",
+            "\\bwait\\b|allow \\d+ (?:days|weeks)|business days|in \\d+ days"
+          ]
+        ]
+      },
+      {
+        "name": "Contact outcome",
+        "terms": [
+          [
+            "Resolved on contact",
+            "resolved|completed|confirmed|done|sorted|fixed"
+          ],
+          [
+            "Pending or awaiting",
+            "pending|awaiting|in progress|work in process|still open"
+          ],
+          [
+            "Could not reach",
+            "no answer|answering machine|busy signal|voicemail|left (?:a )?message|unreachable|disconnected"
+          ],
+          [
+            "Refused",
+            "refus|declined to|would not|hard refusal|soft refusal|uncooperative"
+          ],
+          [
+            "Transferred",
+            "transfer|handed (?:off|over)|passed to|referred to"
+          ],
+          [
+            "Language barrier",
+            "language barrier|did not speak|interpreter"
+          ]
+        ]
+      }
+    ],
+    "hardware": [
+      {
+        "name": "Device / platform",
+        "terms": [
+          [
+            "TV meter",
+            "tv meter|\\btvm\\b|tv tuner|tuner"
+          ],
+          [
+            "Router / gateway",
+            "router|gateway|\\bmodem\\b"
+          ],
+          [
+            "Browser extension",
+            "browser extension|\\bextension\\b|google chrome|firefox|safari|\\bedge\\b|internet explorer"
+          ],
+          [
+            "Mobile / tablet app",
+            "mobile meter|smartphone|\\btablet\\b|android|\\bios\\b|mobile app|phone app"
+          ],
+          [
+            "Presence sensor",
+            "presence sensor"
+          ],
+          [
+            "Reality meter",
+            "reality meter"
+          ],
+          [
+            "CoreMini",
+            "core ?mini"
+          ],
+          [
+            "Smart home",
+            "smart ?home"
+          ],
+          [
+            "Set-top / box switch",
+            "box switch|set[- ]?top|\\bstb\\b|cable box|receiver"
+          ],
+          [
+            "Streaming stick",
+            "streaming stick|fire ?stick|\\broku\\b|chromecast"
+          ]
+        ]
+      },
+      {
+        "name": "Reported symptom",
+        "terms": [
+          [
+            "Not connecting / offline",
+            "not connect|won'?t connect|can'?t connect|cannot connect|offline|no connection|disconnect|dropping|drops? out|lost connection|no signal"
+          ],
+          [
+            "Not recording activity",
+            "not record|no activity|not track|not registering|not counting|not showing|no data|not credited|not being counted"
+          ],
+          [
+            "Will not power on",
+            "no power|won'?t (?:turn on|power)|not turning on|not power|\\bdead\\b|blank screen"
+          ],
+          [
+            "Error message",
+            "error|message says|pop[- ]?up|warning|\\bcode \\d"
+          ],
+          [
+            "Slow / freezing / crashing",
+            "\\bslow\\b|freez|\\blag\\b|hang|unresponsive|crash|stuck"
+          ],
+          [
+            "Damaged / faulty",
+            "broken|damaged|cracked|faulty|defective|burn|smok|water damage"
+          ],
+          [
+            "Wi-Fi / network",
+            "wi-?fi|wifi|network|\\bssid\\b|internet (?:is |connection)"
+          ],
+          [
+            "Battery / power supply",
+            "battery|charger|charging|power (?:cord|supply|adapter)|unplug"
+          ],
+          [
+            "Software / update",
+            "\\bupdate\\b|firmware|\\bversion\\b|reinstall|uninstall|install fail"
+          ],
+          [
+            "Login / credentials",
+            "password|log ?in|sign ?in|credential|verify|\\b2fa\\b"
+          ]
+        ]
+      },
+      {
+        "name": "Action or next step",
+        "terms": [
+          [
+            "Replacement sent",
+            "replacement|new (?:unit|device|meter|router|box)|send (?:a )?new|ship (?:a )?new|\\baer\\b|additional equipment"
+          ],
+          [
+            "Return requested",
+            "\\breturn\\b|\\bars\\b|call tag|\\brma\\b|send (?:it )?back|pick ?up"
+          ],
+          [
+            "Reset / reboot",
+            "reset|reboot|restart|power cycle|unplug and"
+          ],
+          [
+            "Reinstall / reconfigure",
+            "re-?install|reconfigur|set ?up again|walk[- ]?through|re-?pair"
+          ],
+          [
+            "Escalated",
+            "escalat|case manager|supervisor|tier ?2|engineering"
+          ],
+          [
+            "Field visit / appointment",
+            "appointment|technician|field service|in[- ]?home|site visit"
+          ]
+        ]
+      }
+    ],
+    "incentives": [
+      {
+        "name": "Issue raised",
+        "terms": [
+          [
+            "Not received",
+            "not received|haven'?t received|have not received|never received|didn'?t (?:get|receive)|still waiting|\\bmissing\\b|not arrived"
+          ],
+          [
+            "Blocked / declined",
+            "blocked|declined|denied|cannot redeem|can'?t redeem|unable to redeem|restricted|won'?t let"
+          ],
+          [
+            "Points balance query",
+            "how many points|points? balance|balance|how much do i have|check (?:my )?points|available points"
+          ],
+          [
+            "Redemption help",
+            "redeem|redemption|cash out|exchange|how (?:do|to) i (?:order|get)"
+          ],
+          [
+            "Payment status",
+            "payment status|when will i|status of my|processing|pending|still processing"
+          ],
+          [
+            "Amount wrong",
+            "wrong amount|incorrect amount|less than|short(?:ed)?|should have (?:been|received)|underpaid|only received"
+          ],
+          [
+            "Expired",
+            "expir|no longer valid|lapsed|too late"
+          ],
+          [
+            "Tax form",
+            "1099|w-?9|tax form|tax document"
+          ],
+          [
+            "Sweepstake / raffle",
+            "sweepstake|raffle|contest|drawing|\\bprize\\b"
+          ],
+          [
+            "Out of stock",
+            "out of stock|not in stock|unavailable|sold out"
+          ]
+        ]
+      },
+      {
+        "name": "Reward type",
+        "terms": [
+          [
+            "Points",
+            "\\bpoints?\\b"
+          ],
+          [
+            "Prepaid / Visa card",
+            "\\bvisa\\b|prepaid|gift ?card|debit card"
+          ],
+          [
+            "Check",
+            "\\bchecks?\\b|cheque"
+          ],
+          [
+            "Cash",
+            "\\bcash\\b"
+          ],
+          [
+            "Reimbursement / bill",
+            "reimburs|\\bbill\\b|\\bisp\\b|phone bill|toll"
+          ],
+          [
+            "Product / merchandise",
+            "product|merchandise|\\bitem\\b|catalog"
+          ]
+        ]
+      },
+      {
+        "name": "Action or next step",
+        "terms": [
+          [
+            "Reissued / resent",
+            "re-?issue|re-?sent|resend|new card|replacement (?:card|check)"
+          ],
+          [
+            "Mailed out",
+            "mailed|mail(?:ed)? out|posted|sent by (?:mail|post)"
+          ],
+          [
+            "Escalated",
+            "escalat|case manager|supervisor|finance"
+          ],
+          [
+            "Advised to wait",
+            "advised (?:to|the)|told (?:the|her|him|them)|\\bwait\\b|allow \\d+ (?:days|weeks)|business days"
+          ]
+        ]
+      }
+    ]
+  },
+  "driver_facets": {
+    "Troubleshooting & Technical": {
+      "set": "hardware",
       "cross": [
         "Device / platform",
         "Reported symptom"
-      ],
-      "facets": [
-        {
-          "name": "Device / platform",
-          "terms": [
-            [
-              "TV meter",
-              "tv meter|\\btvm\\b|tv tuner|tuner"
-            ],
-            [
-              "Router / gateway",
-              "router|gateway|\\bmodem\\b"
-            ],
-            [
-              "Browser extension",
-              "browser extension|\\bextension\\b|google chrome|firefox|safari|\\bedge\\b|internet explorer"
-            ],
-            [
-              "Mobile / tablet app",
-              "mobile meter|smartphone|\\btablet\\b|android|\\bios\\b|mobile app|phone app"
-            ],
-            [
-              "Presence sensor",
-              "presence sensor"
-            ],
-            [
-              "Reality meter",
-              "reality meter"
-            ],
-            [
-              "CoreMini",
-              "core ?mini"
-            ],
-            [
-              "Smart home",
-              "smart ?home"
-            ],
-            [
-              "Set-top / box switch",
-              "box switch|set[- ]?top|\\bstb\\b|cable box|receiver"
-            ],
-            [
-              "Streaming stick",
-              "streaming stick|fire ?stick|\\broku\\b|chromecast"
-            ]
-          ]
-        },
-        {
-          "name": "Reported symptom",
-          "terms": [
-            [
-              "Not connecting / offline",
-              "not connect|won'?t connect|can'?t connect|cannot connect|offline|no connection|disconnect|dropping|drops? out|lost connection|no signal"
-            ],
-            [
-              "Not recording activity",
-              "not record|no activity|not track|not registering|not counting|not showing|no data|not credited|not being counted"
-            ],
-            [
-              "Will not power on",
-              "no power|won'?t (?:turn on|power)|not turning on|not power|\\bdead\\b|blank screen"
-            ],
-            [
-              "Error message",
-              "error|message says|pop[- ]?up|warning|\\bcode \\d"
-            ],
-            [
-              "Slow / freezing / crashing",
-              "\\bslow\\b|freez|\\blag\\b|hang|unresponsive|crash|stuck"
-            ],
-            [
-              "Damaged / faulty",
-              "broken|damaged|cracked|faulty|defective|burn|smok|water damage"
-            ],
-            [
-              "Wi-Fi / network",
-              "wi-?fi|wifi|network|\\bssid\\b|internet (?:is |connection)"
-            ],
-            [
-              "Battery / power supply",
-              "battery|charger|charging|power (?:cord|supply|adapter)|unplug"
-            ],
-            [
-              "Software / update",
-              "\\bupdate\\b|firmware|\\bversion\\b|reinstall|uninstall|install fail"
-            ],
-            [
-              "Login / credentials",
-              "password|log ?in|sign ?in|credential|verify|\\b2fa\\b"
-            ]
-          ]
-        },
-        {
-          "name": "Action or next step",
-          "terms": [
-            [
-              "Replacement sent",
-              "replacement|new (?:unit|device|meter|router|box)|send (?:a )?new|ship (?:a )?new|\\baer\\b|additional equipment"
-            ],
-            [
-              "Return requested",
-              "\\breturn\\b|\\bars\\b|call tag|\\brma\\b|send (?:it )?back|pick ?up"
-            ],
-            [
-              "Reset / reboot",
-              "reset|reboot|restart|power cycle|unplug and"
-            ],
-            [
-              "Reinstall / reconfigure",
-              "re-?install|reconfigur|set ?up again|walk[- ]?through|re-?pair"
-            ],
-            [
-              "Escalated",
-              "escalat|case manager|supervisor|tier ?2|engineering"
-            ],
-            [
-              "Field visit / appointment",
-              "appointment|technician|field service|in[- ]?home|site visit"
-            ]
-          ]
-        }
       ]
     },
-    {
-      "id": "incentives",
-      "title": "Incentives &amp; rewards deep dive",
-      "drivers": [
-        "Incentives & Rewards"
-      ],
+    "Hardware & Equipment": {
+      "set": "hardware",
+      "cross": [
+        "Device / platform",
+        "Reported symptom"
+      ]
+    },
+    "Incentives & Rewards": {
+      "set": "incentives",
       "cross": [
         "Issue raised",
         "Reward type"
-      ],
-      "facets": [
-        {
-          "name": "Issue raised",
-          "terms": [
-            [
-              "Not received",
-              "not received|haven'?t received|have not received|never received|didn'?t (?:get|receive)|still waiting|\\bmissing\\b|not arrived"
-            ],
-            [
-              "Blocked / declined",
-              "blocked|declined|denied|cannot redeem|can'?t redeem|unable to redeem|restricted|won'?t let"
-            ],
-            [
-              "Points balance query",
-              "how many points|points? balance|balance|how much do i have|check (?:my )?points|available points"
-            ],
-            [
-              "Redemption help",
-              "redeem|redemption|cash out|exchange|how (?:do|to) i (?:order|get)"
-            ],
-            [
-              "Payment status",
-              "payment status|when will i|status of my|processing|pending|still processing"
-            ],
-            [
-              "Amount wrong",
-              "wrong amount|incorrect amount|less than|short(?:ed)?|should have (?:been|received)|underpaid|only received"
-            ],
-            [
-              "Expired",
-              "expir|no longer valid|lapsed|too late"
-            ],
-            [
-              "Tax form",
-              "1099|w-?9|tax form|tax document"
-            ],
-            [
-              "Sweepstake / raffle",
-              "sweepstake|raffle|contest|drawing|\\bprize\\b"
-            ],
-            [
-              "Out of stock",
-              "out of stock|not in stock|unavailable|sold out"
-            ]
-          ]
-        },
-        {
-          "name": "Reward type",
-          "terms": [
-            [
-              "Points",
-              "\\bpoints?\\b"
-            ],
-            [
-              "Prepaid / Visa card",
-              "\\bvisa\\b|prepaid|gift ?card|debit card"
-            ],
-            [
-              "Check",
-              "\\bchecks?\\b|cheque"
-            ],
-            [
-              "Cash",
-              "\\bcash\\b"
-            ],
-            [
-              "Reimbursement / bill",
-              "reimburs|\\bbill\\b|\\bisp\\b|phone bill|toll"
-            ],
-            [
-              "Product / merchandise",
-              "product|merchandise|\\bitem\\b|catalog"
-            ]
-          ]
-        },
-        {
-          "name": "Action or next step",
-          "terms": [
-            [
-              "Reissued / resent",
-              "re-?issue|re-?sent|resend|new card|replacement (?:card|check)"
-            ],
-            [
-              "Mailed out",
-              "mailed|mail(?:ed)? out|posted|sent by (?:mail|post)"
-            ],
-            [
-              "Escalated",
-              "escalat|case manager|supervisor|finance"
-            ],
-            [
-              "Advised to wait",
-              "advised (?:to|the)|told (?:the|her|him|them)|\\bwait\\b|allow \\d+ (?:days|weeks)|business days"
-            ]
-          ]
-        }
       ]
     }
-  ]
+  },
+  "deep_dive_defaults": {
+    "set": "default",
+    "cross": [
+      "What the panelist wanted",
+      "Action or next step"
+    ],
+    "expanded": 3
+  }
 }

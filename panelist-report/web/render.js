@@ -44,8 +44,8 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       const d = `M${x0.toFixed(2)} ${y0.toFixed(2)} A${rOut} ${rOut} 0 ${big} 1 ` +
         `${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} ` +
         `A${rIn} ${rIn} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
-      p.push(`<path d="${d}" fill="${cvar(i)}" data-tip="${ESC(row.label + " — " +
-        row.count + " cases (" + f1(row.pct) + "%)")}"/>`);
+      const tip = row.tip || (row.label + " — " + row.count + " cases (" + f1(row.pct) + "%)");
+      p.push(`<path d="${d}" fill="${cvar(i)}" data-tip="${ESC(tip)}"/>`);
     });
     p.push(`<text x="${cx}" y="${H / 2 + 2}" text-anchor="middle" font-size="30" font-weight="700" ` +
       `fill="var(--text)" style="font-variant-numeric:tabular-nums">${total}</text>`);
@@ -70,9 +70,9 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       const short = lbl.length <= 30 ? lbl : lbl.slice(0, 29) + "…";
       p.push(`<text x="${labelW}" y="${(y + rowh * 0.68).toFixed(1)}" text-anchor="end" ` +
         `font-size="12.5" fill="var(--text-2)">${ESC(short)}<title>${ESC(lbl)}</title></text>`);
+      const tip = row.tip || (lbl + " — " + row.count + " cases (" + f1(row.pct) + "%)");
       p.push(`<rect x="${barX}" y="${y.toFixed(1)}" width="${w.toFixed(2)}" height="${rowh}" ` +
-        `rx="4" fill="${col}" data-tip="${ESC(lbl + " — " + row.count + " cases (" +
-        f1(row.pct) + "%)")}"/>`);
+        `rx="4" fill="${col}" data-tip="${ESC(tip)}"/>`);
       p.push(`<text x="${(barX + w + 9).toFixed(1)}" y="${(y + rowh * 0.68).toFixed(1)}" ` +
         `font-size="12.5" font-weight="640" fill="var(--text)" ` +
         `style="font-variant-numeric:tabular-nums">${row.count} ` +
@@ -440,11 +440,30 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
              col_totals: cols.map((_, j) => M.reduce((a, r) => a + r[j], 0)) };
   }
 
+  /* Tooltip for the rolled-up row: name what is actually inside it. */
+  function rolledTip(d, top) {
+    top = top || 5;
+    const det = d.rolled_detail || [];
+    if (!det.length) return null;
+    const head = det.slice(0, top).map(x => x.label + " " + th(x.count)).join("; ");
+    const more = det.length > top ? "; +" + (det.length - top) + " more" : "";
+    return d.label + " — " + th(d.count) + " cases (" + f1(d.pct) + "%) across " +
+      det.length + " categories: " + head + more;
+  }
+  const withTips = drivers => drivers.map(d => {
+    const row = { label: d.label, count: d.count, pct: d.pct };
+    const t = rolledTip(d);
+    if (t) row.tip = t;
+    return row;
+  });
+
   function driversTable(drivers, total) {
     const h = ['<div class="scroll"><table><thead><tr><th>#</th><th>Call driver</th>' +
       '<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>'];
     drivers.forEach((d, i) => {
-      const tip = d.rolled ? ` title="${ESC(d.rolled.join(", "))}"` : "";
+      const det = d.rolled_detail || [];
+      const tip = det.length
+        ? ` title="${ESC(det.map(x => x.label + " (" + th(x.count) + ")").join("; "))}"` : "";
       h.push(`<tr${d.rolled ? ' class="various"' : ""}><td class="n">${d.rank}</td>` +
         `<td${tip}><span class="swatch" style="background:${cvar(i)}"></span>${ESC(d.label)}` +
         (d.rolled ? ` <span style='color:var(--text-3)'>(${d.rolled.length} categories)</span>` : "") +
@@ -686,8 +705,12 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       A('<p class="sub">Ranked by primary category. Positions 1–' + RULES.gates.top_drivers +
         " are the named drivers; position " + DR.length + " rolls up every remaining category " +
         "so the five add to 100%.</p>");
-      const chartRows = DR.map(d => ({ label: d.rank + ". " + d.label,
-                                       count: d.count, pct: d.pct }));
+      const chartRows = DR.map(d => {
+        const row = { label: d.rank + ". " + d.label, count: d.count, pct: d.pct };
+        const t = rolledTip(d);
+        if (t) row.tip = t;
+        return row;
+      });
       A('<div id="driverBlock">');
       A('<div class="drivers"><figure>' + svgHbar(chartRows, n, null, 196, 560) +
         "</figure><div>" + driversTable(DR, n) + "</div></div>");
@@ -726,9 +749,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       "sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are " +
       "counted separately in the topic-load table so multi-issue demand is not lost.</p>");
 
-    const brows = DR.length
-      ? DR.map(d => ({ label: d.label, count: d.count, pct: d.pct }))
-      : capSeries(V.bucket.rows.slice())[0];
+    const brows = DR.length ? withTips(DR) : capSeries(V.bucket.rows.slice())[0];
     const rolledDrv = DR.find(d => d.rolled);
     A('<div class="grid2">');
     A('<figure><h3 style="margin-top:0">Category mix (primary category)</h3>' + svgDonut(brows, n) +
@@ -736,8 +757,10 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       (rolledDrv ? ` ${ESC(rolledDrv.label)} rolls up ${rolledDrv.rolled.length} lower-volume ` +
         "categories, itemised in the table." : "") + "</figcaption></figure>");
     A("<div>" + distTable(brows, n, "Category bucket") +
-      (rolledDrv ? `<p class='sub'>${ESC(rolledDrv.label)} contains: ` +
-        `${ESC(rolledDrv.rolled.join(", "))}.</p>` : "") + "</div>");
+      (rolledDrv ? `<p class='sub'><b>${ESC(rolledDrv.label)}</b> is a roll-up of ` +
+        `${(rolledDrv.rolled_detail || rolledDrv.rolled).length} smaller drivers, biggest ` +
+        `first: ${ESC((rolledDrv.rolled_detail || []).slice(0, 6)
+          .map(x => x.label + " (" + th(x.count) + ")").join("; "))}.</p>` : "") + "</div>");
     A("</div>");
 
     A('<div class="grid2" style="margin-top:26px">');
@@ -830,16 +853,28 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     const DD = res.deep_dives || [];
     if (DD.length) {
       A('<section class="card"><h2><span class="secnum">2</span>Category deep dives</h2>');
-      A("<p>Two families get a drill-down: the category tells you <i>what</i> the case was " +
-        "filed as, and the free text tells you <i>what actually happened</i>. Each facet below " +
-        "is a fixed vocabulary matched against the subject and description; <b>no text from any " +
-        "case is reproduced anywhere</b> — only the facet label and a count. Email addresses, " +
-        "links and long digit strings are stripped before matching. Coverage is reported per " +
-        "facet so the vocabulary can be judged and extended.</p>");
-      for (const dd of DD) {
-        A("<h3>" + dd.title + "</h3>");
+      A("<p>Every driver family gets a drill-down, biggest first: the category tells you " +
+        "<i>what</i> the case was filed as, and the free text tells you <i>what actually " +
+        "happened</i>. Each facet is a fixed vocabulary matched against the subject and " +
+        "description; <b>no text from any case is reproduced anywhere</b> — only the facet " +
+        "label and a count. Email addresses, links and long digit strings are stripped before " +
+        "matching. Coverage is reported per facet, so a family whose notes do not use this " +
+        "vocabulary says so rather than under-counting quietly. Hardware, troubleshooting and " +
+        "incentives use specialised facet sets; the rest use a general intent / action / " +
+        "outcome set. Sections open on print.</p>");
+      const expanded = (RULES.deep_dive_defaults || {}).expanded ?? 3;
+      DD.forEach((dd, i) => {
+        let cov = "";
+        if ((dd.facets || []).length && dd.facets[0].rows.length) {
+          cov = " · top " + dd.facets[0].name.toLowerCase() + ": " + dd.facets[0].rows[0].label;
+        }
+        A('<details class="dd"' + (i < expanded ? " open" : "") +
+          '><summary><span class="nm">' + ESC(dd.title) + '</span><span class="mt">' +
+          th(dd.cases) + " cases · " + f1(dd.pct_of_total) + "%" + ESC(cov) +
+          '</span></summary><div class="body">');
         A(deepDiveBlock(dd));
-      }
+        A("</div></details>");
+      });
       A("</section>");
     }
 
@@ -1046,5 +1081,5 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       buildBody(res, meta) + "<script>" + RUNTIME_JS + "<\/script></body></html>";
   }
 
-  return { buildBody, buildDocument };
+  return { buildBody, buildDocument, buildFindings, buildRecs };
 }

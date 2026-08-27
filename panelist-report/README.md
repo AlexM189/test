@@ -96,6 +96,22 @@ Signal, Left Message), not support topics. Those map to `Outbound Contact Attemp
 `Outbound/Withdraw Non Primary Member`) are routed to that reason instead. Use the case
 origin slicer to see inbound demand without outbound dialling outcomes in the way.
 
+## PowerPoint export
+
+The builder's first page has a **Download deck (.pptx)** button beside the HTML
+download. `web/pptx.js` writes the package by hand — a .pptx is a ZIP of OOXML
+parts, entries are stored uncompressed, and slides are shapes and text only, so
+no library is bundled and nothing leaves the browser.
+
+The deck reuses the report's own findings and recommendations verbatim: title,
+executive summary, top call drivers, monthly movement, data quality, the three
+biggest driver families that the facet vocabulary actually reaches, the
+four-quarter outlook, and the recommendations.
+
+`tools/validate_pptx.py deck.pptx` checks the relationship graph, content-type
+coverage and XML well-formedness of every part — the things that actually break
+PowerPoint, and which python-pptx is too lenient to catch.
+
 ## Category deep dives
 
 `rules.json` carries a `deep_dives` list. Each entry names a family of drivers and a
@@ -103,15 +119,19 @@ set of **facets** — a fixed vocabulary of labelled regular expressions matched
 the case **subject and description**, not the category, so the facets add information
 the category field does not already carry.
 
-Two ship by default:
+**Every driver gets a dive**, biggest first, rendered as a collapsible block (the
+first `deep_dive_defaults.expanded` are open; all open automatically on print).
+`facet_sets` holds the reusable vocabularies and `driver_facets` attaches a
+specialised set to a driver; everything else uses the generic `default` set:
 
-| Dive | Drivers | Facets |
+| Facet set | Used by | Facets |
 |---|---|---|
 | `hardware` | Troubleshooting & Technical, Hardware & Equipment | Device / platform · Reported symptom · Action or next step |
 | `incentives` | Incentives & Rewards | Issue raised · Reward type · Action or next step |
+| `default` | every other driver | What the panelist wanted · Action or next step · Contact outcome |
 
 Each renders stat tiles, the KB categories inside the family, a bar per facet, a
-cross-tab between the two facets named in `cross`, and a monthly trend for the family.
+cross-tab between the two facets named in `cross`, and a monthly trend.
 
 A case placed by the **subject fallback** has no meaningful value in its Category cell -
 that is why the fallback ran. Those cases belong in the family (their subject says so)
@@ -141,6 +161,10 @@ appending `[label, pattern]` to a facet's `terms`, rebuild, and re-run
   lists every triggering keyword. Cases neither field can place stay in
   Other / Unmapped and are counted separately. Only the matched keyword is ever
   shown - never the subject text, which can carry identifying detail.
+- **The roll-up is never a driver.** "Various topics" collects the leftover drivers
+  so the five add to 100%, but it can never be named "the largest driver", and it
+  never earns a peak or growth insight — those are computed over real drivers only.
+  Hovering it names its biggest members with counts.
 - **Five call drivers everywhere.** `gates.top_drivers` (default 4) named buckets
   plus one rolled-up "Various topics" row. The same five appear in the exec-summary
   driver chart, the donut, the cross-tab columns and the trend lines, so no chart

@@ -21,7 +21,9 @@ TOP_DRIVERS     = RULES["gates"]["top_drivers"]
 VARIOUS         = RULES["various_label"]
 ANOM            = RULES["anomaly"]
 UNMAPPED        = "Other / Unmapped"
-DEEP_DIVES      = RULES.get("deep_dives", [])
+FACET_SETS      = RULES.get("facet_sets", {})
+DRIVER_FACETS   = RULES.get("driver_facets", {})
+DD_DEFAULTS     = RULES.get("deep_dive_defaults", {"set": "default", "cross": [], "expanded": 3})
 
 _ws = lambda s: re.sub(r"\s+", " ", str(s or "")).strip()
 
@@ -438,6 +440,29 @@ def free_text(row):
     return re.sub(r"\s+", " ", t).strip()
 
 
+def dive_config(driver):
+    """Facet set for one driver: an override where configured, otherwise the
+    generic set, so every family gets a drill-down without hand-writing 14 of them."""
+    o = DRIVER_FACETS.get(driver) or {}
+    name = o.get("set") or DD_DEFAULTS.get("set", "default")
+    return {"id": re.sub(r"[^a-z0-9]+", "-", driver.lower()).strip("-"),
+            "title": driver, "drivers": [driver],
+            "cross": o.get("cross") or DD_DEFAULTS.get("cross") or [],
+            "facet_set": name, "facets": FACET_SETS.get(name, [])}
+
+
+def all_deep_dives(df, V):
+    """One dive per driver present in the data, biggest first."""
+    out = []
+    for row in V["bucket"]["rows"]:
+        if not row["count"]:
+            continue
+        d = deep_dive(df, V, dive_config(row["label"]))
+        d["facet_set"] = dive_config(row["label"])["facet_set"]
+        out.append(d)
+    return out
+
+
 def deep_dive(df, V, cfg):
     """Drill-down for one family of drivers. Facets are matched against the free
     text only, so they add information the category field does not already carry.
@@ -579,7 +604,9 @@ def top_drivers(V):
         head.append({"rank": len(head) + 1, "label": VARIOUS,
                      "count": sum(r["count"] for r in tail),
                      "pct": round(sum(r["pct"] for r in tail), 1),
-                     "rolled": [r["label"] for r in tail]})
+                     "rolled": [r["label"] for r in tail],
+                     "rolled_detail": [{"label": r["label"], "count": r["count"],
+                                        "pct": r["pct"]} for r in tail]})
     return head
 
 
@@ -718,12 +745,15 @@ def period_movement(df, V, freq, label, drivers):
         if any(acc):
             stack.append({"name": rolled["label"], "values": acc})
 
+    # the rolled-up row is a bag of leftover drivers, not a driver - it can never be
+    # "the largest driver" and never earns a peak or growth insight of its own
+    named = [s for s in stack if s["name"] != VARIOUS]
     totals = [counts[k] for k in keys]
     rows = []
     for i, k in enumerate(keys):
         prev = totals[i - 1] if i else None
         delta = (totals[i] - prev) if prev is not None else None
-        top = max(stack, key=lambda s: s["values"][i]) if stack else None
+        top = max(named, key=lambda s: s["values"][i]) if named else None
         rows.append({"key": k, "total": totals[i], "delta": delta,
                      "pct": (round(100.0 * delta / prev, 1) if prev else None),
                      "top_bucket": top["name"] if top else None,
@@ -753,7 +783,7 @@ def period_movement(df, V, freq, label, drivers):
                     "text": "Latest %s (%s) is %+d case(s) on %s, %+.1f%%."
                             % (label, keys[-1], d, keys[-2], p)})
     peaks, moves = [], []
-    for s_ in stack:
+    for s_ in named:
         v = s_["values"]
         mu = sum(v) / len(v)
         pi = max(range(len(v)), key=lambda i: v[i])
@@ -818,6 +848,6 @@ def run(df):
             },
             "most_received": most_received(df, vol),
             "quality": data_quality(df),
-            "deep_dives": [deep_dive(df, vol, c) for c in DEEP_DIVES],
+            "deep_dives": all_deep_dives(df, vol),
             "cube": build_cube(df, vol),
             "buckets": BUCKETS}
