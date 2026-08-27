@@ -96,6 +96,32 @@ Signal, Left Message), not support topics. Those map to `Outbound Contact Attemp
 `Outbound/Withdraw Non Primary Member`) are routed to that reason instead. Use the case
 origin slicer to see inbound demand without outbound dialling outcomes in the way.
 
+## Category deep dives
+
+`rules.json` carries a `deep_dives` list. Each entry names a family of drivers and a
+set of **facets** — a fixed vocabulary of labelled regular expressions matched against
+the case **subject and description**, not the category, so the facets add information
+the category field does not already carry.
+
+Two ship by default:
+
+| Dive | Drivers | Facets |
+|---|---|---|
+| `hardware` | Troubleshooting & Technical, Hardware & Equipment | Device / platform · Reported symptom · Action or next step |
+| `incentives` | Incentives & Rewards | Issue raised · Reward type · Action or next step |
+
+Each renders stat tiles, the KB categories inside the family, a bar per facet, a
+cross-tab between the two facets named in `cross`, and a monthly trend for the family.
+
+**Privacy.** Output is the facet label and a count — never text from a case. Email
+addresses, URLs and digit runs of 7 or more are stripped before matching. Because the
+vocabulary is fixed in `rules.json`, nothing a panelist wrote can reach the page.
+
+Each facet reports **coverage** — how many family cases matched at least one term and
+how many matched none — so the vocabulary can be judged and extended. Add a term by
+appending `[label, pattern]` to a facet's `terms`, rebuild, and re-run
+`tools/crossvalidate.py`.
+
 ## Rules the pipeline enforces
 
 - **Primary category = the first label in the Category field.** One bucket per case,

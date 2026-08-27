@@ -33,6 +33,12 @@ out={
  "inf2":[r["inference"]["from_kb"],r["inference"]["from_rule"],r["inference"]["pct_from_kb"],r["inference"]["pct_from_rule"]],
  "cube":[r["cube"]["origins"],r["cube"]["drivers"],len(r["cube"]["periods"]["week"]),len(r["cube"]["periods"]["month"]),len(r["cube"]["periods"]["quarter"]),
          [sum(sum(p) for p in o) for o in r["cube"]["counts"]["week"]]],
+ "dd":[[d["id"],d["cases"],d["pct_of_total"],d.get("with_free_text"),
+       [[f["name"],f["coverage_pct"],f["unmatched"],[[x["label"],x["count"],x["pct"]] for x in f["rows"]]] for f in d.get("facets",[])],
+       ([d["cross"]["a"],d["cross"]["b"],d["cross"]["matrix"],d["cross"]["row_totals"],d["cross"]["col_totals"]] if d.get("cross") else None),
+       ([d["repeat"]["members"],d["repeat"]["repeat_members"],d["repeat"]["pct_cases_from_repeat"]] if d.get("repeat",{}).get("computable") else "NC"),
+       (d["monthly"]["values"] if d.get("monthly",{}).get("computable") else "NC"),
+       [[x["label"],x["count"]] for x in d.get("top_categories",[])]] for d in r["deep_dives"]],
  "most":([r["most_received"]["label"],r["most_received"]["count"],[l["label"] for l in r["most_received"]["top_labels"]],(r["most_received"]["origin"]["label"] if r["most_received"]["origin"] else None)] if r["most_received"] else None),
 }
 print(json.dumps(out))

@@ -274,6 +274,84 @@ def movement_block(mv, drivers):
     return "".join(out)
 
 
+def facet_block(f, n):
+    if not f["rows"]:
+        return ('<p class="sub"><b>%s</b> — no term in this facet matched any case.</p>'
+                % ESC(f["name"]))
+    h = ['<h4>%s</h4>' % ESC(f["name"])]
+    h.append(svg_hbar(f["rows"][:8], n, label_w=210, W=640))
+    h.append('<p class="sub">%s of %s cases in this family matched at least one term '
+             '(%.1f%%); %s matched none. A case can match several terms, so the bars '
+             'deliberately sum above the case count.</p>'
+             % ("{:,}".format(f["matched"]), "{:,}".format(n), f["coverage_pct"],
+                "{:,}".format(f["unmatched"])))
+    return "".join(h)
+
+
+def cross_heat(c):
+    mx = max((max(r) for r in c["matrix"]), default=0) or 1
+    h = ['<div class="scroll"><table><thead><tr><th>%s \\ %s</th>'
+         % (ESC(c["a_name"]), ESC(c["b_name"]))]
+    for b in c["b"]:
+        h.append('<th class="n">%s</th>' % ESC(b))
+    h.append('<th class="n">Total</th></tr></thead><tbody>')
+    for i, a in enumerate(c["a"]):
+        h.append("<tr><td><b>%s</b></td>" % ESC(a))
+        for j, b in enumerate(c["b"]):
+            v = c["matrix"][i][j]
+            step = 0 if v == 0 else min(6, 1 + int(5 * v / mx))
+            style = "" if v == 0 else ("background:var(--seq%d);color:%s"
+                                       % (step, "#fff" if step >= 3 else "var(--text)"))
+            h.append('<td class="n" style="%s" data-tip="%s">%s</td>'
+                     % (style, ESC("%s + %s: %d cases" % (a, b, v)), v or "–"))
+        h.append('<td class="n"><b>%d</b></td></tr>' % c["row_totals"][i])
+    h.append("</tbody></table></div>")
+    return "".join(h)
+
+
+def deep_dive_block(dd):
+    if not dd.get("facets"):
+        return na_block(dd["title"].replace("&amp;", "&"), dd)
+    n = dd["cases"]
+    h = []
+    tiles = [("Cases in family", "{:,}".format(n), "%.1f%% of all cases" % dd["pct_of_total"]),
+             ("With free text", "%.1f%%" % dd["pct_with_free_text"],
+              "%s of %s carry a subject or description"
+              % ("{:,}".format(dd["with_free_text"]), "{:,}".format(n)))]
+    rp = dd.get("repeat") or {}
+    if rp.get("computable"):
+        tiles.append(("Repeat contact", "%.1f%%" % rp["pct_cases_from_repeat"],
+                      "of this family's cases come from members with 2+ cases here"))
+    if dd["facets"] and dd["facets"][0]["rows"]:
+        t = dd["facets"][0]["rows"][0]
+        tiles.append(("Top %s" % dd["facets"][0]["name"].split("/")[0].strip().lower(),
+                      "%.0f%%" % t["pct"], "%s (%s cases)" % (t["label"], "{:,}".format(t["count"]))))
+    h.append('<div class="stats">' + "".join(
+        '<div class="stat"><div class="k">%s</div><div class="v num">%s</div>'
+        '<div class="d">%s</div></div>' % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:4])
+        + "</div>")
+
+    if dd.get("top_categories"):
+        h.append("<h4>Categories inside this family</h4>")
+        h.append(svg_hbar(dd["top_categories"][:6], n, series_color="var(--s1)", label_w=250, W=640))
+
+    for f in dd["facets"]:
+        h.append(facet_block(f, n))
+
+    if dd.get("cross"):
+        c = dd["cross"]
+        h.append("<h4>%s against %s</h4>" % (ESC(c["a_name"]), ESC(c["b_name"])))
+        h.append(cross_heat(c))
+        h.append('<p class="sub">Cases where both terms appear in the same free text. '
+                 'This is co-occurrence in one case, not a proven cause.</p>')
+
+    if (dd.get("monthly") or {}).get("computable"):
+        m = dd["monthly"]
+        h.append("<h4>Volume for this family by month</h4>")
+        h.append(svg_line(m["keys"], [{"name": "cases", "values": m["values"]}]))
+    return "".join(h)
+
+
 def heat_table(ct):
     origins, buckets, M = ct["origins"], ct["buckets"], ct["matrix"]
     mx = max((max(r) for r in M), default=0) or 1
@@ -478,7 +556,7 @@ def build_recs(V, C, F):
                              "several causal tests outright. Adding these fields costs a report "
                              "definition change, not a system change: "
                              + "; ".join("<b>%s</b> — %s" % (ESC(m), ESC(w)) for m, w in miss) + ".",
-                     "tie": "Ties to the NOT COMPUTABLE panels in sections 2 and 3."})
+                     "tie": "Ties to the NOT COMPUTABLE panels in sections 3 and 4."})
     b = V["bucket"]["rows"]
     if b:
         top = b[0]
@@ -517,7 +595,7 @@ def build_recs(V, C, F):
                              "The same pipeline produces the quantified chains, the discovered "
                              "correlations and a fitted four-quarter forecast once a multi-month "
                              "export is supplied — no rework required.",
-                     "tie": "Ties to the gates stated in sections 2 and 3."})
+                     "tie": "Ties to the gates stated in sections 3 and 4."})
     return recs
 
 
@@ -780,8 +858,23 @@ def build(res, meta):
             A("<h3>%s</h3>" % ESC(ttl) + na_block(ttl, rec))
     A("</section>")
 
-    # ---------------- 2. correlation
-    A('<section class="card"><h2><span class="secnum">2</span>Multivariate correlation analysis</h2>')
+    # ---------------- 2. deep dives
+    DD = res.get("deep_dives") or []
+    if DD:
+        A('<section class="card"><h2><span class="secnum">2</span>Category deep dives</h2>')
+        A('<p>Two families get a drill-down: the category tells you <i>what</i> the case was '
+          'filed as, and the free text tells you <i>what actually happened</i>. Each facet '
+          'below is a fixed vocabulary matched against the subject and description; '
+          '<b>no text from any case is reproduced anywhere</b> — only the facet label and a '
+          'count. Email addresses, links and long digit strings are stripped before matching. '
+          'Coverage is reported per facet so the vocabulary can be judged and extended.</p>')
+        for dd in DD:
+            A("<h3>%s</h3>" % dd["title"])
+            A(deep_dive_block(dd))
+        A("</section>")
+
+    # ---------------- 3. correlation
+    A('<section class="card"><h2><span class="secnum">3</span>Multivariate correlation analysis</h2>')
     g = C["gate"]
     A('<p>Each hypothesised chain is tested as measured co-occurrence, not asserted narrative. '
       'A chain is only reported when the dataset carries at least <b>%d cases</b> and at least '
@@ -850,7 +943,7 @@ def build(res, meta):
     A("</section>")
 
     # ---------------- 3. forecast
-    A('<section class="card"><h2><span class="secnum">3</span>Projected support trends — next four quarters</h2>')
+    A('<section class="card"><h2><span class="secnum">4</span>Projected support trends — next four quarters</h2>')
     if Fc.get("computable"):
         A('<p><b>Method:</b> ordinary least-squares linear trend fitted to <b>%d</b> months of '
           'observed case volume (slope %+.2f cases/month), summed to quarterly totals. The interval '
@@ -887,7 +980,7 @@ def build(res, meta):
     A("</section>")
 
     # ---------------- 4. risk
-    A('<section class="card"><h2><span class="secnum">4</span>Predictive trend analysis &amp; risk forecasting</h2>')
+    A('<section class="card"><h2><span class="secnum">5</span>Predictive trend analysis &amp; risk forecasting</h2>')
     A('<p>Exposure below is sized directly from measured case share. The threat and owner columns '
       'are an <b>operational interpretation</b> of each bucket, not a value derived from the export — '
       'they are shown so the ranking is actionable, and should be challenged where they do not match '
@@ -929,7 +1022,7 @@ def build(res, meta):
     A("</section>")
 
     # ---------------- 5. recommendations
-    A('<section class="card"><h2><span class="secnum">5</span>Strategic recommendations &amp; action plan</h2>')
+    A('<section class="card"><h2><span class="secnum">6</span>Strategic recommendations &amp; action plan</h2>')
     recs = build_recs(V, C, finds)
     for i, r in enumerate(recs):
         A('<div class="rec"><div class="h"><span class="pill p%d">Priority %d</span>'

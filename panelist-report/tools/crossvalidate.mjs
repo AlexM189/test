@@ -36,6 +36,12 @@ const out={
   inf2:[r.inference.from_kb,r.inference.from_rule,r.inference.pct_from_kb,r.inference.pct_from_rule],
   cube:[r.cube.origins,r.cube.drivers,r.cube.periods.week.length,r.cube.periods.month.length,r.cube.periods.quarter.length,
         (r.cube.counts.week||[]).map(o=>o.map(p=>p.reduce((a,b)=>a+b,0)).reduce((a,b)=>a+b,0))],
+  dd:r.deep_dives.map(d=>[d.id,d.cases,d.pct_of_total,d.with_free_text,
+      (d.facets||[]).map(f=>[f.name,f.coverage_pct,f.unmatched,f.rows.map(x=>[x.label,x.count,x.pct])]),
+      d.cross?[d.cross.a,d.cross.b,d.cross.matrix,d.cross.row_totals,d.cross.col_totals]:null,
+      d.repeat&&d.repeat.computable?[d.repeat.members,d.repeat.repeat_members,d.repeat.pct_cases_from_repeat]:'NC',
+      d.monthly&&d.monthly.computable?d.monthly.values:'NC',
+      (d.top_categories||[]).map(x=>[x.label,x.count])]),
   most:r.most_received?[r.most_received.label,r.most_received.count,r.most_received.top_labels.map(l=>l.label),r.most_received.origin?r.most_received.origin.label:null]:null,
 };
 console.log(JSON.stringify(out));

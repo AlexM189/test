@@ -21,6 +21,7 @@ TOP_DRIVERS     = RULES["gates"]["top_drivers"]
 VARIOUS         = RULES["various_label"]
 ANOM            = RULES["anomaly"]
 UNMAPPED        = "Other / Unmapped"
+DEEP_DIVES      = RULES.get("deep_dives", [])
 
 _ws = lambda s: re.sub(r"\s+", " ", str(s or "")).strip()
 
@@ -418,6 +419,102 @@ def data_quality(df):
             "primary_unknown_cases": prim_unknown, "primary_unknown_pct": pct(prim_unknown, n)}
 
 
+_SCRUB = [(re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+"), " "),
+          (re.compile(r"https?://\S+"), " "),
+          (re.compile(r"\b\d{7,}\b"), " ")]
+
+
+def free_text(row):
+    """Subject + description with obvious identifiers removed. Used only for
+    keyword matching - the text itself never reaches the report."""
+    t = (str(row.get("subject", "") or "") + " " + str(row.get("description", "") or "")).lower()
+    for rx, rep in _SCRUB:
+        t = rx.sub(rep, t)
+    return re.sub(r"\s+", " ", t).strip()
+
+
+def deep_dive(df, V, cfg):
+    """Drill-down for one family of drivers. Facets are matched against the free
+    text only, so they add information the category field does not already carry.
+    Output is a fixed vocabulary of facet labels - never text from a case."""
+    fam = df[df["bucket"].isin(cfg["drivers"])].copy()
+    n_all, n = len(df), len(fam)
+    out = {"id": cfg["id"], "title": cfg["title"], "drivers": cfg["drivers"],
+           "cases": n, "pct_of_total": pct(n, n_all)}
+    if not n:
+        out.update(_nc("no cases fall in %s" % " or ".join(cfg["drivers"]),
+                       ["cases in these drivers"]))
+        return out
+
+    has_desc = int((fam.get("description", pd.Series([""] * n, index=fam.index))
+                    .astype(str).str.strip() != "").sum()) if "description" in fam else 0
+    txt = fam.apply(free_text, axis=1)
+    non_empty = int((txt.str.len() > 0).sum())
+    out["with_description"] = has_desc
+    out["pct_with_description"] = pct(has_desc, n)
+    out["with_free_text"] = non_empty
+    out["pct_with_free_text"] = pct(non_empty, n)
+
+    out["top_categories"] = [{"label": k, "count": int(v), "pct": pct(int(v), n)}
+                             for k, v in fam["primary_category"].replace("", "(blank)")
+                             .value_counts().head(8).items()]
+
+    facet_hits = {}
+    out["facets"] = []
+    for f in cfg["facets"]:
+        rows, matched_any = [], pd.Series(False, index=fam.index)
+        hits = {}
+        for label, pat in f["terms"]:
+            m = txt.str.contains(pat, regex=True, na=False)
+            hits[label] = m
+            c = int(m.sum())
+            if c:
+                rows.append({"label": label, "count": c, "pct": pct(c, n)})
+            matched_any = matched_any | m
+        rows.sort(key=lambda r: (-r["count"], r["label"]))
+        cov = int(matched_any.sum())
+        facet_hits[f["name"]] = hits
+        out["facets"].append({
+            "name": f["name"], "rows": rows, "matched": cov, "coverage_pct": pct(cov, n),
+            "unmatched": n - cov,
+            "unmatched_pct": pct(n - cov, n),
+            "basis": non_empty})
+
+    out["cross"] = None
+    ca, cb = (cfg.get("cross") or [None, None])[:2]
+    if ca in facet_hits and cb in facet_hits:
+        A = [r["label"] for r in next(x for x in out["facets"] if x["name"] == ca)["rows"]][:6]
+        B = [r["label"] for r in next(x for x in out["facets"] if x["name"] == cb)["rows"]][:6]
+        if A and B:
+            M = [[int((facet_hits[ca][a] & facet_hits[cb][b]).sum()) for b in B] for a in A]
+            out["cross"] = {"a_name": ca, "b_name": cb, "a": A, "b": B, "matrix": M,
+                            "row_totals": [sum(r) for r in M],
+                            "col_totals": [sum(r[j] for r in M) for j in range(len(B))]}
+
+    if "mno" in fam and fam["mno"].astype(str).str.strip().any():
+        vc = fam["mno"].value_counts()
+        rep = vc[vc > 1]
+        out["repeat"] = {"computable": True, "members": int(vc.size),
+                         "repeat_members": int(rep.size),
+                         "cases_from_repeat": int(rep.sum()),
+                         "pct_cases_from_repeat": pct(int(rep.sum()), n)}
+    else:
+        out["repeat"] = _nc("no member identifier column", ["MNO"])
+
+    if V["months_spanned"] >= 2 and fam["_date"].notna().any():
+        keys, _ = _series(df, "M")
+        if len(keys) >= 2:
+            lab = fam.dropna(subset=["_date"])["_date"].map(
+                lambda x: _plabel(pd.Period(x, freq="M"), "M"))
+            vals = [int((lab == k).sum()) for k in keys]
+            out["monthly"] = {"computable": True, "keys": keys, "values": vals}
+        else:
+            out["monthly"] = _nc("fewer than 2 complete months", ["a longer date range"])
+    else:
+        out["monthly"] = _nc("fewer than 2 complete months", ["a longer date range"])
+    return out
+
+
 def build_cube(df, V):
     """Small aggregation cube (origin x period x driver) so the report can be
     filtered in the browser without ever shipping a row-level record."""
@@ -706,5 +803,6 @@ def run(df):
             },
             "most_received": most_received(df, vol),
             "quality": data_quality(df),
+            "deep_dives": [deep_dive(df, vol, c) for c in DEEP_DIVES],
             "cube": build_cube(df, vol),
             "buckets": BUCKETS}

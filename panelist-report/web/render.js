@@ -276,6 +276,76 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     return out.join("");
   }
 
+  function facetBlock(f, n) {
+    if (!f.rows.length) {
+      return `<p class="sub"><b>${ESC(f.name)}</b> — no term in this facet matched any case.</p>`;
+    }
+    return `<h4>${ESC(f.name)}</h4>` + svgHbar(f.rows.slice(0, 8), n, null, 210, 640) +
+      `<p class="sub">${th(f.matched)} of ${th(n)} cases in this family matched at least one ` +
+      `term (${f1(f.coverage_pct)}%); ${th(f.unmatched)} matched none. A case can match several ` +
+      "terms, so the bars deliberately sum above the case count.</p>";
+  }
+
+  function crossHeat(c) {
+    const mx = Math.max(...c.matrix.map(r => Math.max(...r, 0)), 0) || 1;
+    const h = [`<div class="scroll"><table><thead><tr><th>${ESC(c.a_name)} \\ ` +
+      `${ESC(c.b_name)}</th>`];
+    c.b.forEach(b => h.push(`<th class="n">${ESC(b)}</th>`));
+    h.push('<th class="n">Total</th></tr></thead><tbody>');
+    c.a.forEach((a, i) => {
+      h.push(`<tr><td><b>${ESC(a)}</b></td>`);
+      c.b.forEach((b, j) => {
+        const v = c.matrix[i][j];
+        const stp = v === 0 ? 0 : Math.min(6, 1 + Math.floor(5 * v / mx));
+        const style = v === 0 ? "" :
+          `background:var(--seq${stp});color:${stp >= 3 ? "#fff" : "var(--text)"}`;
+        h.push(`<td class="n" style="${style}" data-tip="${ESC(a + " + " + b + ": " + v +
+          " cases")}">${v || "–"}</td>`);
+      });
+      h.push(`<td class="n"><b>${c.row_totals[i]}</b></td></tr>`);
+    });
+    h.push("</tbody></table></div>");
+    return h.join("");
+  }
+
+  function deepDiveBlock(dd) {
+    if (!dd.facets) return naBlock(dd.title.replace(/&amp;/g, "&"), dd);
+    const n = dd.cases;
+    const h = [];
+    const tiles = [["Cases in family", th(n), f1(dd.pct_of_total) + "% of all cases"],
+      ["With free text", f1(dd.pct_with_free_text) + "%",
+       th(dd.with_free_text) + " of " + th(n) + " carry a subject or description"]];
+    const rp = dd.repeat || {};
+    if (rp.computable) tiles.push(["Repeat contact", f1(rp.pct_cases_from_repeat) + "%",
+      "of this family's cases come from members with 2+ cases here"]);
+    if (dd.facets.length && dd.facets[0].rows.length) {
+      const t = dd.facets[0].rows[0];
+      tiles.push(["Top " + dd.facets[0].name.split("/")[0].trim().toLowerCase(),
+        f0(t.pct) + "%", t.label + " (" + th(t.count) + " cases)"]);
+    }
+    h.push('<div class="stats">' + tiles.slice(0, 4).map(([k, v, d]) =>
+      `<div class="stat"><div class="k">${ESC(k)}</div><div class="v num">${ESC(v)}</div>` +
+      `<div class="d">${ESC(d)}</div></div>`).join("") + "</div>");
+
+    if ((dd.top_categories || []).length) {
+      h.push("<h4>Categories inside this family</h4>");
+      h.push(svgHbar(dd.top_categories.slice(0, 6), n, "var(--s1)", 250, 640));
+    }
+    for (const f of dd.facets) h.push(facetBlock(f, n));
+
+    if (dd.cross) {
+      h.push(`<h4>${ESC(dd.cross.a_name)} against ${ESC(dd.cross.b_name)}</h4>`);
+      h.push(crossHeat(dd.cross));
+      h.push('<p class="sub">Cases where both terms appear in the same free text. This is ' +
+        "co-occurrence in one case, not a proven cause.</p>");
+    }
+    if ((dd.monthly || {}).computable) {
+      h.push("<h4>Volume for this family by month</h4>");
+      h.push(svgLine(dd.monthly.keys, [{ name: "cases", values: dd.monthly.values }]));
+    }
+    return h.join("");
+  }
+
   function heatTable(ct) {
     const mx = Math.max(...ct.matrix.map(r => Math.max(...r, 0)), 0) || 1;
     const h = ['<div class="scroll"><table><thead><tr><th>Origin \\ Category bucket</th>'];
@@ -450,7 +520,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       body: "The export currently supports volume and mix analysis but blocks several causal " +
         "tests outright. Adding these fields costs a report definition change, not a system " +
         "change: " + miss.map(([m, w]) => `<b>${ESC(m)}</b> — ${ESC(w)}`).join("; ") + ".",
-      tie: "Ties to the NOT COMPUTABLE panels in sections 2 and 3." });
+      tie: "Ties to the NOT COMPUTABLE panels in sections 3 and 4." });
 
     if (V.bucket.rows.length) {
       const t = V.bucket.rows[0];
@@ -488,7 +558,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       body: "Correlation and forecasting are gated off at the current record count. The same " +
         "pipeline produces the quantified chains, the discovered correlations and a fitted " +
         "four-quarter forecast once a multi-month export is supplied — no rework required.",
-      tie: "Ties to the gates stated in sections 2 and 3." });
+      tie: "Ties to the gates stated in sections 3 and 4." });
     return recs;
   }
 
@@ -734,8 +804,25 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     }
     A("</section>");
 
-    // 2. correlation
-    A('<section class="card"><h2><span class="secnum">2</span>Multivariate correlation analysis</h2>');
+    // 2. deep dives
+    const DD = res.deep_dives || [];
+    if (DD.length) {
+      A('<section class="card"><h2><span class="secnum">2</span>Category deep dives</h2>');
+      A("<p>Two families get a drill-down: the category tells you <i>what</i> the case was " +
+        "filed as, and the free text tells you <i>what actually happened</i>. Each facet below " +
+        "is a fixed vocabulary matched against the subject and description; <b>no text from any " +
+        "case is reproduced anywhere</b> — only the facet label and a count. Email addresses, " +
+        "links and long digit strings are stripped before matching. Coverage is reported per " +
+        "facet so the vocabulary can be judged and extended.</p>");
+      for (const dd of DD) {
+        A("<h3>" + dd.title + "</h3>");
+        A(deepDiveBlock(dd));
+      }
+      A("</section>");
+    }
+
+    // 3. correlation
+    A('<section class="card"><h2><span class="secnum">3</span>Multivariate correlation analysis</h2>');
     A(`<p>Each hypothesised chain is tested as measured co-occurrence, not asserted narrative. ` +
       `A chain is only reported when the dataset carries at least <b>${C.gate.min_cases} cases</b> ` +
       `and at least <b>${C.gate.min_cooccurrence} cases showing both signals</b>; otherwise it is ` +
@@ -796,7 +883,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A("</section>");
 
     // 3. forecast
-    A('<section class="card"><h2><span class="secnum">3</span>Projected support trends — next four quarters</h2>');
+    A('<section class="card"><h2><span class="secnum">4</span>Projected support trends — next four quarters</h2>');
     if (Fc.computable) {
       A(`<p><b>Method:</b> ordinary least-squares linear trend fitted to <b>${Fc.months_fitted}</b> ` +
         `months of observed case volume (slope ${Fc.slope_cases_per_month >= 0 ? "+" : ""}` +
@@ -831,7 +918,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A("</section>");
 
     // 4. risk
-    A('<section class="card"><h2><span class="secnum">4</span>Predictive trend analysis &amp; risk forecasting</h2>');
+    A('<section class="card"><h2><span class="secnum">5</span>Predictive trend analysis &amp; risk forecasting</h2>');
     A("<p>Exposure below is sized directly from measured case share. The threat and owner columns " +
       "are an <b>operational interpretation</b> of each bucket, not a value derived from the " +
       "export — they are shown so the ranking is actionable, and should be challenged where they " +
@@ -870,7 +957,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A("</section>");
 
     // 5. recommendations
-    A('<section class="card"><h2><span class="secnum">5</span>Strategic recommendations &amp; action plan</h2>');
+    A('<section class="card"><h2><span class="secnum">6</span>Strategic recommendations &amp; action plan</h2>');
     for (const r of buildRecs(V, C)) {
       A(`<div class="rec"><div class="h"><span class="pill p${Math.min(r.pri, 3)}">Priority ` +
         `${r.pri}</span><span class="pill p3">${ESC(r.horizon)}</span>` +

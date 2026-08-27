@@ -17,6 +17,13 @@ export function makeEngine(RULES) {
   const VARIOUS = RULES.various_label;
   const ANOM = RULES.anomaly;
   const UNMAPPED = "Other / Unmapped";
+  const DEEP_DIVES = (RULES.deep_dives || []).map(d => ({
+    id: d.id, title: d.title, drivers: d.drivers, cross: d.cross,
+    facets: d.facets.map(f => ({ name: f.name,
+      terms: f.terms.map(([label, pat]) => [label, new RegExp(pat, "i")]) })),
+  }));
+  const SCRUB = [[/[\w.+-]+@[\w-]+\.[\w.]+/g, " "], [/https?:\/\/\S+/g, " "],
+                 [/\b\d{7,}\b/g, " "]];
   const norm = s => String(s ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const ws = s => String(s ?? "").replace(/\s+/g, " ").trim();
   const pct = (n, d) => (d ? Math.round(1000 * n / d) / 10 : 0);
@@ -500,6 +507,96 @@ export function makeEngine(RULES) {
 
   /* Small aggregation cube (origin x period x driver) so the report can be filtered
      in the browser without ever shipping a row-level record. */
+  /* Subject + description with obvious identifiers removed. Used only for keyword
+     matching - the text itself never reaches the report. */
+  function freeText(r) {
+    let t = ((r.subject || "") + " " + (r.description || "")).toLowerCase();
+    for (const [rx, rep] of SCRUB) t = t.replace(rx, rep);
+    return t.replace(/\s+/g, " ").trim();
+  }
+
+  /* Drill-down for one family of drivers. Facets are matched against the free text
+     only, so they add information the category field does not already carry. Output
+     is a fixed vocabulary of facet labels - never text from a case. */
+  function deepDive(recs, V, cfg) {
+    const fam = recs.filter(r => cfg.drivers.indexOf(r.bucket) >= 0);
+    const nAll = recs.length, n = fam.length;
+    const out = { id: cfg.id, title: cfg.title, drivers: cfg.drivers, cases: n,
+                  pct_of_total: pct(n, nAll) };
+    if (!n) {
+      Object.assign(out, nc("no cases fall in " + cfg.drivers.join(" or "),
+                            ["cases in these drivers"]));
+      return out;
+    }
+    const hasDesc = fam.filter(r => ws(r.description) !== "").length;
+    const txt = fam.map(freeText);
+    const nonEmpty = txt.filter(t => t.length > 0).length;
+    out.with_description = hasDesc;
+    out.pct_with_description = pct(hasDesc, n);
+    out.with_free_text = nonEmpty;
+    out.pct_with_free_text = pct(nonEmpty, n);
+    out.top_categories = counts(fam, "primary_category", n).slice(0, 8)
+      .map(x => ({ label: x.label, count: x.count, pct: x.pct }));
+
+    const facetHits = {};
+    out.facets = [];
+    for (const f of cfg.facets) {
+      const rows = [], hits = {};
+      const matchedAny = new Array(n).fill(false);
+      for (const [label, re] of f.terms) {
+        const m = txt.map(t => re.test(t));
+        hits[label] = m;
+        let c = 0;
+        for (let i = 0; i < n; i++) if (m[i]) { c++; matchedAny[i] = true; }
+        if (c) rows.push({ label, count: c, pct: pct(c, n) });
+      }
+      rows.sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
+      const cov = matchedAny.filter(Boolean).length;
+      facetHits[f.name] = hits;
+      out.facets.push({ name: f.name, rows, matched: cov, coverage_pct: pct(cov, n),
+                        unmatched: n - cov, unmatched_pct: pct(n - cov, n), basis: nonEmpty });
+    }
+
+    out.cross = null;
+    const ca = (cfg.cross || [])[0], cb = (cfg.cross || [])[1];
+    if (facetHits[ca] && facetHits[cb]) {
+      const A = out.facets.find(x => x.name === ca).rows.map(r => r.label).slice(0, 6);
+      const B = out.facets.find(x => x.name === cb).rows.map(r => r.label).slice(0, 6);
+      if (A.length && B.length) {
+        const M = A.map(a => B.map(b => {
+          let c = 0;
+          for (let i = 0; i < n; i++) if (facetHits[ca][a][i] && facetHits[cb][b][i]) c++;
+          return c;
+        }));
+        out.cross = { a_name: ca, b_name: cb, a: A, b: B, matrix: M,
+                      row_totals: M.map(r => r.reduce((x, y) => x + y, 0)),
+                      col_totals: B.map((_, j) => M.reduce((x, r) => x + r[j], 0)) };
+      }
+    }
+
+    if (fam.some(r => r.mno)) {
+      const vc = new Map();
+      for (const r of fam) if (r.mno) vc.set(r.mno, (vc.get(r.mno) || 0) + 1);
+      const rep = [...vc.values()].filter(v => v > 1);
+      const cs = rep.reduce((a, b) => a + b, 0);
+      out.repeat = { computable: true, members: vc.size, repeat_members: rep.length,
+                     cases_from_repeat: cs, pct_cases_from_repeat: pct(cs, n) };
+    } else out.repeat = nc("no member identifier column", ["MNO"]);
+
+    const { keys } = series(recs, "M");
+    if (V.months_spanned >= 2 && keys.length >= 2 && fam.some(r => r._date)) {
+      const pos = new Map(keys.map((k, i) => [k, i]));
+      const vals = keys.map(() => 0);
+      for (const r of fam) {
+        if (!r._date) continue;
+        const i = pos.get(plabel(r._date, "M"));
+        if (i !== undefined) vals[i]++;
+      }
+      out.monthly = { computable: true, keys, values: vals };
+    } else out.monthly = nc("fewer than 2 complete months", ["a longer date range"]);
+    return out;
+  }
+
   function buildCube(recs, V) {
     const drivers = V.bucket.rows.map(r => r.label);
     const origins = V.origin.computable ? V.origin.rows.map(r => r.label) : ["(all)"];
@@ -802,7 +899,8 @@ export function makeEngine(RULES) {
                  monthly: periodMovement(recs, volume, "M", "month", topDrivers(volume)),
                  quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
                },
-               quality: dataQuality(recs), cube: buildCube(recs, volume) };
+               quality: dataQuality(recs), cube: buildCube(recs, volume),
+               deep_dives: DEEP_DIVES.map(c => deepDive(recs, volume, c)) };
     },
   };
 }
