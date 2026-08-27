@@ -27,6 +27,12 @@ out={
  "alerts":[[a["level"],a["scope"],a["text"]] for a in r["anomaly"]["alerts"]],
  "mv_m":([r["movement"]["monthly"]["keys"],r["movement"]["monthly"]["totals"],[[s["name"],s["values"]] for s in r["movement"]["monthly"]["stack"]],[[i["kind"],i["text"]] for i in r["movement"]["monthly"]["insights"]],[[x["key"],x["total"],x["delta"],x["pct"],x["top_bucket"],x["top_count"],x["top_pct"]] for x in r["movement"]["monthly"]["rows"]]] if r["movement"]["monthly"]["computable"] else ["NC",r["movement"]["monthly"]["reason"]]),
  "mv_q":([r["movement"]["quarterly"]["keys"],r["movement"]["quarterly"]["totals"],[[s["name"],s["values"]] for s in r["movement"]["quarterly"]["stack"]],[[i["kind"],i["text"]] for i in r["movement"]["quarterly"]["insights"]],[[x["key"],x["total"],x["delta"],x["pct"],x["top_bucket"],x["top_count"],x["top_pct"]] for x in r["movement"]["quarterly"]["rows"]]] if r["movement"]["quarterly"]["computable"] else ["NC",r["movement"]["quarterly"]["reason"]]),
+ "q":[r["quality"]["kb_size"],r["quality"]["junk_distinct"],r["quality"]["junk_tag_total"],r["quality"]["unknown_distinct"],r["quality"]["unknown_tag_total"],r["quality"]["primary_junk_cases"],r["quality"]["primary_junk_pct"],r["quality"]["primary_unknown_cases"],r["quality"]["primary_unknown_pct"]],
+ "q_junk":[[x["label"],x["count"]] for x in r["quality"]["junk_labels"]],
+ "q_unk":[[x["label"],x["count"]] for x in r["quality"]["unknown_labels"]],
+ "inf2":[r["inference"]["from_kb"],r["inference"]["from_rule"],r["inference"]["pct_from_kb"],r["inference"]["pct_from_rule"]],
+ "cube":[r["cube"]["origins"],r["cube"]["drivers"],len(r["cube"]["periods"]["week"]),len(r["cube"]["periods"]["month"]),len(r["cube"]["periods"]["quarter"]),
+         [sum(sum(p) for p in o) for o in r["cube"]["counts"]["week"]]],
  "most":([r["most_received"]["label"],r["most_received"]["count"],[l["label"] for l in r["most_received"]["top_labels"]],(r["most_received"]["origin"]["label"] if r["most_received"]["origin"] else None)] if r["most_received"] else None),
 }
 print(json.dumps(out))

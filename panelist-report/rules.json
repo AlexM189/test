@@ -132,104 +132,83 @@
       "signupdate"
     ]
   },
-  "bucket_rules": [
-    [
-      "Account Access & Security",
-      "password|passwd|pwd|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\bump\\b|google[ _-]?account|account security|security question|lock(?:ed)? out|credential"
-    ],
-    [
-      "Incentives & Rewards",
-      "incentive|reward|\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|sweepstake|bonus|blocked reward"
-    ],
-    [
-      "Hardware & Meter",
-      "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\bchrome\\b|\\bdevice\\b|equipment|hardware|modem|set[- ]?top|\\bstb\\b|dongle|battery|firmware|wi-?fi|connectivity|offline"
-    ],
-    [
-      "Logistics & Returns",
-      "\\bars\\b|return|\\bship|deliver|tag requested|\\brma\\b|pick[- ]?up|tracking|appointment|field service|technician|install visit|dispatch"
-    ],
-    [
-      "Activity & Reactivation",
-      "activity|reactivat|inactiv|\\bpurge|dormant|non[- ]?complian|participation"
-    ],
-    [
-      "Onboarding & Setup",
-      "set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up"
-    ],
-    [
-      "Outbound & Callbacks",
-      "outbound|call ?back|follow[- ]?up call"
-    ],
-    [
-      "Communications & Contact",
-      "email|bounce|\\bsms\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number change"
-    ],
-    [
-      "Billing & Tax",
-      "\\btax\\b|w-?9|1099|invoice|billing"
-    ],
-    [
-      "Complaint & Escalation",
-      "complaint|escalat|supervisor|dissatisf|legal|bbb"
-    ]
-  ],
   "signals": {
-    "hardware_meter": "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|browser extension|chrome|equipment|hardware|modem|offline|wi-?fi",
-    "activity": "activity|participation|non[- ]?complian",
-    "reactivation": "reactivat|inactiv|dormant|\\bpurge",
-    "blocked_reward": "blocked reward|reward.*(?:block|hold|fail)|incentive.*(?:block|hold|fail)",
-    "reward_any": "incentive|reward|\\bpoint|prepaid|visa|redeem",
-    "email_issue": "email|bounce|undeliver|mailing",
-    "password_access": "password|login|sign[- ]?in|\\bump\\b|credential|lock(?:ed)? out",
-    "google_account": "google[ _-]?account|google[ _-]?android|gmail|google chrome",
-    "outbound_cb": "outbound|call ?back",
-    "returns_ars": "\\bars\\b|return|tag requested|\\brma\\b",
-    "shipping": "\\bship|deliver|tracking",
-    "appointment": "appointment|field service|technician|dispatch|install visit",
-    "lost_stolen": "lost or stolen|lost/stolen|stolen",
-    "setup": "set[- ]?up|install|how to|onboard"
+    "hardware_meter": "tv meter|reality meter|presence sensor|coremini|smarthome|router|box ?switch|screenwise|mobile meter|streaming stick|equipment|device is broken|hardware|browser extension",
+    "activity": "activity inquiry|not eligible|survey status|not receiving surveys",
+    "troubleshooting": "troubleshooting|device is broken|connection tool|invalid credentials|unable to verify",
+    "suspension": "^suspend|/suspend|been away|inactive status",
+    "withdrawal": "withdraw|off-?panel|^retire|retirement request|no longer eligible|not interested",
+    "reactivation": "reactivat|re-?recruitment|volunteer to join",
+    "blocked_reward": "blocked rewards|redemptions blocked|expired incentive|check not received|have not received|payment status|product not in stock",
+    "reward_any": "incentive|reimbursement|reward|\\bpoint|raffle|sweepstake|visa|1099|w-9",
+    "email_bounce": "bounce|wrong address|mailbox full|full mail box|undeliver",
+    "unsubscribe": "unsubscribe|do not call|not follow up calls|disconnected number",
+    "password_access": "password|\\b2fa\\b|invalid credentials|unable to verify|wrong login|credential",
+    "google_account": "google account|google[_ ]android|google[_ ]ios|change email - google",
+    "outbound_cb": "^outbound|call ?back|callback",
+    "returns_ars": "ars tag|call tag|return|shipment|logistics center|\\brma\\b",
+    "appointment": "in home install|missed appointment|appointment needed",
+    "setup": "install|^setup|walk-?through|^how to|link request",
+    "selfservice": "chatbot|virtualassistant",
+    "privacy": "privacy|\\bccpa\\b|improper use of data",
+    "feedback_negative": "feedback/complaint|feedback/negative|complaint|negative feedback"
   },
   "risk_profile": {
-    "Hardware & Meter": {
-      "threat": "Panel data loss, cost-to-serve",
+    "Attrition & Withdrawal": {
+      "threat": "Direct panel shrinkage and replacement recruitment cost",
+      "owner": "Panel Operations"
+    },
+    "Suspension & Reactivation": {
+      "threat": "Recoverable panelists lost to inaction",
+      "owner": "Panel Operations"
+    },
+    "Troubleshooting & Technical": {
+      "threat": "Cost-to-serve, and data quality where meters misreport",
       "owner": "Engineering / Product (metering)"
     },
-    "Activity & Reactivation": {
-      "threat": "Panelist churn, panel representativeness",
-      "owner": "Panel Operations"
+    "Profile & Account Admin": {
+      "threat": "Contactability and record accuracy",
+      "owner": "Support Ops / CRM administration"
     },
     "Incentives & Rewards": {
       "threat": "Trust and brand reputation, repeat contact",
       "owner": "Rewards / Finance Ops"
     },
-    "Account Access & Security": {
-      "threat": "Lockout-driven churn, onboarding failure",
-      "owner": "Identity / Engineering"
-    },
-    "Logistics & Returns": {
-      "threat": "Cost-to-serve, unrecovered assets",
-      "owner": "Field Service / Logistics"
-    },
-    "Onboarding & Setup": {
-      "threat": "Early-life churn",
-      "owner": "Panel Operations / Support Ops"
-    },
-    "Outbound & Callbacks": {
-      "threat": "Handling cost, channel breakdown",
-      "owner": "WFM / Support Ops"
-    },
-    "Communications & Contact": {
-      "threat": "Deliverability and contactability",
+    "Communications & Deliverability": {
+      "threat": "Unreachable panelists drifting into involuntary withdrawal",
       "owner": "CRM / Marketing Ops"
     },
-    "Billing & Tax": {
-      "threat": "Compliance exposure",
-      "owner": "Finance"
+    "Installation & Onboarding": {
+      "threat": "Early-life churn",
+      "owner": "Field Service / Panel Operations"
     },
-    "Complaint & Escalation": {
-      "threat": "Brand reputation",
+    "Participation & Eligibility": {
+      "threat": "Under-counted activity leading to purge",
+      "owner": "Engineering / Product (metering)"
+    },
+    "Feedback & Complaints": {
+      "threat": "Brand reputation; earliest read on dissatisfaction",
       "owner": "Support Ops leadership"
+    },
+    "Outbound Contact Attempts": {
+      "threat": "Handling cost with no resolution; dialling efficiency",
+      "owner": "WFM / Outbound Ops"
+    },
+    "Hardware & Equipment": {
+      "threat": "Panel data loss and equipment cost",
+      "owner": "Engineering / Product (metering)"
+    },
+    "Self-Service (Chatbot / VA)": {
+      "threat": "Deflection quality and escalation rate",
+      "owner": "Digital / Support Ops"
+    },
+    "Logistics & Returns": {
+      "threat": "Cost-to-serve and unrecovered assets",
+      "owner": "Field Service / Logistics"
+    },
+    "Privacy & Compliance": {
+      "threat": "Regulatory and reputational exposure",
+      "owner": "Privacy Officer / Legal"
     },
     "Other / Unmapped": {
       "threat": "Unclassified demand",
@@ -252,43 +231,593 @@
   "subject_rules": [
     [
       "Incentives & Rewards",
-      "reward|incentive|\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|compensat|\\bcash\\b|bonus|sweepstake|missing .*(reward|point|payment)|not (?:been )?paid"
+      "reward|incentive|\\bpoint|prepaid|visa|gift ?card|redeem|payout|payment|reimburs|compensat|sweepstake|raffle|missing .*(reward|point|payment)|not (?:been )?paid|1099|w-?9"
     ],
     [
-      "Account Access & Security",
-      "password|passwd|\\bpwd\\b|login|log in|sign[- ]?in|2fa|mfa|authenticat|\\bump\\b|google[ _-]?account|lock(?:ed)? out|credential|reset .*account|can(?:no|')?t (?:log|sign)"
+      "Privacy & Compliance",
+      "\\bprivacy\\b|\\bccpa\\b|delete my data|personal data|privacy officer"
     ],
     [
-      "Hardware & Meter",
-      "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|browser extension|google chrome|\\bchrome\\b|\\bdevice\\b|equipment|hardware|modem|set[- ]?top|\\bstb\\b|dongle|battery|firmware|wi-?fi|connectivity|offline|not working|won'?t (?:work|turn|connect|power)|stopped working|no longer works|broken|faulty|not connect|keeps? (?:disconnect|drop)"
+      "Attrition & Withdrawal",
+      "withdraw|cancel my (?:account|membership)|leave the panel|quit the panel|remove me|retire from|off[- ]panel|no longer (?:want|interested)"
+    ],
+    [
+      "Suspension & Reactivation",
+      "suspend|reactivat|\\bpause\\b|on hold|come back|rejoin|been away"
+    ],
+    [
+      "Profile & Account Admin",
+      "password|passwd|\\bpwd\\b|login|log in|sign[- ]?in|2fa|mfa|authenticat|lock(?:ed)? out|credential|change (?:my )?(?:email|address|phone|name)|update (?:my )?(?:profile|details)|terms of service"
+    ],
+    [
+      "Communications & Deliverability",
+      "\\bemail\\b|bounce|undeliver|\\bsms\\b|text message|mailing|unsubscribe|opt[- ]?out|stop calling|do not call|wrong number|newsletter"
+    ],
+    [
+      "Participation & Eligibility",
+      "activity|not credited|no credit|not eligible|survey (?:access|status)|not receiving surveys|no surveys"
+    ],
+    [
+      "Troubleshooting & Technical",
+      "not working|won'?t (?:work|turn|connect|power)|stopped working|no longer works|broken|faulty|not connect|keeps? (?:disconnect|drop)|error|troubleshoot|offline|\\bcrash"
+    ],
+    [
+      "Installation & Onboarding",
+      "set[- ]?up|install|how to|walk[- ]?through|onboard|welcome|registration|enrol|sign[- ]?up|getting started"
     ],
     [
       "Logistics & Returns",
-      "\\bars\\b|return|\\bship|deliver|tracking|\\brma\\b|pick[- ]?up|appointment|field service|technician|dispatch|not (?:yet )?(?:arrived|received)|where is my"
+      "\\bars\\b|return|\\bship|deliver|tracking|\\brma\\b|pick[- ]?up|call tag|not (?:yet )?(?:arrived|received)|where is my"
     ],
     [
-      "Activity & Reactivation",
-      "activity|reactivat|inactiv|dormant|\\bpurge|participation|not credited|no credit"
+      "Hardware & Equipment",
+      "tv meter|\\bmeter\\b|router|box switch|screenwise|tablet|presence sensor|coremini|smarthome|browser extension|\\bdevice\\b|equipment|hardware|modem|dongle|streaming stick"
     ],
     [
-      "Onboarding & Setup",
-      "set[- ]?up|install|how to|training|onboard|welcome|registration|enrol|sign[- ]?up|new (?:member|panelist|household)"
-    ],
-    [
-      "Outbound & Callbacks",
+      "Outbound Contact Attempts",
       "outbound|call ?back|follow[- ]?up call|please call"
     ],
     [
-      "Communications & Contact",
-      "\\bemail|bounce|undeliver|\\bsms\\b|text message|mailing|contact preference|address change|unsubscribe|opt[- ]?out|phone number"
+      "Feedback & Complaints",
+      "complaint|complain|escalat|supervisor|dissatisf|unhappy|compliment|feedback"
+    ]
+  ],
+  "drivers": [
+    "Attrition & Withdrawal",
+    "Troubleshooting & Technical",
+    "Profile & Account Admin",
+    "Incentives & Rewards",
+    "Communications & Deliverability",
+    "Suspension & Reactivation",
+    "Installation & Onboarding",
+    "Participation & Eligibility",
+    "Feedback & Complaints",
+    "Outbound Contact Attempts",
+    "Hardware & Equipment",
+    "Self-Service (Chatbot / VA)",
+    "Logistics & Returns",
+    "Privacy & Compliance"
+  ],
+  "category_map": {
+    "2FA - General inquiry": "Profile & Account Admin",
+    "AER Escalation from Logistics Center": "Logistics & Returns",
+    "ARS Tag Requested": "Logistics & Returns",
+    "ATP One-Click Unsubscribe": "Communications & Deliverability",
+    "ATP Unsubscribe": "Communications & Deliverability",
+    "Activity inquiry/Browser Extension/Edge": "Participation & Eligibility",
+    "Activity inquiry/Browser Extension/Firefox": "Participation & Eligibility",
+    "Activity inquiry/Browser Extension/Google Chrome": "Participation & Eligibility",
+    "Activity inquiry/Browser Extension/Safari": "Participation & Eligibility",
+    "Add A Member": "Profile & Account Admin",
+    "Additional Equipment": "Hardware & Equipment",
+    "Additional Equipment/Streaming Stick": "Hardware & Equipment",
+    "Blocked rewards": "Incentives & Rewards",
+    "Bounced/Email": "Communications & Deliverability",
+    "Bounced/Email/Mailbox Full": "Communications & Deliverability",
+    "Bounced/Email/Wrong Address": "Communications & Deliverability",
+    "Box Switch": "Hardware & Equipment",
+    "Box Switch/HH": "Hardware & Equipment",
+    "Boxswitch Problem Escalation from Logistics Center": "Hardware & Equipment",
+    "Boxswitch Successful Escalation from Logistics Center": "Hardware & Equipment",
+    "Browser Extension/Activity Inquiry": "Participation & Eligibility",
+    "CDC One-Click Unsubscribe": "Communications & Deliverability",
+    "CDC Unsubscribe": "Communications & Deliverability",
+    "CHAT One-Click Unsubscribe": "Communications & Deliverability",
+    "CHAT Unsubscribe": "Communications & Deliverability",
+    "Call tag requested": "Logistics & Returns",
+    "Chatbot": "Self-Service (Chatbot / VA)",
+    "Chatbot / Browser extension": "Self-Service (Chatbot / VA)",
+    "Chatbot / Create browser app account": "Self-Service (Chatbot / VA)",
+    "Chatbot / Mobile app": "Self-Service (Chatbot / VA)",
+    "Chatbot / Other": "Self-Service (Chatbot / VA)",
+    "Chatbot / Points": "Self-Service (Chatbot / VA)",
+    "Chatbot / Redeem Points": "Self-Service (Chatbot / VA)",
+    "Chatbot / Router problems": "Self-Service (Chatbot / VA)",
+    "Chatbot / Surveys": "Self-Service (Chatbot / VA)",
+    "Chatbot / Troubleshooting": "Self-Service (Chatbot / VA)",
+    "Chatbot / Update my contact info": "Self-Service (Chatbot / VA)",
+    "Compliment": "Feedback & Complaints",
+    "Compliment/Case Manager": "Feedback & Complaints",
+    "Compliment/General": "Feedback & Complaints",
+    "Compliment/Incentive": "Feedback & Complaints",
+    "Compliment/Survey Feedback": "Feedback & Complaints",
+    "Configuration Escalation from Logistics Center": "Logistics & Returns",
+    "Contact information notification": "Communications & Deliverability",
+    "CoreMini": "Hardware & Equipment",
+    "CoreMini/Activity Inquiry": "Participation & Eligibility",
+    "CoreMini/Installation": "Installation & Onboarding",
+    "CoreMini/Troubleshooting": "Troubleshooting & Technical",
+    "Could Not Deregister Escalation from Logistics Center": "Logistics & Returns",
+    "Device is broken": "Troubleshooting & Technical",
+    "Device or Equipment Order/Cancellation/Involuntary Withdrawal": "Attrition & Withdrawal",
+    "Device/Equipment - Lost or Stolen": "Hardware & Equipment",
+    "Dial Pattern Import": "Communications & Deliverability",
+    "Disconnected Number": "Communications & Deliverability",
+    "Do not call - reminder calls": "Communications & Deliverability",
+    "Email Bounce/Full Mail box": "Communications & Deliverability",
+    "Email Bounce/Full Mail box/Active panel member": "Communications & Deliverability",
+    "Email Bounce/Full Mail box/Non respondent": "Communications & Deliverability",
+    "Email Bounce/Wrong address": "Communications & Deliverability",
+    "Email Bounce/Wrong address/Last attempt before Withdrawal": "Communications & Deliverability",
+    "Email Bounce/Wrong address/On the bill but not in our database": "Communications & Deliverability",
+    "Email Bounce/Wrong address/Panel member has changed address": "Communications & Deliverability",
+    "Equipment Received": "Hardware & Equipment",
+    "Expired Incentive": "Incentives & Rewards",
+    "Feedback/Browser Extension/Edge": "Feedback & Complaints",
+    "Feedback/Browser Extension/Firefox": "Feedback & Complaints",
+    "Feedback/Browser Extension/Google Chrome": "Feedback & Complaints",
+    "Feedback/Browser Extension/Safari": "Feedback & Complaints",
+    "Feedback/Complaint/Incentives": "Feedback & Complaints",
+    "Feedback/Complaint/Other": "Feedback & Complaints",
+    "Feedback/Complaint/Privacy": "Feedback & Complaints",
+    "Feedback/Complaint/Survey": "Feedback & Complaints",
+    "Feedback/Compliment": "Feedback & Complaints",
+    "Feedback/Compliment/Other": "Feedback & Complaints",
+    "Feedback/Compliment/Staff Member": "Feedback & Complaints",
+    "Feedback/Compliment/Survey": "Feedback & Complaints",
+    "Feedback/General": "Feedback & Complaints",
+    "Feedback/General - Google_Android": "Feedback & Complaints",
+    "Feedback/General - Google_iOS": "Feedback & Complaints",
+    "Feedback/General - Nurago_iOS": "Feedback & Complaints",
+    "Feedback/Negative - Google_Android": "Feedback & Complaints",
+    "Feedback/Negative - Google_iOS": "Feedback & Complaints",
+    "Feedback/Negative - Nurago_iOS": "Feedback & Complaints",
+    "Feedback/Negative - reCaptcha": "Feedback & Complaints",
+    "Hard Bounced/Email": "Communications & Deliverability",
+    "How To": "Installation & Onboarding",
+    "In Home Install": "Installation & Onboarding",
+    "In Home Install/Missed Appointment": "Installation & Onboarding",
+    "In Home Install/Needed": "Installation & Onboarding",
+    "Incentive": "Incentives & Rewards",
+    "Incentive/1099-Misc Mailed": "Incentives & Rewards",
+    "Incentive/Browser Extension": "Incentives & Rewards",
+    "Incentive/Browser Extension/Edge": "Incentives & Rewards",
+    "Incentive/Browser Extension/Firefox": "Incentives & Rewards",
+    "Incentive/Browser Extension/Google Chrome": "Incentives & Rewards",
+    "Incentive/Browser Extension/Safari": "Incentives & Rewards",
+    "Incentive/Check not received": "Incentives & Rewards",
+    "Incentive/General Inquiry": "Incentives & Rewards",
+    "Incentive/Have not received": "Incentives & Rewards",
+    "Incentive/Mailed out check or cash incentive": "Incentives & Rewards",
+    "Incentive/Negative Feedback": "Incentives & Rewards",
+    "Incentive/Payment Status": "Incentives & Rewards",
+    "Incentive/Point Inquiry": "Incentives & Rewards",
+    "Incentive/Positive Feedback": "Incentives & Rewards",
+    "Incentive/Product not in stock": "Incentives & Rewards",
+    "Incentive/Raffles": "Incentives & Rewards",
+    "Incentive/Redemptions Blocked": "Incentives & Rewards",
+    "Incentive/Sweepstakes": "Incentives & Rewards",
+    "Incentive/Tax Form Inquiry": "Incentives & Rewards",
+    "Incentive/W-9 Mailed": "Incentives & Rewards",
+    "Installation Walk-Through": "Installation & Onboarding",
+    "Installation Walk-through/Browser Extension Installation": "Installation & Onboarding",
+    "Installation Walk-through/Router+cTV": "Installation & Onboarding",
+    "Installation walk-through/Browser Extension/Edge": "Installation & Onboarding",
+    "Installation walk-through/Browser Extension/Firefox": "Installation & Onboarding",
+    "Installation walk-through/Browser Extension/Google Chrome": "Installation & Onboarding",
+    "Installation walk-through/Browser Extension/Safari": "Installation & Onboarding",
+    "KP Application": "Hardware & Equipment",
+    "KP Application/ General Inquiry": "Hardware & Equipment",
+    "KP Application/ Troubleshooting": "Troubleshooting & Technical",
+    "KP One-Click Unsubscribe": "Communications & Deliverability",
+    "KP Tablet/Setup": "Installation & Onboarding",
+    "KP Unsubscribe": "Communications & Deliverability",
+    "Language Barrier": "Communications & Deliverability",
+    "Letter sent by PM.": "Communications & Deliverability",
+    "MM - Installation Completed (Fully Compliant)": "Installation & Onboarding",
+    "MM One-Click Unsubscribe": "Communications & Deliverability",
+    "MM Presence Application": "Hardware & Equipment",
+    "MM Presence Application/General inquiry": "Hardware & Equipment",
+    "MM Presence Application/Troubleshooting": "Troubleshooting & Technical",
+    "MM Unsubscribe": "Communications & Deliverability",
+    "Mass Retirement 2010": "Attrition & Withdrawal",
+    "Member Back from Inactive Status--\"Been Away": "Suspension & Reactivation",
+    "Member Retired": "Attrition & Withdrawal",
+    "Member requested not follow up calls": "Communications & Deliverability",
+    "Newsletter Contest Entry": "Incentives & Rewards",
+    "No Local Access Numbers": "Communications & Deliverability",
+    "Not eligible/Browser Extension/Edge": "Participation & Eligibility",
+    "Not eligible/Browser Extension/Firefox": "Participation & Eligibility",
+    "Not eligible/Browser Extension/Google Chrome": "Participation & Eligibility",
+    "Not eligible/Browser Extension/Safari": "Participation & Eligibility",
+    "Off-Panel": "Attrition & Withdrawal",
+    "Off-Panel/Incentive": "Attrition & Withdrawal",
+    "Off-Panel/Other": "Attrition & Withdrawal",
+    "Off-Panel/Survey Issue": "Attrition & Withdrawal",
+    "On Screen Message/Account Registration": "Communications & Deliverability",
+    "On Screen Message/Wrong Login information": "Communications & Deliverability",
+    "On screen Message": "Communications & Deliverability",
+    "Outbound": "Outbound Contact Attempts",
+    "Outbound/Already called in to Confirm": "Outbound Contact Attempts",
+    "Outbound/Answering Machine": "Outbound Contact Attempts",
+    "Outbound/Busy Signal": "Outbound Contact Attempts",
+    "Outbound/Callback Requested": "Outbound Contact Attempts",
+    "Outbound/Change Email": "Profile & Account Admin",
+    "Outbound/Completed Survey": "Outbound Contact Attempts",
+    "Outbound/Consent and Email address given": "Profile & Account Admin",
+    "Outbound/Entire Installation Completed": "Installation & Onboarding",
+    "Outbound/Final Already Sent Unit Back": "Logistics & Returns",
+    "Outbound/Final Call Tag Requested": "Logistics & Returns",
+    "Outbound/Final Disconnect-Computer Tone": "Outbound Contact Attempts",
+    "Outbound/Final Hard Refusal": "Attrition & Withdrawal",
+    "Outbound/Final Language Barrier": "Outbound Contact Attempts",
+    "Outbound/Final Left Message": "Outbound Contact Attempts",
+    "Outbound/Final Never Received Unit": "Logistics & Returns",
+    "Outbound/Final No Answer-Last Attempt": "Outbound Contact Attempts",
+    "Outbound/Final Physical Incapacitation": "Outbound Contact Attempts",
+    "Outbound/Final Refer to Case Manager": "Outbound Contact Attempts",
+    "Outbound/Final Request ARS": "Logistics & Returns",
+    "Outbound/Final Unrecoverable": "Outbound Contact Attempts",
+    "Outbound/Final Unrecoverable/no alternate to disconnected phone": "Outbound Contact Attempts",
+    "Outbound/Final Wrong Number": "Outbound Contact Attempts",
+    "Outbound/Left Message with Another Person in the Household": "Outbound Contact Attempts",
+    "Outbound/No Answer": "Outbound Contact Attempts",
+    "Outbound/Promises to Complete": "Outbound Contact Attempts",
+    "Outbound/Promises to Return Hardware": "Logistics & Returns",
+    "Outbound/Recruitment Confirmed": "Outbound Contact Attempts",
+    "Outbound/Soft Refusal": "Attrition & Withdrawal",
+    "Outbound/Suspend Household": "Suspension & Reactivation",
+    "Outbound/Suspend Member": "Suspension & Reactivation",
+    "Outbound/Transfer to Case Manager": "Outbound Contact Attempts",
+    "Outbound/Unsure at this time": "Outbound Contact Attempts",
+    "Outbound/Update Phone Number": "Profile & Account Admin",
+    "Outbound/Withdraw Non Primary Member": "Attrition & Withdrawal",
+    "Outbound/Work in Process": "Outbound Contact Attempts",
+    "Outbound/Work in progress": "Outbound Contact Attempts",
+    "Outbound/missed4letter": "Outbound Contact Attempts",
+    "Partial Return Received": "Logistics & Returns",
+    "Password Security": "Profile & Account Admin",
+    "Presence Sensor": "Hardware & Equipment",
+    "Presence Sensor/ Activity inquiry": "Participation & Eligibility",
+    "Presence Sensor/ Appointment needed": "Hardware & Equipment",
+    "Presence Sensor/ General Inquiry": "Hardware & Equipment",
+    "Presence Sensor/ Incentives Inquiry": "Incentives & Rewards",
+    "Presence Sensor/ Installation": "Installation & Onboarding",
+    "Presence Sensor/ Troubleshooting": "Troubleshooting & Technical",
+    "Primary didnt signed to received the LP": "Profile & Account Admin",
+    "Primary member Switch for Panel memeber": "Profile & Account Admin",
+    "Privacy/CCPA - California residents": "Privacy & Compliance",
+    "Privacy/CCPA - Non-California residents": "Privacy & Compliance",
+    "Privacy/Escalation to Privacy Officer": "Privacy & Compliance",
+    "Privacy/Feedback/Complaint": "Privacy & Compliance",
+    "Privacy/Improper use of data": "Privacy & Compliance",
+    "Privacy/Other": "Privacy & Compliance",
+    "Privacy/Recruitment Concerns": "Privacy & Compliance",
+    "Privacy/Share all data collected": "Privacy & Compliance",
+    "Privacy/Voluntary Withdraw": "Privacy & Compliance",
+    "Privacy/Withdraw/Delete all PII": "Privacy & Compliance",
+    "Program Change (Migrate)": "Profile & Account Admin",
+    "Program Change (Migrate)/Household": "Profile & Account Admin",
+    "Program Change (Migrate)/Member": "Profile & Account Admin",
+    "RMA Verify Missing parts Escalation from Logistics Center": "Logistics & Returns",
+    "Reactivate": "Suspension & Reactivation",
+    "Reactivate/Suspend": "Suspension & Reactivation",
+    "Reactivate/first chance": "Suspension & Reactivation",
+    "Reactivate/last chance": "Suspension & Reactivation",
+    "Reactivate/profile never completed": "Suspension & Reactivation",
+    "Reactivate/re-recruitment": "Suspension & Reactivation",
+    "Reactivated Via SurveyDirector": "Suspension & Reactivation",
+    "Reality Meter/Activity inquiry": "Participation & Eligibility",
+    "Reality Meter/Incentives inquiry": "Incentives & Rewards",
+    "Reality Meter/Installation": "Installation & Onboarding",
+    "Reality Meter/Installation/Computer": "Installation & Onboarding",
+    "Reality Meter/Installation/Google Android": "Installation & Onboarding",
+    "Reality Meter/Installation/iOS": "Installation & Onboarding",
+    "Reality Meter/Opt-out": "Hardware & Equipment",
+    "Reality Meter/Troubleshooting": "Troubleshooting & Technical",
+    "Reality Meter/Troubleshooting/VPN": "Troubleshooting & Technical",
+    "Reality meter/Volunteer to join": "Suspension & Reactivation",
+    "Recruitment": "Suspension & Reactivation",
+    "Recruitment/Recruitment Confirmed": "Suspension & Reactivation",
+    "Refused Reactivation Via SurveyDirector": "Attrition & Withdrawal",
+    "Reimbursement": "Incentives & Rewards",
+    "Reimbursement/Calling toll numbers": "Incentives & Rewards",
+    "Reimbursement/Device bill": "Incentives & Rewards",
+    "Reimbursement/Haven't received payment ISP": "Incentives & Rewards",
+    "Reimbursement/Haven't received payment phone bill": "Incentives & Rewards",
+    "Reimbursement/Mailed out Reimbursement check": "Incentives & Rewards",
+    "Reimbursement/Other": "Incentives & Rewards",
+    "Reimbursement/Other ISP bill": "Incentives & Rewards",
+    "Reimbursement/Shipping": "Incentives & Rewards",
+    "Retire": "Attrition & Withdrawal",
+    "Retire/Doesn't Meet YABS Requirement": "Attrition & Withdrawal",
+    "Retired for health problems": "Attrition & Withdrawal",
+    "Retirement Request": "Attrition & Withdrawal",
+    "Retirement Request/Approved": "Attrition & Withdrawal",
+    "Retirement Request/Denied": "Attrition & Withdrawal",
+    "Return Checks": "Incentives & Rewards",
+    "Return Only": "Logistics & Returns",
+    "Return Visa Card": "Incentives & Rewards",
+    "Returned 1099": "Incentives & Rewards",
+    "Router/Activity Inquiry": "Participation & Eligibility",
+    "SOW2 Reactivated Screenwise Panelist": "Suspension & Reactivation",
+    "SOW4 Reactivated Screenwise Panelist": "Suspension & Reactivation",
+    "SW Mobile only": "Hardware & Equipment",
+    "SW One-Click Unsubscribe": "Communications & Deliverability",
+    "SW Router/Installation": "Installation & Onboarding",
+    "SW Unsubscribe": "Communications & Deliverability",
+    "Screenwise AllClear ID Letter": "Privacy & Compliance",
+    "Screenwise Mobile Meter Smartphone/Activity Inquiry": "Participation & Eligibility",
+    "Screenwise Mobile Meter Tablet/Activity Inquiry": "Participation & Eligibility",
+    "Screenwise iOS Mobile Meter/ Safari Extension": "Hardware & Equipment",
+    "Setup - Troubleshooting": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/Antenna": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/Cable": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/Complete and successful TV Tuner installation": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/Dialing Toll Number": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/Digital Cable": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/KP Digital": "Troubleshooting & Technical",
+    "Setup - Troubleshooting/Satellite": "Troubleshooting & Technical",
+    "Setup/Link Request - Google_Android": "Installation & Onboarding",
+    "Setup/Link Request - Google_iOS": "Installation & Onboarding",
+    "Setup/Link Request - Nurago_iOS": "Installation & Onboarding",
+    "Setup/Smartphone Installation - Google_Android": "Installation & Onboarding",
+    "Setup/Smartphone Installation - Google_iOS": "Installation & Onboarding",
+    "Setup/Smartphone Installation - Nurago_iOS": "Installation & Onboarding",
+    "Shipment": "Logistics & Returns",
+    "Shipment/Loss claim": "Logistics & Returns",
+    "Shipment/Shipping tag has not arrived": "Logistics & Returns",
+    "Shipment/stolen": "Logistics & Returns",
+    "Shipping": "Logistics & Returns",
+    "SmartHome/Activity inquiry": "Participation & Eligibility",
+    "SmartHome/General Inquiry": "Hardware & Equipment",
+    "SmartHome/Incentives": "Incentives & Rewards",
+    "SmartHome/Troubleshooting": "Troubleshooting & Technical",
+    "Spam Message Received": "Communications & Deliverability",
+    "Survey Status": "Participation & Eligibility",
+    "Survey Status/Problem with Access": "Participation & Eligibility",
+    "Survey Status/Problem with Access/Can't connect to KP website": "Participation & Eligibility",
+    "Survey Status/Problem with Access/Video Download problem CHRONIC": "Participation & Eligibility",
+    "Survey Status/Problem with Access/Video download problem 1st or 2nd time": "Participation & Eligibility",
+    "Survey Status/Problem with Access/publisher not available": "Participation & Eligibility",
+    "Survey access": "Participation & Eligibility",
+    "Survey access/Publisher Unavailable": "Participation & Eligibility",
+    "Suspend": "Suspension & Reactivation",
+    "Suspend primary": "Suspension & Reactivation",
+    "Suspend/Household": "Suspension & Reactivation",
+    "Suspend/Household/business": "Suspension & Reactivation",
+    "Suspend/Household/not specified": "Suspension & Reactivation",
+    "Suspend/Household/other": "Suspension & Reactivation",
+    "Suspend/Household/personal reasons": "Suspension & Reactivation",
+    "Suspend/Household/vacation": "Suspension & Reactivation",
+    "Suspend/Member": "Suspension & Reactivation",
+    "Suspend/Member/No Answer Uncooperative": "Suspension & Reactivation",
+    "Suspend/Member/business": "Suspension & Reactivation",
+    "Suspend/Member/not specified": "Suspension & Reactivation",
+    "Suspend/Member/other": "Suspension & Reactivation",
+    "Suspend/Member/personal problems": "Suspension & Reactivation",
+    "Suspend/Member/vacation": "Suspension & Reactivation",
+    "TV Meter/Activity inquiry": "Participation & Eligibility",
+    "TV Meter/General Inquiry": "Hardware & Equipment",
+    "TV Meter/Incentives": "Incentives & Rewards",
+    "TV Meter/Installation": "Installation & Onboarding",
+    "TV Meter/Troubleshooting": "Troubleshooting & Technical",
+    "Terms of Service": "Profile & Account Admin",
+    "Terms of Service Inquiry": "Profile & Account Admin",
+    "Terms of Service Inquiry/Cost": "Profile & Account Admin",
+    "Terms of Service Inquiry/Privacy": "Profile & Account Admin",
+    "Troubleshooting": "Troubleshooting & Technical",
+    "Troubleshooting/Browser Extension": "Troubleshooting & Technical",
+    "Troubleshooting/Browser Extension/Edge": "Troubleshooting & Technical",
+    "Troubleshooting/Browser Extension/Firefox": "Troubleshooting & Technical",
+    "Troubleshooting/Browser Extension/Google Chrome": "Troubleshooting & Technical",
+    "Troubleshooting/Browser Extension/Internet Explorer": "Troubleshooting & Technical",
+    "Troubleshooting/Browser Extension/Safari": "Troubleshooting & Technical",
+    "Troubleshooting/Connection Tool": "Troubleshooting & Technical",
+    "Troubleshooting/Connection Tool/Cancelation Screen": "Troubleshooting & Technical",
+    "Troubleshooting/Connection Tool/Welcome Screen": "Troubleshooting & Technical",
+    "Troubleshooting/Fixed Meter KP Digital": "Troubleshooting & Technical",
+    "Troubleshooting/Hardware": "Troubleshooting & Technical",
+    "Troubleshooting/Invalid Credentials - Google_Android": "Troubleshooting & Technical",
+    "Troubleshooting/Invalid Credentials - Google_iOS": "Troubleshooting & Technical",
+    "Troubleshooting/Invalid Credentials - Nurago_iOS": "Troubleshooting & Technical",
+    "Troubleshooting/Members Site": "Troubleshooting & Technical",
+    "Troubleshooting/Other": "Troubleshooting & Technical",
+    "Troubleshooting/Other - Google_Android": "Troubleshooting & Technical",
+    "Troubleshooting/Other - Google_iOS": "Troubleshooting & Technical",
+    "Troubleshooting/Other - Nurago_iOS": "Troubleshooting & Technical",
+    "Troubleshooting/Router+cTV": "Troubleshooting & Technical",
+    "Troubleshooting/Smart Phone KP Digital": "Troubleshooting & Technical",
+    "Troubleshooting/Survey": "Troubleshooting & Technical",
+    "Troubleshooting/Survey/Not receiving surveys": "Troubleshooting & Technical",
+    "Troubleshooting/Survey/Problem in survey": "Troubleshooting & Technical",
+    "Troubleshooting/Survey/Too many surveys": "Troubleshooting & Technical",
+    "Troubleshooting/Tablet KP Digital": "Troubleshooting & Technical",
+    "Troubleshooting/Unable To Verify - Google_Android": "Troubleshooting & Technical",
+    "Troubleshooting/Unable To Verify - Google_iOS": "Troubleshooting & Technical",
+    "Troubleshooting/Unable To Verify - Nurago_iOS": "Troubleshooting & Technical",
+    "Troubleshooting/Web Browsing": "Troubleshooting & Technical",
+    "Troubleshooting/password reset": "Troubleshooting & Technical",
+    "Troubleshooting/reCaptcha": "Troubleshooting & Technical",
+    "UPS Bounced Mail": "Communications & Deliverability",
+    "Unexpected Return at Logistics Center": "Logistics & Returns",
+    "Uninstall/Browser Extension/Edge": "Installation & Onboarding",
+    "Uninstall/Browser Extension/Firefox": "Installation & Onboarding",
+    "Uninstall/Browser Extension/Google Chrome": "Installation & Onboarding",
+    "Uninstall/Browser Extension/Safari": "Installation & Onboarding",
+    "Unrecoverable equipment": "Hardware & Equipment",
+    "Update Profile": "Profile & Account Admin",
+    "Update Profile/Address": "Profile & Account Admin",
+    "Update Profile/Address/All": "Profile & Account Admin",
+    "Update Profile/Address/Mailing Address": "Profile & Account Admin",
+    "Update Profile/Address/Residence Address": "Profile & Account Admin",
+    "Update Profile/Address/Shipping Address": "Profile & Account Admin",
+    "Update Profile/Change Email": "Profile & Account Admin",
+    "Update Profile/Change Email - Google Account": "Profile & Account Admin",
+    "Update Profile/Change Email/Device Address": "Profile & Account Admin",
+    "Update Profile/Change Email/Our database only": "Profile & Account Admin",
+    "Update Profile/Change Phone Number - Smartphone": "Profile & Account Admin",
+    "Update Profile/Change Primary Subscriber": "Profile & Account Admin",
+    "Update Profile/Delete Email": "Profile & Account Admin",
+    "Update Profile/Name": "Profile & Account Admin",
+    "Update Profile/Name/Incorrectly Spelled": "Profile & Account Admin",
+    "Update Profile/Name/Marriage-Adoption": "Profile & Account Admin",
+    "Update Profile/Password": "Profile & Account Admin",
+    "Update Profile/Password/Device": "Profile & Account Admin",
+    "Update Profile/Password/KnowledgePanel": "Profile & Account Admin",
+    "Update Profile/Personal Information": "Profile & Account Admin",
+    "Update Profile/Phone Number": "Profile & Account Admin",
+    "Update Profile/Phone Number/Alternate": "Profile & Account Admin",
+    "Update Profile/Phone Number/Home": "Profile & Account Admin",
+    "Update Profile/Smartphone Change - Android To iOS": "Profile & Account Admin",
+    "Update Profile/Smartphone Change - iOS To Android": "Profile & Account Admin",
+    "Update Profile/Smartphone Withdrawal - No Longer Eligible": "Attrition & Withdrawal",
+    "Update Profile/Smartphone Withdrawal - No Longer Interested": "Attrition & Withdrawal",
+    "Update Profile/Smartphone Withdrawal - Refused": "Attrition & Withdrawal",
+    "Update Profile/Survey information": "Profile & Account Admin",
+    "Update profile/ table withdrawal - Refuse": "Attrition & Withdrawal",
+    "VirtualAssistant": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Browser extension": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Mobile app": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Other": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Points": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Redeem Points": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Router problems": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Surveys": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Sweepstakes": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Troubleshooting": "Self-Service (Chatbot / VA)",
+    "VirtualAssistant / Update my contact info": "Self-Service (Chatbot / VA)",
+    "Volunteer to Join": "Suspension & Reactivation",
+    "Withdraw": "Attrition & Withdrawal",
+    "Withdraw HH": "Attrition & Withdrawal",
+    "Withdraw Non Primary Member": "Attrition & Withdrawal",
+    "Withdraw Panel Member": "Attrition & Withdrawal",
+    "Withdraw/Household": "Attrition & Withdrawal",
+    "Withdraw/Household/Changed Mind": "Attrition & Withdrawal",
+    "Withdraw/Household/Death": "Attrition & Withdrawal",
+    "Withdraw/Household/Disagrees with the terms and conditions": "Attrition & Withdrawal",
+    "Withdraw/Household/Does not like the tools or hardware.": "Attrition & Withdrawal",
+    "Withdraw/Household/Health Problems": "Attrition & Withdrawal",
+    "Withdraw/Household/Initial email bounced": "Attrition & Withdrawal",
+    "Withdraw/Household/Leaving Household": "Attrition & Withdrawal",
+    "Withdraw/Household/Negative reaction to surveys": "Attrition & Withdrawal",
+    "Withdraw/Household/No Answer Uncooperative": "Attrition & Withdrawal",
+    "Withdraw/Household/No Longer Eligible": "Attrition & Withdrawal",
+    "Withdraw/Household/Not interested": "Attrition & Withdrawal",
+    "Withdraw/Household/Other": "Attrition & Withdrawal",
+    "Withdraw/Household/Personal Reasons": "Attrition & Withdrawal",
+    "Withdraw/Household/Prefer Computer": "Attrition & Withdrawal",
+    "Withdraw/Household/Retire from Panel": "Attrition & Withdrawal",
+    "Withdraw/Household/Too Busy": "Attrition & Withdrawal",
+    "Withdraw/Household/Transfer to another Panel": "Attrition & Withdrawal",
+    "Withdraw/Household/Under Age Requirements": "Attrition & Withdrawal",
+    "Withdraw/Household/Unit unrecoverable\\deactivate": "Attrition & Withdrawal",
+    "Withdraw/Member": "Attrition & Withdrawal",
+    "Withdraw/Member/Changed Mind": "Attrition & Withdrawal",
+    "Withdraw/Member/Death": "Attrition & Withdrawal",
+    "Withdraw/Member/Disagrees with the terms and conditions": "Attrition & Withdrawal",
+    "Withdraw/Member/Does not like the tools or hardware.": "Attrition & Withdrawal",
+    "Withdraw/Member/Health Problems": "Attrition & Withdrawal",
+    "Withdraw/Member/Leaving Household": "Attrition & Withdrawal",
+    "Withdraw/Member/Negative reaction to surveys": "Attrition & Withdrawal",
+    "Withdraw/Member/No Answer Uncooperative": "Attrition & Withdrawal",
+    "Withdraw/Member/No Longer Eligible": "Attrition & Withdrawal",
+    "Withdraw/Member/Not interested": "Attrition & Withdrawal",
+    "Withdraw/Member/Other": "Attrition & Withdrawal",
+    "Withdraw/Member/Personal Reasons": "Attrition & Withdrawal",
+    "Withdraw/Member/Prefer Computer": "Attrition & Withdrawal",
+    "Withdraw/Member/Primary Subscriber": "Attrition & Withdrawal",
+    "Withdraw/Member/Too Busy": "Attrition & Withdrawal",
+    "Withdraw/Member/Under Age Requirements": "Attrition & Withdrawal",
+    "YAM Re-Recruitment": "Suspension & Reactivation",
+    "YAMS re-recruitment": "Suspension & Reactivation"
+  },
+  "driver_rules": [
+    [
+      "Privacy & Compliance",
+      "^privacy\\b|privacy officer|\\bccpa\\b|improper use of data|share all data|allclear id"
     ],
     [
-      "Billing & Tax",
-      "\\btax\\b|w-?9|1099|invoice|billing"
+      "Attrition & Withdrawal",
+      "^withdraw|^off-?panel|^retire\\b|^retirement request|retired for health|member retired|mass retirement|involuntary withdrawal|table withdrawal|smartphone withdrawal|refused reactivation|withdraw non primary|^withdraw hh"
     ],
     [
-      "Complaint & Escalation",
-      "complaint|escalat|supervisor|dissatisf|legal|\\bbbb\\b"
+      "Suspension & Reactivation",
+      "^suspend|^reactivat|been away|inactive status|re-?recruitment|^recruitment|volunteer to join|sow\\d reactivated|^yam"
+    ],
+    [
+      "Suspension & Reactivation",
+      "^outbound/suspend"
+    ],
+    [
+      "Attrition & Withdrawal",
+      "^outbound/withdraw|^outbound/final hard refusal|^outbound/soft refusal"
+    ],
+    [
+      "Profile & Account Admin",
+      "^outbound/(change email|update phone|consent and email)"
+    ],
+    [
+      "Installation & Onboarding",
+      "^outbound/entire installation"
+    ],
+    [
+      "Logistics & Returns",
+      "^outbound/(final request ars|promises to return hardware|final already sent unit back|final never received unit|final call tag)"
+    ],
+    [
+      "Outbound Contact Attempts",
+      "^outbound\\b"
+    ],
+    [
+      "Self-Service (Chatbot / VA)",
+      "^chatbot|^virtualassistant"
+    ],
+    [
+      "Feedback & Complaints",
+      "^feedback|^compliment"
+    ],
+    [
+      "Incentives & Rewards",
+      "^incentive|blocked rewards|expired incentive|^reimbursement|return visa card|^return checks|returned 1099|newsletter contest|/incentives?\\b|/ incentives?\\b"
+    ],
+    [
+      "Troubleshooting & Technical",
+      "troubleshooting|device is broken|connection tool|recaptcha|invalid credentials|unable to verify|web browsing|fixed meter|members site"
+    ],
+    [
+      "Installation & Onboarding",
+      "install|^setup\\b|walk-?through|^kp tablet/setup|^how to|link request"
+    ],
+    [
+      "Participation & Eligibility",
+      "^survey\\b|activity inquiry|^not eligible|survey status|survey access"
+    ],
+    [
+      "Hardware & Equipment",
+      "tv meter|reality meter|presence sensor|coremini|smarthome|router|box ?switch|additional equipment|device/equipment|unrecoverable equipment|equipment received|screenwise|mobile meter|streaming stick|kp application|mm presence application|kp digital|^sw mobile|browser extension"
+    ],
+    [
+      "Communications & Deliverability",
+      "bounce|unsubscribe|on ?screen message|local access numbers|disconnected number|do not call|not follow up calls|dial pattern|letter sent|spam message|contact information notification|language barrier"
+    ],
+    [
+      "Logistics & Returns",
+      "ars tag|call tag|^shipment|^shipping\\b|return only|partial return|unexpected return|logistics center|^uninstall|\\brma\\b|^aer\\b|equipment order"
+    ],
+    [
+      "Profile & Account Admin",
+      "^update profile|^add a member|primary member switch|primary subscriber|password|^2fa|terms of service|program change|primary didnt signed|^letter sent"
     ]
   ]
 }

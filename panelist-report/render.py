@@ -426,7 +426,8 @@ def build_findings(V, C, preview):
                   % (rc["members_with_multiple_cases"], rc["members"], rc["pct_members_repeat"],
                      rc["cases_from_repeat_members"], rc["pct_cases_from_repeat"],
                      rc["max_cases_one_member"])))
-    for k in ("chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout", "chain_field_service"):
+    for k in ("chain_hw_inactivity", "chain_activity_withdraw", "chain_reward_dupes",
+              "chain_bounce_withdraw", "chain_google_lockout", "chain_field_service"):
         ch = C.get(k, {})
         if ch.get("computable") and (ch.get("lift") or 0) >= 1.2:
             f.append(("Confirmed link: %s" % ch["title"],
@@ -587,7 +588,16 @@ def build(res, meta):
         A("".join(bits))
 
     AN = res.get("anomaly") or {}
+    CUBE = res.get("cube") or {}
     A("<h3>Movement watch</h3>")
+    if CUBE.get("periods", {}).get("week"):
+        A('<div id="explorer"><div class="slicer" id="originSlicer" role="group" '
+          'aria-label="Filter by case origin"></div><div id="weeklyChart"></div>'
+          '<div id="weekDetail"><p class="nojs">Weekly breakdown requires JavaScript; the '
+          'tables and charts below cover the same period without it.</p></div></div>')
+        A('<p class="sub">Contacts per complete week. Pick a case origin to filter every '
+          'figure in this block and the call-driver ranking below it; click a bar to see that '
+          'week\'s top drivers.</p>')
     if AN.get("alerts"):
         A('<div class="alerts">' + "".join(
             '<div class="alert %s"><span class="dir">%s</span><span>%s</span></div>'
@@ -623,8 +633,10 @@ def build(res, meta):
           % (RULES["gates"]["top_drivers"], len(DR)))
         chart_rows = [{"label": "%d. %s" % (d["rank"], d["label"]),
                        "count": d["count"], "pct": d["pct"]} for d in DR]
+        A('<div id="driverBlock">')
         A('<div class="drivers"><figure>' + svg_hbar(chart_rows, n, label_w=196, W=560)
           + "</figure><div>" + drivers_table(DR, n) + "</div></div>")
+        A("</div>")
 
     A("<h3>Top findings</h3>")
     finds = build_findings(V, C, preview)
@@ -687,13 +699,48 @@ def build(res, meta):
         A(na_block("Origin breakdown", V["origin"]))
     A("</div>")
 
-    A("<h3>Top 5 primary category labels (raw, before bucketing)</h3>")
-    prows = list(V["primary_raw"]["rows"])[:5]
+    Q = res.get("quality") or {}
+    junk_set = {j["label"] for j in Q.get("junk_labels", [])}
+    A("<h3>Top 5 primary category labels (real categories only)</h3>")
+    prows = [x for x in V["primary_raw"]["rows"] if x["label"] not in junk_set][:5]
     A(svg_hbar(prows, n, series_color="var(--s1)", label_w=240))
-    A('<p class="sub">The five most-used raw labels out of %d distinct labels seen in the '
-      'Category field; the remainder are in the Appendix A mapping table. Percentages are of '
-      'all %d cases, so these five do not sum to 100%%.</p>'
+    A('<p class="sub">The five most-used real category labels out of %d distinct labels seen '
+      'in the Category field. Placeholder values are excluded here and sized in the data-quality '
+      'panel below. Percentages are of all %d cases, so these five do not sum to 100%%.</p>'
       % (V["tag_load"]["distinct_tags"], n))
+
+    if Q:
+        A("<h3>Data quality — what the category field cannot tell you</h3>")
+        A('<p>Every category value in the export is checked against the <b>%d-category '
+          'knowledge base</b>. Two things break the reporting: values that are not categories '
+          'at all, and values the KB does not contain.</p>' % Q.get("kb_size", 0))
+        A('<div class="stats">' + "".join(
+            '<div class="stat"><div class="k">%s</div><div class="v num">%s</div>'
+            '<div class="d">%s</div></div>' % (k, v, d) for k, v, d in [
+                ("Mapped from the KB", "%.1f%%" % (res["inference"]["pct_from_kb"]),
+                 "%s cases matched a real category exactly"
+                 % "{:,}".format(res["inference"]["from_kb"])),
+                ("Placeholder primary", "%.1f%%" % Q["primary_junk_pct"],
+                 "%s cases whose primary value is a number or placeholder"
+                 % "{:,}".format(Q["primary_junk_cases"])),
+                ("Unknown to the KB", "%.1f%%" % Q["primary_unknown_pct"],
+                 "%s cases using a label the KB does not list"
+                 % "{:,}".format(Q["primary_unknown_cases"])),
+                ("Distinct problems", "{:,}".format(Q["junk_distinct"] + Q["unknown_distinct"]),
+                 "%d placeholder + %d unknown label(s)"
+                 % (Q["junk_distinct"], Q["unknown_distinct"]))]) + "</div>")
+        if Q.get("junk_labels"):
+            A('<div class="callout"><div class="t">These values are not categories</div>'
+              "They pass straight through to Other / Unmapped and inflate it. Fixing the "
+              "picklist at source removes them from every chart in this report: "
+              + "; ".join("<b>%s</b> (%s cases)" % (ESC(j["label"]), "{:,}".format(j["count"]))
+                          for j in Q["junk_labels"][:8]) + ".</div>")
+        if Q.get("unknown_labels"):
+            A('<div class="callout info"><div class="t">Labels the knowledge base does not list'
+              "</div>Real-looking values with no KB entry — either retired categories still in "
+              "use, or new ones not yet documented: "
+              + "; ".join("<b>%s</b> (%s)" % (ESC(u["label"]), "{:,}".format(u["count"]))
+                          for u in Q["unknown_labels"][:8]) + ".</div>")
 
     A("<h3>Origin × category cross-tab</h3>")
     if V["crosstab"].get("computable"):
@@ -743,7 +790,8 @@ def build(res, meta):
       'plus its subject line — never the free-text description body, which is excluded from all '
       'processing that reaches this page.</p>' % (g["min_cases"], g["min_cooccurrence"]))
 
-    for key in ("chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout", "chain_field_service"):
+    for key in ("chain_hw_inactivity", "chain_activity_withdraw", "chain_reward_dupes",
+                "chain_bounce_withdraw", "chain_google_lockout", "chain_field_service"):
         ch = C[key]
         if ch.get("computable"):
             A('<h3 style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline">%s'
@@ -935,6 +983,9 @@ def build(res, meta):
     A('<p class="foot">All figures computed directly from the supplied export(s). Panels marked '
       'NOT COMPUTABLE indicate a field or sample size the export does not provide; no value in this '
       'report is estimated, imputed or carried over from outside the data.</p>')
+    if CUBE.get("periods", {}).get("week"):
+        A('<script type="application/json" id="cubeData">%s</script>'
+          % json.dumps(CUBE, separators=(",", ":")).replace("</", "<\\/"))
     A("</section></div>")
 
     return ("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"

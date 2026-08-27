@@ -31,6 +31,11 @@ const out={
   alerts:r.anomaly.alerts.map(a=>[a.level,a.scope,a.text]),
   mv_m:r.movement.monthly.computable?[r.movement.monthly.keys,r.movement.monthly.totals,r.movement.monthly.stack.map(s=>[s.name,s.values]),r.movement.monthly.insights.map(i=>[i.kind,i.text]),r.movement.monthly.rows.map(x=>[x.key,x.total,x.delta,x.pct,x.top_bucket,x.top_count,x.top_pct])]:['NC',r.movement.monthly.reason],
   mv_q:r.movement.quarterly.computable?[r.movement.quarterly.keys,r.movement.quarterly.totals,r.movement.quarterly.stack.map(s=>[s.name,s.values]),r.movement.quarterly.insights.map(i=>[i.kind,i.text]),r.movement.quarterly.rows.map(x=>[x.key,x.total,x.delta,x.pct,x.top_bucket,x.top_count,x.top_pct])]:['NC',r.movement.quarterly.reason],
+  q:[r.quality.kb_size,r.quality.junk_distinct,r.quality.junk_tag_total,r.quality.unknown_distinct,r.quality.unknown_tag_total,r.quality.primary_junk_cases,r.quality.primary_junk_pct,r.quality.primary_unknown_cases,r.quality.primary_unknown_pct],
+  q_junk:r.quality.junk_labels.map(x=>[x.label,x.count]), q_unk:r.quality.unknown_labels.map(x=>[x.label,x.count]),
+  inf2:[r.inference.from_kb,r.inference.from_rule,r.inference.pct_from_kb,r.inference.pct_from_rule],
+  cube:[r.cube.origins,r.cube.drivers,r.cube.periods.week.length,r.cube.periods.month.length,r.cube.periods.quarter.length,
+        (r.cube.counts.week||[]).map(o=>o.map(p=>p.reduce((a,b)=>a+b,0)).reduce((a,b)=>a+b,0))],
   most:r.most_received?[r.most_received.label,r.most_received.count,r.most_received.top_labels.map(l=>l.label),r.most_received.origin?r.most_received.origin.label:null]:null,
 };
 console.log(JSON.stringify(out));

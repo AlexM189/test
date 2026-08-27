@@ -9,8 +9,12 @@ RULES = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 
 MIN_CASES_LIFT  = RULES["gates"]["min_cases_lift"]
 MIN_COOCCUR     = RULES["gates"]["min_cooccurrence"]
 MIN_PERIODS_FIT = RULES["gates"]["min_periods_fit"]
-BUCKET_RULES    = [(n, p) for n, p in RULES["bucket_rules"]]
-BUCKETS         = [b for b, _ in BUCKET_RULES] + ["Other / Unmapped"]
+DRIVER_RULES    = [(n, p) for n, p in RULES["driver_rules"]]
+DRIVERS         = RULES["drivers"]
+BUCKETS         = DRIVERS + ["Other / Unmapped"]
+_catnorm        = lambda s: re.sub(r"\s*/\s*", "/", re.sub(r"\s+", " ", str(s or ""))).strip().lower()
+CATEGORY_MAP    = {_catnorm(k): v for k, v in RULES["category_map"].items()}
+KB_NAMES        = {_catnorm(k): k for k in RULES["category_map"]}
 SIGNALS         = RULES["signals"]
 SUBJECT_RULES   = [(n, p) for n, p in RULES["subject_rules"]]
 TOP_DRIVERS     = RULES["gates"]["top_drivers"]
@@ -30,11 +34,36 @@ def split_tags(cell):
 
 
 def bucket_of(tag):
-    t = str(tag).lower()
-    for name, pat in BUCKET_RULES:
-        if re.search(pat, t):
-            return name
-    return "Other / Unmapped"
+    """Driver for a category label. Exact match against the KB category list wins;
+    only a label the KB does not contain falls through to the ordered rules."""
+    return bucket_src(tag)[0]
+
+
+def bucket_src(tag):
+    """(driver, source) where source is 'kb', 'rule' or 'none'."""
+    key = _catnorm(tag)
+    if not key:
+        return "Other / Unmapped", "none"
+    hit = CATEGORY_MAP.get(key)
+    if hit:
+        return hit, "kb"
+    for name, pat in DRIVER_RULES:
+        if re.search(pat, key, re.I):
+            return name, "rule"
+    return "Other / Unmapped", "none"
+
+
+def is_junk_label(tag):
+    """Labels that carry no reportable meaning - pure numbers, single characters,
+    placeholders. These are a data-entry problem, not a category."""
+    t = _ws(tag)
+    if not t:
+        return True
+    if re.fullmatch(r"[\d.,;:_\-/\s]+", t):
+        return True
+    if len(t) <= 2:
+        return True
+    return t.lower() in {"n/a", "na", "none", "null", "other", "test", "tbd", "-", "--", "."}
 
 
 def bucket_from_subject(subject):
@@ -56,8 +85,9 @@ def derive(df):
     df = df.copy()
     df["tags"] = df.get("category", "").apply(split_tags)
     df["primary_category"] = df["tags"].apply(lambda t: t[0] if t else "")
-    df["bucket"] = df["primary_category"].apply(lambda t: bucket_of(t) if t else UNMAPPED)
-    df["bucket_source"] = "category"
+    src = df["primary_category"].apply(lambda t: bucket_src(t) if t else (UNMAPPED, "none"))
+    df["bucket"] = [b for b, _ in src]
+    df["bucket_source"] = [s2 if s2 != "none" else "none" for _, s2 in src]
     df["inferred_keyword"] = ""
     # anything the category field could not place gets a second pass over the subject
     needs = df["bucket"] == UNMAPPED
@@ -208,25 +238,30 @@ def correlation_section(df):
         res[key] = {"title": title, "computable": True, "missing_fields": missing,
                     "note": note, "verdict": verdict[0], "verdict_text": verdict[1], **r}
 
-    chain("chain_hw_inactivity", "Hardware/meter instability → activity & reactivation contact",
-          "hardware_meter", "activity",
-          note="Purge outcome requires a purged/inactive value in Member Status; "
-               "case-level data alone cannot confirm an involuntary purge.")
-    chain("chain_reward_dupes", "Blocked rewards → repeat contact → outbound/callback load",
-          "blocked_reward", "outbound_cb",
-          extra_missing=[] if has_member else ["MNO (to link repeat contacts)"],
-          note="Bounced-email evidence needs an email-status or bounce field; not present in the "
-               "columns seen so far.")
+    chain("chain_hw_inactivity", "Meter / hardware problems → participation & activity doubt",
+          "hardware_meter", "activity", [],
+          "Whether an activity gap became an involuntary purge needs a panelist status "
+          "history; case data alone cannot confirm the outcome.")
+    chain("chain_activity_withdraw", "Participation & activity doubt → withdrawal or suspension",
+          "activity", "withdrawal", [],
+          "Co-occurrence within a case, not a sequence over time. A created-date field would "
+          "let this be tested as an ordered progression instead.")
+    chain("chain_reward_dupes", "Blocked or missing rewards → outbound / callback load",
+          "blocked_reward", "outbound_cb", [] if has_member else ["MNO (to link repeat contacts)"],
+          "Repeat-contact linkage below sizes how much of this is the same panelist calling again.")
+    chain("chain_bounce_withdraw", "Email deliverability failure → withdrawal",
+          "email_bounce", "withdrawal", [],
+          "The category list itself links these ('Email Bounce/Wrong address/Last attempt before "
+          "Withdrawal', 'Withdraw/Household/Initial email bounced'), so the measured rate below "
+          "is the check on how often that path is actually travelled.")
     chain("chain_google_lockout", "Google account migration → access lockout",
-          "google_account", "password_access",
-          extra_missing=["member type / household role (primary vs secondary)"],
-          note="Secondary-member lockout and household attrition are NOT computable without a "
-               "member-type or household-link field.")
-    chain("chain_field_service", "Field service / shipping → onboarding & setup contact",
-          "appointment", "setup",
-          extra_missing=["enrollment or join date (for 30/60/90-day tenure)"],
-          note="Early-life churn is NOT computable without an enrollment date; tenure cannot be "
-               "derived from case dates alone.")
+          "google_account", "password_access", ["member type / household role (primary vs secondary)"],
+          "Secondary-member lockout and household attrition are NOT computable without a "
+          "member-type or household-link field.")
+    chain("chain_field_service", "Install appointment / field service → onboarding contact",
+          "appointment", "setup", ["enrollment or join date (for 30/60/90-day tenure)"],
+          "Early-life churn is NOT computable without an enrollment date; tenure cannot be "
+          "derived from case dates alone.")
 
     # repeat-contact behaviour
     if has_member:
@@ -335,7 +370,9 @@ def inference_audit(df):
     """How each case got its bucket, and on what evidence."""
     n = len(df)
     src = df["bucket_source"].value_counts().to_dict()
-    from_cat = int(src.get("category", 0))
+    from_kb = int(src.get("kb", 0))
+    from_rule = int(src.get("rule", 0))
+    from_cat = from_kb + from_rule
     from_sub = int(src.get("subject", 0))
     none = int(src.get("none", 0))
     rows = []
@@ -348,10 +385,77 @@ def inference_audit(df):
     if from_sub:
         for b, c in df[df["bucket_source"] == "subject"]["bucket"].value_counts().items():
             by_bucket.append({"label": b, "count": int(c), "pct": pct(int(c), from_sub)})
-    return {"total": n, "from_category": from_cat, "from_subject": from_sub,
-            "unresolved": none,
+    return {"total": n, "from_category": from_cat, "from_kb": from_kb, "from_rule": from_rule,
+            "pct_from_kb": pct(from_kb, n), "pct_from_rule": pct(from_rule, n),
+            "from_subject": from_sub, "unresolved": none,
             "pct_from_subject": pct(from_sub, n), "pct_unresolved": pct(none, n),
             "keywords": rows[:40], "by_bucket": by_bucket}
+
+
+def data_quality(df):
+    """Category values in the export that the KB does not contain, plus labels that
+    carry no meaning at all. This is the cleanup list, sized."""
+    n = len(df)
+    unknown, junk = Counter(), Counter()
+    for lst in df["tags"]:
+        for t in lst:
+            key = _catnorm(t)
+            if is_junk_label(t):
+                junk[_ws(t) or "(blank)"] += 1
+            elif key not in CATEGORY_MAP:
+                unknown[_ws(t)] += 1
+    prim_junk = int(df["primary_category"].apply(is_junk_label).sum())
+    prim_unknown = int(df["primary_category"].apply(
+        lambda t: bool(_ws(t)) and not is_junk_label(t) and _catnorm(t) not in CATEGORY_MAP).sum())
+    top = lambda c: [{"label": k, "count": v} for k, v in
+                     sorted(c.items(), key=lambda kv: (-kv[1], kv[0]))[:25]]
+    return {"kb_size": len(CATEGORY_MAP),
+            "junk_labels": top(junk),
+            "junk_distinct": len(junk), "junk_tag_total": sum(junk.values()),
+            "unknown_labels": top(unknown),
+            "unknown_distinct": len(unknown), "unknown_tag_total": sum(unknown.values()),
+            "primary_junk_cases": prim_junk, "primary_junk_pct": pct(prim_junk, n),
+            "primary_unknown_cases": prim_unknown, "primary_unknown_pct": pct(prim_unknown, n)}
+
+
+def build_cube(df, V):
+    """Small aggregation cube (origin x period x driver) so the report can be
+    filtered in the browser without ever shipping a row-level record."""
+    drivers = [r["label"] for r in V["bucket"]["rows"]]
+    origins = ([r["label"] for r in V["origin"]["rows"]]
+               if V["origin"].get("computable") else ["(all)"])
+    di = {d: i for i, d in enumerate(drivers)}
+    oi = {o: i for i, o in enumerate(origins)}
+    out = {"origins": origins, "drivers": drivers, "periods": {}, "counts": {},
+           "top_drivers": TOP_DRIVERS, "various_label": VARIOUS}
+    # every case, regardless of whether it falls in a complete week - so the driver
+    # ranking agrees with the case total quoted everywhere else in the report
+    tot = [[0] * len(drivers) for _ in origins]
+    for o, b in zip((df["case_origin"].replace("", "(blank)") if "case_origin" in df
+                     else pd.Series(["(all)"] * len(df), index=df.index)), df["bucket"]):
+        if o in oi and b in di:
+            tot[oi[o]][di[b]] += 1
+    out["total"] = tot
+    d = df.dropna(subset=["_date"]).copy()
+    if d.empty:
+        return out
+    for freq, key in (("W", "week"), ("M", "month"), ("Q", "quarter")):
+        keys, _ = _series(df, freq)
+        if not keys:
+            out["periods"][key] = []
+            out["counts"][key] = []
+            continue
+        pos = {k: i for i, k in enumerate(keys)}
+        cube = [[[0] * len(drivers) for _ in keys] for _ in origins]
+        lab = d["_date"].map(lambda x: _plabel(pd.Period(x, freq=freq), freq))
+        for (o, p, b), c in d.assign(_p=lab).groupby(
+                [d["case_origin"].replace("", "(blank)") if "case_origin" in d
+                 else pd.Series(["(all)"] * len(d), index=d.index), "_p", "bucket"]).size().items():
+            if p in pos and o in oi and b in di:
+                cube[oi[o]][pos[p]][di[b]] += int(c)
+        out["periods"][key] = keys
+        out["counts"][key] = cube
+    return out
 
 
 def top_drivers(V):
@@ -601,4 +705,6 @@ def run(df):
                 "quarterly": period_movement(df, vol, "Q", "quarter", top_drivers(vol)),
             },
             "most_received": most_received(df, vol),
+            "quality": data_quality(df),
+            "cube": build_cube(df, vol),
             "buckets": BUCKETS}

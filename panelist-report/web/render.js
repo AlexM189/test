@@ -407,8 +407,8 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         `(${f1(rc.pct_cases_from_repeat)}% of volume); the highest single member opened ` +
         `${rc.max_cases_one_member}.`]);
     }
-    for (const k of ["chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout",
-                     "chain_field_service"]) {
+    for (const k of ["chain_hw_inactivity", "chain_activity_withdraw", "chain_reward_dupes",
+                     "chain_bounce_withdraw", "chain_google_lockout", "chain_field_service"]) {
       const ch = C[k] || {};
       if (ch.computable && (ch.lift || 0) >= 1.2) {
         f.push([`Confirmed link: ${ch.title}`,
@@ -553,7 +553,18 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     }
 
     const AN = res.anomaly || {};
+    const CUBE = res.cube || {};
+    const hasWeeks = !!((CUBE.periods || {}).week || []).length;
     A("<h3>Movement watch</h3>");
+    if (hasWeeks) {
+      A('<div id="explorer"><div class="slicer" id="originSlicer" role="group" ' +
+        'aria-label="Filter by case origin"></div><div id="weeklyChart"></div>' +
+        '<div id="weekDetail"><p class="nojs">Weekly breakdown requires JavaScript; the ' +
+        'tables and charts below cover the same period without it.</p></div></div>');
+      A('<p class="sub">Contacts per complete week. Pick a case origin to filter every figure ' +
+        "in this block and the call-driver ranking below it; click a bar to see that week's " +
+        "top drivers.</p>");
+    }
     if ((AN.alerts || []).length) {
       A('<div class="alerts">' + AN.alerts.map(a =>
         `<div class="alert ${a.level === "down" ? "down" : "up"}"><span class="dir">` +
@@ -586,8 +597,10 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         "so the five add to 100%.</p>");
       const chartRows = DR.map(d => ({ label: d.rank + ". " + d.label,
                                        count: d.count, pct: d.pct }));
+      A('<div id="driverBlock">');
       A('<div class="drivers"><figure>' + svgHbar(chartRows, n, null, 196, 560) +
         "</figure><div>" + driversTable(DR, n) + "</div></div>");
+      A("</div>");
     }
 
     A("<h3>Top findings</h3>");
@@ -645,12 +658,47 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     } else A(naBlock("Origin breakdown", V.origin));
     A("</div>");
 
-    A("<h3>Top 5 primary category labels (raw, before bucketing)</h3>");
-    const prows = V.primary_raw.rows.slice(0, 5);
+    const Q = res.quality || {};
+    const junkSet = new Set((Q.junk_labels || []).map(j => j.label));
+    A("<h3>Top 5 primary category labels (real categories only)</h3>");
+    const prows = V.primary_raw.rows.filter(x => !junkSet.has(x.label)).slice(0, 5);
     A(svgHbar(prows, n, "var(--s1)", 240));
-    A('<p class="sub">The five most-used raw labels out of ' + V.tag_load.distinct_tags +
-      " distinct labels seen in the Category field; the remainder are in the Appendix A mapping " +
-      "table. Percentages are of all " + n + " cases, so these five do not sum to 100%.</p>");
+    A('<p class="sub">The five most-used real category labels out of ' + V.tag_load.distinct_tags +
+      " distinct labels seen in the Category field. Placeholder values are excluded here and " +
+      "sized in the data-quality panel below. Percentages are of all " + n + " cases, so these " +
+      "five do not sum to 100%.</p>");
+
+    if (Q.kb_size) {
+      A("<h3>Data quality — what the category field cannot tell you</h3>");
+      A("<p>Every category value in the export is checked against the <b>" + Q.kb_size +
+        "-category knowledge base</b>. Two things break the reporting: values that are not " +
+        "categories at all, and values the KB does not contain.</p>");
+      A('<div class="stats">' + [
+        ["Mapped from the KB", f1(res.inference.pct_from_kb) + "%",
+         th(res.inference.from_kb) + " cases matched a real category exactly"],
+        ["Placeholder primary", f1(Q.primary_junk_pct) + "%",
+         th(Q.primary_junk_cases) + " cases whose primary value is a number or placeholder"],
+        ["Unknown to the KB", f1(Q.primary_unknown_pct) + "%",
+         th(Q.primary_unknown_cases) + " cases using a label the KB does not list"],
+        ["Distinct problems", th(Q.junk_distinct + Q.unknown_distinct),
+         Q.junk_distinct + " placeholder + " + Q.unknown_distinct + " unknown label(s)"],
+      ].map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
+        `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
+      if ((Q.junk_labels || []).length) {
+        A('<div class="callout"><div class="t">These values are not categories</div>' +
+          "They pass straight through to Other / Unmapped and inflate it. Fixing the picklist " +
+          "at source removes them from every chart in this report: " +
+          Q.junk_labels.slice(0, 8).map(j => `<b>${ESC(j.label)}</b> (${th(j.count)} cases)`)
+            .join("; ") + ".</div>");
+      }
+      if ((Q.unknown_labels || []).length) {
+        A('<div class="callout info"><div class="t">Labels the knowledge base does not list' +
+          "</div>Real-looking values with no KB entry — either retired categories still in use, " +
+          "or new ones not yet documented: " +
+          Q.unknown_labels.slice(0, 8).map(u => `<b>${ESC(u.label)}</b> (${th(u.count)})`)
+            .join("; ") + ".</div>");
+      }
+    }
 
     A("<h3>Origin × category cross-tab</h3>");
     if (V.crosstab.computable) {
@@ -695,8 +743,8 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       "across every category tag on a case plus its subject line — never the free-text " +
       "description body, which is excluded from all processing that reaches this page.</p>");
 
-    for (const key of ["chain_hw_inactivity", "chain_reward_dupes", "chain_google_lockout",
-                       "chain_field_service"]) {
+    for (const key of ["chain_hw_inactivity", "chain_activity_withdraw", "chain_reward_dupes",
+                       "chain_bounce_withdraw", "chain_google_lockout", "chain_field_service"]) {
       const ch = C[key];
       if (ch.computable) {
         A('<h3 style="display:flex;flex-wrap:wrap;gap:10px;align-items:baseline">' +
@@ -874,6 +922,10 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       "NOT COMPUTABLE indicate a field or sample size the export does not provide; no value in " +
       "this report is estimated, imputed or carried over from outside the data. Analysis ran " +
       "entirely in this browser — no file was uploaded to any server.</p>");
+    if (hasWeeks) {
+      A('<script type="application/json" id="cubeData">' +
+        JSON.stringify(CUBE).replace(/<\//g, "<\\/") + "<\/script>");
+    }
     A("</section></div>");
     return H.join("");
   }

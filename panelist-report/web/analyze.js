@@ -7,7 +7,10 @@ export function makeEngine(RULES) {
   const MIN_CASES_LIFT = G.min_cases_lift;
   const MIN_COOCCUR = G.min_cooccurrence;
   const MIN_PERIODS_FIT = G.min_periods_fit;
-  const BUCKET_RULES = RULES.bucket_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
+  const DRIVER_RULES = RULES.driver_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
+  const DRIVERS = RULES.drivers;
+  const catnorm = s => String(s ?? "").replace(/\s+/g, " ").replace(/\s*\/\s*/g, "/").trim().toLowerCase();
+  const CATEGORY_MAP = new Map(Object.entries(RULES.category_map).map(([k, v]) => [catnorm(k), v]));
   const SIGNALS = Object.entries(RULES.signals).map(([k, p]) => [k, new RegExp(p, "i")]);
   const SUBJECT_RULES = RULES.subject_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
   const TOP_DRIVERS = G.top_drivers;
@@ -76,10 +79,27 @@ export function makeEngine(RULES) {
 
   /* ------------------------------------------------ derivation */
   const splitTags = cell => String(cell ?? "").split(",").map(ws).filter(Boolean);
-  function bucketOf(tag) {
-    const t = String(tag);
-    for (const [name, re] of BUCKET_RULES) if (re.test(t)) return name;
-    return "Other / Unmapped";
+  /* Driver for a category label. Exact match against the KB category list wins;
+     only a label the KB does not contain falls through to the ordered rules. */
+  function bucketSrc(tag) {
+    const key = catnorm(tag);
+    if (!key) return [UNMAPPED, "none"];
+    const hit = CATEGORY_MAP.get(key);
+    if (hit) return [hit, "kb"];
+    for (const [name, re] of DRIVER_RULES) if (re.test(key)) return [name, "rule"];
+    return [UNMAPPED, "none"];
+  }
+  const bucketOf = tag => bucketSrc(tag)[0];
+
+  /* Labels that carry no reportable meaning - pure numbers, single characters,
+     placeholders. A data-entry problem, not a category. */
+  const JUNK_WORDS = new Set(["n/a", "na", "none", "null", "other", "test", "tbd", "-", "--", "."]);
+  function isJunkLabel(tag) {
+    const t = ws(tag);
+    if (!t) return true;
+    if (/^[\d.,;:_\-/\s]+$/.test(t)) return true;
+    if (t.length <= 2) return true;
+    return JUNK_WORDS.has(t.toLowerCase());
   }
 
   /* Fallback when the Category field is blank or its primary label matches no
@@ -146,8 +166,9 @@ export function makeEngine(RULES) {
     for (const r of recs) {
       r.tags = splitTags(r.category);
       r.primary_category = r.tags[0] || "";
-      r.bucket = r.primary_category ? bucketOf(r.primary_category) : UNMAPPED;
-      r.bucket_source = "category";
+      const [b0, s0] = r.primary_category ? bucketSrc(r.primary_category) : [UNMAPPED, "none"];
+      r.bucket = b0;
+      r.bucket_source = s0;
       r.inferred_keyword = "";
       if (r.bucket === UNMAPPED) {
         const [b, kw] = bucketFromSubject(r.subject);
@@ -302,18 +323,27 @@ export function makeEngine(RULES) {
                                  verdict: v[0], verdict_text: v[1] }, r);
     };
 
-    chain("chain_hw_inactivity", "Hardware/meter instability → activity & reactivation contact",
+    chain("chain_hw_inactivity", "Meter / hardware problems → participation & activity doubt",
       "hardware_meter", "activity", [],
-      "Purge outcome requires a purged/inactive value in Member Status; case-level data alone " +
-      "cannot confirm an involuntary purge.");
-    chain("chain_reward_dupes", "Blocked rewards → repeat contact → outbound/callback load",
+      "Whether an activity gap became an involuntary purge needs a panelist status history; " +
+      "case data alone cannot confirm the outcome.");
+    chain("chain_activity_withdraw", "Participation & activity doubt → withdrawal or suspension",
+      "activity", "withdrawal", [],
+      "Co-occurrence within a case, not a sequence over time. A created-date field would let " +
+      "this be tested as an ordered progression instead.");
+    chain("chain_reward_dupes", "Blocked or missing rewards → outbound / callback load",
       "blocked_reward", "outbound_cb", hasMember ? [] : ["MNO (to link repeat contacts)"],
-      "Bounced-email evidence needs an email-status or bounce field; not present in the columns seen so far.");
+      "Repeat-contact linkage below sizes how much of this is the same panelist calling again.");
+    chain("chain_bounce_withdraw", "Email deliverability failure → withdrawal",
+      "email_bounce", "withdrawal", [],
+      "The category list itself links these ('Email Bounce/Wrong address/Last attempt before " +
+      "Withdrawal', 'Withdraw/Household/Initial email bounced'), so the measured rate below is " +
+      "the check on how often that path is actually travelled.");
     chain("chain_google_lockout", "Google account migration → access lockout",
       "google_account", "password_access", ["member type / household role (primary vs secondary)"],
       "Secondary-member lockout and household attrition are NOT computable without a member-type " +
       "or household-link field.");
-    chain("chain_field_service", "Field service / shipping → onboarding & setup contact",
+    chain("chain_field_service", "Install appointment / field service → onboarding contact",
       "appointment", "setup", ["enrollment or join date (for 30/60/90-day tenure)"],
       "Early-life churn is NOT computable without an enrollment date; tenure cannot be derived " +
       "from case dates alone.");
@@ -412,10 +442,11 @@ export function makeEngine(RULES) {
 
   function inferenceAudit(recs) {
     const n = recs.length;
-    let fromCat = 0, fromSub = 0, none = 0;
+    let fromKb = 0, fromRule = 0, fromSub = 0, none = 0;
     const kw = new Map(), byB = new Map();
     for (const r of recs) {
-      if (r.bucket_source === "category") fromCat++;
+      if (r.bucket_source === "kb") fromKb++;
+      else if (r.bucket_source === "rule") fromRule++;
       else if (r.bucket_source === "subject") {
         fromSub++;
         const k = r.bucket + "\u0000" + r.inferred_keyword;
@@ -430,9 +461,80 @@ export function makeEngine(RULES) {
       a.keyword.localeCompare(b.keyword)).slice(0, 40);
     const by_bucket = [...byB.entries()].sort((a, b) => b[1] - a[1])
       .map(([label, count]) => ({ label, count, pct: pct(count, fromSub) }));
-    return { total: n, from_category: fromCat, from_subject: fromSub, unresolved: none,
+    return { total: n, from_category: fromKb + fromRule, from_kb: fromKb, from_rule: fromRule,
+             pct_from_kb: pct(fromKb, n), pct_from_rule: pct(fromRule, n),
+             from_subject: fromSub, unresolved: none,
              pct_from_subject: pct(fromSub, n), pct_unresolved: pct(none, n),
              keywords, by_bucket };
+  }
+
+  /* Category values the KB does not contain, plus labels that carry no meaning
+     at all. This is the cleanup list, sized. */
+  function dataQuality(recs) {
+    const n = recs.length;
+    const unknown = new Map(), junk = new Map();
+    let primJunk = 0, primUnknown = 0;
+    for (const r of recs) {
+      for (const t of r.tags) {
+        if (isJunkLabel(t)) {
+          const k = ws(t) || "(blank)";
+          junk.set(k, (junk.get(k) || 0) + 1);
+        } else if (!CATEGORY_MAP.has(catnorm(t))) {
+          unknown.set(ws(t), (unknown.get(ws(t)) || 0) + 1);
+        }
+      }
+      const p = r.primary_category;
+      if (isJunkLabel(p)) primJunk++;
+      else if (ws(p) && !CATEGORY_MAP.has(catnorm(p))) primUnknown++;
+    }
+    const top = m => [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 25).map(([label, count]) => ({ label, count }));
+    const sum = m => [...m.values()].reduce((a, b) => a + b, 0);
+    return { kb_size: CATEGORY_MAP.size,
+             junk_labels: top(junk), junk_distinct: junk.size, junk_tag_total: sum(junk),
+             unknown_labels: top(unknown), unknown_distinct: unknown.size,
+             unknown_tag_total: sum(unknown),
+             primary_junk_cases: primJunk, primary_junk_pct: pct(primJunk, n),
+             primary_unknown_cases: primUnknown, primary_unknown_pct: pct(primUnknown, n) };
+  }
+
+  /* Small aggregation cube (origin x period x driver) so the report can be filtered
+     in the browser without ever shipping a row-level record. */
+  function buildCube(recs, V) {
+    const drivers = V.bucket.rows.map(r => r.label);
+    const origins = V.origin.computable ? V.origin.rows.map(r => r.label) : ["(all)"];
+    const di = new Map(drivers.map((d, i) => [d, i]));
+    const oi = new Map(origins.map((o, i) => [o, i]));
+    const out = { origins, drivers, periods: {}, counts: {},
+                  top_drivers: TOP_DRIVERS, various_label: VARIOUS };
+    // every case, regardless of whether it falls in a complete week - so the driver
+    // ranking agrees with the case total quoted everywhere else in the report
+    const tot = origins.map(() => drivers.map(() => 0));
+    for (const r of recs) {
+      const o = V.origin.computable
+        ? ((r.case_origin ?? "") === "" ? "(blank)" : r.case_origin) : "(all)";
+      const a = oi.get(o), b = di.get(r.bucket);
+      if (a !== undefined && b !== undefined) tot[a][b]++;
+    }
+    out.total = tot;
+    for (const [freq, key] of [["W", "week"], ["M", "month"], ["Q", "quarter"]]) {
+      const { keys } = series(recs, freq);
+      out.periods[key] = keys;
+      if (!keys.length) { out.counts[key] = []; continue; }
+      const pos = new Map(keys.map((k, i) => [k, i]));
+      const cube = origins.map(() => keys.map(() => drivers.map(() => 0)));
+      for (const r of recs) {
+        if (!r._date) continue;
+        const pi = pos.get(plabel(r._date, freq));
+        if (pi === undefined) continue;
+        const o = V.origin.computable
+          ? ((r.case_origin ?? "") === "" ? "(blank)" : r.case_origin) : "(all)";
+        const a = oi.get(o), b = di.get(r.bucket);
+        if (a !== undefined && b !== undefined) cube[a][pi][b]++;
+      }
+      out.counts[key] = cube;
+    }
+    return out;
   }
 
   function topDrivers(V) {
@@ -699,7 +801,8 @@ export function makeEngine(RULES) {
                movement: {
                  monthly: periodMovement(recs, volume, "M", "month", topDrivers(volume)),
                  quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
-               } };
+               },
+               quality: dataQuality(recs), cube: buildCube(recs, volume) };
     },
   };
 }

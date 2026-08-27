@@ -75,6 +75,27 @@ either engine. (Requires `node`.)
 | `web/report.css`, `web/report-runtime.js` | Shared styling and runtime |
 | `tools/crossvalidate.py` | Engine equivalence check |
 
+## Category mapping
+
+`rules.json` carries an explicit `category_map`: every one of the **442 categories in
+the knowledge base**, each assigned to one of 14 **call drivers**. A case's driver is
+resolved in this order:
+
+1. **Exact match** against the KB category list (normalised for case and spacing)
+2. **Ordered `driver_rules`** — a fallback for category values the KB does not list
+3. **`subject_rules`** against the subject line, when the category is blank or unknown
+4. Otherwise `Other / Unmapped`, counted and reported
+
+The report states how many cases took each path, and `out/category-to-driver-mapping.xlsx`
+is the full mapping with KB descriptions and a column to edit — hand it back and the
+change flows to both front ends.
+
+Note that the KB's `Outbound/*` branch is mostly **call dispositions** (No Answer, Busy
+Signal, Left Message), not support topics. Those map to `Outbound Contact Attempts`;
+`Outbound/` entries that name a real reason (`Outbound/Suspend Member`,
+`Outbound/Withdraw Non Primary Member`) are routed to that reason instead. Use the case
+origin slicer to see inbound demand without outbound dialling outcomes in the way.
+
 ## Rules the pipeline enforces
 
 - **Primary category = the first label in the Category field.** One bucket per case,
@@ -91,6 +112,14 @@ either engine. (Requires `node`.)
   plus one rolled-up "Various topics" row. The same five appear in the exec-summary
   driver chart, the donut, the cross-tab columns and the trend lines, so no chart
   carries more series than a reader can follow.
+- **Case origin slicer.** The Movement watch block embeds a small aggregation cube
+  (origin x period x driver — no row-level record). Picking an origin re-ranks the
+  Top 5 call drivers and redraws the weekly chart, so "Outbound" dialling outcomes
+  can be excluded from a view of inbound demand. Clicking a week bar shows that
+  week's top five drivers.
+- **Data quality panel.** Every category value is checked against the KB. Values that
+  are not categories at all (numbers, `N/A`, single characters) and values the KB does
+  not list are counted and named, so the cleanup list is sized rather than described.
 - **Monthly and quarterly movement.** When the export spans two or more complete
   calendar months (or quarters), section 1 renders a stacked bar per period — bar
   height is volume, segments are the five drivers — with generated insights above

@@ -90,6 +90,9 @@ async function run() {
     host.innerHTML = renderer.buildBody(res, meta);
     host.classList.remove("hidden");
     window.__reportInit(host);
+    // the report body is injected after page load, so the explorer has to be
+    // wired up here rather than on DOMContentLoaded
+    if (window.__explorerInit) window.__explorerInit(host);
 
     // full standalone document for download
     state.doc = renderer.buildDocument(res, meta);
