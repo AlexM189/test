@@ -148,6 +148,11 @@ def volume_section(df, date_col):
     out["primary_raw"] = {"computable": True, "rows": [
         {"label": k, "count": int(v), "pct": pct(int(v), n)}
         for k, v in df["primary_category"].replace("", "(blank)").value_counts().head(25).items()]}
+    clean = df[~df["primary_category"].apply(is_junk_label)]
+    out["primary_raw_clean"] = {"computable": True,
+        "excluded_cases": int(n - len(clean)),
+        "rows": [{"label": k, "count": int(v), "pct": pct(int(v), n)}
+                 for k, v in clean["primary_category"].value_counts().head(25).items()]}
     out["member_status"] = dist("member_status")
     out["case_status"]   = dist("case_status")
     out["site"]  = dist("site")  if "site"  in df else _nc("no office/site column in the export", ["site / office"])
@@ -455,9 +460,19 @@ def deep_dive(df, V, cfg):
     out["with_free_text"] = non_empty
     out["pct_with_free_text"] = pct(non_empty, n)
 
+    # A case placed by the subject fallback has no meaningful category value - its
+    # Category cell was a placeholder or a label the KB does not list. Charting it
+    # would show "1" as though it were a category, so those cases are counted
+    # separately instead.
+    src = fam["bucket_source"].value_counts().to_dict()
+    out["by_source"] = {"kb": int(src.get("kb", 0)), "rule": int(src.get("rule", 0)),
+                        "subject": int(src.get("subject", 0)), "none": int(src.get("none", 0))}
+    real = fam[(fam["bucket_source"].isin(["kb", "rule"]))
+               & (~fam["primary_category"].apply(is_junk_label))]
+    out["categories_charted"] = int(len(real))
+    out["categories_excluded"] = n - int(len(real))
     out["top_categories"] = [{"label": k, "count": int(v), "pct": pct(int(v), n)}
-                             for k, v in fam["primary_category"].replace("", "(blank)")
-                             .value_counts().head(8).items()]
+                             for k, v in real["primary_category"].value_counts().head(8).items()]
 
     facet_hits = {}
     out["facets"] = []

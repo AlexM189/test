@@ -224,6 +224,9 @@ export function makeEngine(RULES) {
     V.origin = dist("case_origin", "case_origin");
     V.bucket = { computable: true, rows: counts(recs, "bucket", n) };
     V.primary_raw = { computable: true, rows: counts(recs, "primary_category", n).slice(0, 25) };
+    const cleanRecs = recs.filter(r => !isJunkLabel(r.primary_category));
+    V.primary_raw_clean = { computable: true, excluded_cases: n - cleanRecs.length,
+      rows: counts(cleanRecs, "primary_category", n).slice(0, 25) };
     V.member_status = dist("member_status", "member_status");
     V.case_status = dist("case_status", "case_status");
     V.site = recs.some(r => r.site) ? { computable: true, rows: counts(recs, "site", n) }
@@ -535,7 +538,18 @@ export function makeEngine(RULES) {
     out.pct_with_description = pct(hasDesc, n);
     out.with_free_text = nonEmpty;
     out.pct_with_free_text = pct(nonEmpty, n);
-    out.top_categories = counts(fam, "primary_category", n).slice(0, 8)
+    // A case placed by the subject fallback has no meaningful category value - its
+    // Category cell was a placeholder or a label the KB does not list. Charting it
+    // would show "1" as though it were a category, so those cases are counted
+    // separately instead.
+    const bs = { kb: 0, rule: 0, subject: 0, none: 0 };
+    for (const r of fam) if (bs[r.bucket_source] !== undefined) bs[r.bucket_source]++;
+    out.by_source = bs;
+    const real = fam.filter(r => (r.bucket_source === "kb" || r.bucket_source === "rule") &&
+                                 !isJunkLabel(r.primary_category));
+    out.categories_charted = real.length;
+    out.categories_excluded = n - real.length;
+    out.top_categories = counts(real, "primary_category", n).slice(0, 8)
       .map(x => ({ label: x.label, count: x.count, pct: x.pct }));
 
     const facetHits = {};

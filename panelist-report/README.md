@@ -113,6 +113,13 @@ Two ship by default:
 Each renders stat tiles, the KB categories inside the family, a bar per facet, a
 cross-tab between the two facets named in `cross`, and a monthly trend for the family.
 
+A case placed by the **subject fallback** has no meaningful value in its Category cell -
+that is why the fallback ran. Those cases belong in the family (their subject says so)
+and are counted in every facet, but they are excluded from "Categories inside this
+family", which would otherwise chart a placeholder such as `1` as though it were a
+category. The block states how many were excluded and why, and a "Placed by subject"
+tile sizes them.
+
 **Privacy.** Output is the facet label and a count — never text from a case. Email
 addresses, URLs and digit runs of 7 or more are stripped before matching. Because the
 vocabulary is fixed in `rules.json`, nothing a panelist wrote can reach the page.

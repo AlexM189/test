@@ -274,6 +274,10 @@ def movement_block(mv, drivers):
     return "".join(out)
 
 
+def pct_of(a, b):
+    return round(100.0 * a / b, 1) if b else 0.0
+
+
 def facet_block(f, n):
     if not f["rows"]:
         return ('<p class="sub"><b>%s</b> — no term in this facet matched any case.</p>'
@@ -318,6 +322,11 @@ def deep_dive_block(dd):
              ("With free text", "%.1f%%" % dd["pct_with_free_text"],
               "%s of %s carry a subject or description"
               % ("{:,}".format(dd["with_free_text"]), "{:,}".format(n)))]
+    bsrc = dd.get("by_source") or {}
+    if bsrc.get("subject"):
+        tiles.append(("Placed by subject", "%.1f%%" % pct_of(bsrc["subject"], n),
+                      "%s case(s) had no usable category value"
+                      % "{:,}".format(bsrc["subject"])))
     rp = dd.get("repeat") or {}
     if rp.get("computable"):
         tiles.append(("Repeat contact", "%.1f%%" % rp["pct_cases_from_repeat"],
@@ -331,9 +340,25 @@ def deep_dive_block(dd):
         '<div class="d">%s</div></div>' % (ESC(k), ESC(v), ESC(d)) for k, v, d in tiles[:4])
         + "</div>")
 
+    bs = dd.get("by_source") or {}
+    inferred = bs.get("subject", 0)
+    h.append("<h4>Categories inside this family</h4>")
     if dd.get("top_categories"):
-        h.append("<h4>Categories inside this family</h4>")
         h.append(svg_hbar(dd["top_categories"][:6], n, series_color="var(--s1)", label_w=250, W=640))
+    else:
+        h.append('<p class="sub">No case in this family carries a real category label.</p>')
+    note = ("Only the <b>%s case(s)</b> that carry a real category label are charted."
+            % "{:,}".format(dd.get("categories_charted", 0)))
+    if inferred:
+        note += (" The other <b>%s</b> reached this family through the <b>subject line</b>, "
+                 "because their Category cell held a placeholder (a bare number, N/A) or a "
+                 "label the knowledge base does not list — there is no real category to chart "
+                 "for them, so they are counted here rather than plotted. Their facet counts "
+                 "below still include them." % "{:,}".format(inferred))
+    if bs.get("none"):
+        note += (" A further <b>%s</b> could not be placed from either field."
+                 % "{:,}".format(bs["none"]))
+    h.append('<p class="sub">%s</p>' % note)
 
     for f in dd["facets"]:
         h.append(facet_block(f, n))
@@ -778,14 +803,15 @@ def build(res, meta):
     A("</div>")
 
     Q = res.get("quality") or {}
-    junk_set = {j["label"] for j in Q.get("junk_labels", [])}
+    PRC = V.get("primary_raw_clean") or V["primary_raw"]
     A("<h3>Top 5 primary category labels (real categories only)</h3>")
-    prows = [x for x in V["primary_raw"]["rows"] if x["label"] not in junk_set][:5]
+    prows = list(PRC["rows"])[:5]
     A(svg_hbar(prows, n, series_color="var(--s1)", label_w=240))
     A('<p class="sub">The five most-used real category labels out of %d distinct labels seen '
-      'in the Category field. Placeholder values are excluded here and sized in the data-quality '
-      'panel below. Percentages are of all %d cases, so these five do not sum to 100%%.</p>'
-      % (V["tag_load"]["distinct_tags"], n))
+      'in the Category field. <b>%s case(s)</b> whose primary value is a placeholder are '
+      'excluded here and sized in the data-quality panel below. Percentages are of all %d '
+      'cases, so these five do not sum to 100%%.</p>'
+      % (V["tag_load"]["distinct_tags"], "{:,}".format(PRC.get("excluded_cases", 0)), n))
 
     if Q:
         A("<h3>Data quality — what the category field cannot tell you</h3>")
