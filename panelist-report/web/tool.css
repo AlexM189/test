@@ -1,38 +1,96 @@
-/* Chrome for the upload tool itself - the report body brings its own styles. */
-.tool{max-width:1180px;margin:0 auto;padding:28px 20px 40px}
-.tool header{border-bottom:2px solid var(--border-strong);padding-bottom:18px;margin-bottom:24px}
-.drop{border:2px dashed var(--border-strong);border-radius:16px;background:var(--surface);
-  padding:38px 24px;text-align:center;transition:border-color .15s,background .15s;cursor:pointer}
-.drop:hover,.drop:focus-visible{border-color:var(--accent);background:var(--surface-2);outline:none}
-.drop.over{border-color:var(--accent);background:var(--surface-2)}
-.drop .big{font-size:1.06rem;font-weight:640;margin-bottom:.3em}
-.drop .small{color:var(--text-2);font-size:.88rem}
-.files{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:8px}
-.files li{display:flex;align-items:center;gap:11px;background:var(--surface-2);
-  border:1px solid var(--border);border-radius:10px;padding:9px 12px;font-size:.88rem}
+/* Chrome for the upload tool. The report body brings its own styles; this file
+   only dresses the page around it. The flow is three explicit steps, because the
+   thing people get wrong is not knowing whether anything happened. */
+.tool{max-width:1180px;margin:0 auto;padding:26px 20px 40px}
+
+.brand{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;
+  border-bottom:1px solid var(--border);padding-bottom:20px;margin-bottom:24px}
+.brand .mark{flex:none;width:42px;height:42px;border-radius:11px;background:var(--accent);
+  color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;
+  font-size:1.05rem;letter-spacing:-.02em;box-shadow:var(--shadow)}
+.brand .who{flex:1;min-width:250px}
+.brand .eyebrow{margin:0 0 .25em}
+.brand h1{font-size:clamp(1.35rem,3.2vw,1.75rem);margin:0 0 .3em}
+.brand .lede{color:var(--text-2);font-size:.93rem;margin:0;max-width:62ch}
+.brand .tools{display:flex;gap:8px;align-items:center;flex:none}
+
+.steps{list-style:none;padding:0;margin:0;display:grid;gap:14px;
+  grid-template-columns:1.35fr 1fr 1fr;align-items:stretch}
+@media (max-width:900px){.steps{grid-template-columns:1fr}}
+.step{background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  padding:16px 17px 18px;box-shadow:var(--shadow);display:flex;flex-direction:column;
+  transition:border-color .18s,opacity .18s}
+.step[data-state="todo"]{opacity:.62}
+.step[data-state="active"]{border-color:var(--accent)}
+.step[data-state="done"] .sn{background:var(--good);border-color:var(--good);color:#fff}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.sn{flex:none;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;
+  justify-content:center;font-size:.78rem;font-weight:700;background:var(--surface-2);
+  border:1px solid var(--border-strong);color:var(--text-2)}
+.step[data-state="active"] .sn{background:var(--accent);border-color:var(--accent);color:#fff}
+.sh .t{font-weight:660;font-size:.95rem}
+.sh .hint{margin-left:auto;font-size:.76rem;color:var(--text-3);white-space:nowrap}
+
+.drop{border:2px dashed var(--border-strong);border-radius:12px;background:var(--surface-2);
+  padding:22px 16px;text-align:center;cursor:pointer;transition:border-color .15s,background .15s}
+.drop:hover,.drop:focus-visible,.drop.over{border-color:var(--accent);outline:none;
+  background:color-mix(in srgb, var(--accent) 7%, var(--surface-2))}
+@supports not (color:color-mix(in srgb, red 50%, blue)){
+  .drop:hover,.drop:focus-visible,.drop.over{background:var(--surface)}}
+.drop .ico{font-size:1.5rem;line-height:1;margin-bottom:6px;opacity:.75}
+.drop .big{font-size:.95rem;font-weight:640;margin-bottom:.25em}
+.drop .small{color:var(--text-2);font-size:.81rem;line-height:1.5}
+
+.files{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-direction:column;gap:7px}
+.files li{display:flex;align-items:center;gap:10px;background:var(--surface-2);
+  border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:.85rem}
 .files .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.files .sz{color:var(--text-3);font-size:.8rem;margin-left:auto;white-space:nowrap}
-.files button{background:none;border:none;color:var(--text-3);cursor:pointer;font-size:1.05rem;
+.files .sz{color:var(--text-3);font-size:.78rem;margin-left:auto;white-space:nowrap}
+.files button{background:none;border:none;color:var(--text-3);cursor:pointer;font-size:1rem;
   line-height:1;padding:2px 5px;border-radius:6px;font-family:inherit}
 .files button:hover{color:var(--bad);background:var(--surface)}
-.actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:20px}
+
+.btnrow{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:auto;padding-top:12px}
 .primary{background:var(--accent);border:1px solid var(--accent);color:#fff;border-radius:9px;
-  padding:10px 18px;font-size:.92rem;font-weight:640;cursor:pointer;font-family:inherit}
-.primary:disabled{opacity:.45;cursor:not-allowed}
+  padding:11px 20px;font-size:.92rem;font-weight:650;cursor:pointer;font-family:inherit;
+  width:100%}
+.primary:disabled{opacity:.4;cursor:not-allowed}
 .primary:not(:disabled):hover{filter:brightness(1.08)}
 .ghost{background:var(--surface);border:1px solid var(--border-strong);color:var(--text-2);
-  border-radius:9px;padding:10px 15px;font-size:.88rem;cursor:pointer;font-family:inherit}
+  border-radius:9px;padding:10px 14px;font-size:.86rem;cursor:pointer;font-family:inherit;
+  display:inline-flex;align-items:center;gap:7px}
 .ghost:hover{color:var(--text);border-color:var(--accent)}
-.status{margin-top:16px;font-size:.9rem;color:var(--text-2);min-height:1.4em}
+.ghost.wide{width:100%;justify-content:center}
+.ghost .ico{opacity:.8}
+
+.status{margin-top:12px;font-size:.85rem;color:var(--text-2);min-height:1.3em;
+  display:flex;gap:8px;align-items:flex-start}
+.status.busy::before{content:"";flex:none;width:13px;height:13px;margin-top:2px;
+  border-radius:50%;border:2px solid var(--border-strong);border-top-color:var(--accent);
+  animation:spin .7s linear infinite}
+.status.done::before{content:"\2713";color:var(--good);font-weight:700;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.status.busy::before{animation:none}}
+
 .err{border-left:3px solid var(--bad);background:var(--surface-2);border-radius:0 10px 10px 0;
-  padding:13px 15px;margin-top:16px;font-size:.9rem}
+  padding:12px 14px;margin-top:12px;font-size:.86rem}
 .err .t{font-weight:680;color:var(--bad);margin-bottom:.25em}
-.privacy{display:flex;gap:9px;align-items:flex-start;margin-top:18px;font-size:.84rem;
+
+.privacy{display:flex;gap:10px;align-items:flex-start;margin-top:16px;font-size:.83rem;
   color:var(--text-2);background:var(--surface-2);border:1px solid var(--border);
-  border-radius:10px;padding:11px 13px}
-.report-host{margin-top:30px;border-top:2px solid var(--border-strong);padding-top:8px}
+  border-radius:11px;padding:12px 14px}
+.privacy b{color:var(--text)}
+
+.report-host{margin-top:30px;border-top:1px solid var(--border);padding-top:4px}
 .report-host .toolbar{display:none}
 .report-host .wrap{padding-left:0;padding-right:0;max-width:none}
 .hidden{display:none!important}
-@media print{.tool > header,.drop,.files,.actions,.privacy,.status{display:none!important}
-  .report-host{border-top:none;margin-top:0;padding-top:0}}
+
+@media (max-width:600px){
+  .tool{padding:16px 13px 40px}
+  .step{padding:14px 14px 16px}
+}
+@media print{
+  .brand,.steps,.privacy,.status,.err{display:none!important}
+  .report-host{border-top:none;margin-top:0;padding-top:0}
+}

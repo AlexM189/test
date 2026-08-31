@@ -45,10 +45,10 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         `${x1.toFixed(2)} ${y1.toFixed(2)} L${x2.toFixed(2)} ${y2.toFixed(2)} ` +
         `A${rIn} ${rIn} 0 ${big} 0 ${x3.toFixed(2)} ${y3.toFixed(2)} Z`;
       const tip = row.tip || (row.label + " — " + row.count + " cases (" + f1(row.pct) + "%)");
-      p.push(`<path d="${d}" fill="${cvar(i)}" data-tip="${ESC(tip)}"/>`);
+      p.push(`<path d="${d}" fill="${row.color || cvar(i)}" data-tip="${ESC(tip)}"/>`);
     });
     p.push(`<text x="${cx}" y="${H / 2 + 2}" text-anchor="middle" font-size="30" font-weight="700" ` +
-      `fill="var(--text)" style="font-variant-numeric:tabular-nums">${total}</text>`);
+      `fill="var(--text)" style="font-variant-numeric:tabular-nums">${th(total)}</text>`);
     p.push(`<text x="${cx}" y="${H / 2 + 22}" text-anchor="middle" font-size="11.5" ` +
       `fill="var(--text-3)" letter-spacing=".07em">CASES</text>`);
     return `<svg viewBox="0 0 ${W} ${H}" role="img" style="max-width:300px;margin:0 auto">${p.join("")}</svg>`;
@@ -65,7 +65,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     rows.forEach((row, i) => {
       const y = i * (rowh + gap);
       const w = Math.max(barW * row.count / mx, 3);
-      const col = seriesColor || cvar(i);
+      const col = row.color || seriesColor || cvar(i);
       const lbl = row.label;
       const short = lbl.length <= 30 ? lbl : lbl.slice(0, 29) + "…";
       p.push(`<text x="${labelW}" y="${(y + rowh * 0.68).toFixed(1)}" text-anchor="end" ` +
@@ -75,7 +75,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         `rx="4" fill="${col}" data-tip="${ESC(tip)}"/>`);
       p.push(`<text x="${(barX + w + 9).toFixed(1)}" y="${(y + rowh * 0.68).toFixed(1)}" ` +
         `font-size="12.5" font-weight="640" fill="var(--text)" ` +
-        `style="font-variant-numeric:tabular-nums">${row.count} ` +
+        `style="font-variant-numeric:tabular-nums">${th(row.count)} ` +
         `<tspan fill="var(--text-3)" font-weight="400">(${f1(row.pct)}%)</tspan></text>`);
     });
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" style="max-width:${W}px" ` +
@@ -418,16 +418,18 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     const h = [`<div class="scroll"><table><thead><tr><th>${ESC(head)}</th>` +
       `<th class="n">Cases</th><th class="n">% of total</th></tr></thead><tbody>`];
     rows.forEach((r, i) => {
-      h.push(`<tr><td><span class="swatch" style="background:${cvar(i)}"></span>${ESC(r.label)}</td>` +
-        `<td class="n">${r.count}</td><td class="n">${f1(r.pct)}%</td></tr>`);
+      h.push(`<tr${r.color ? ' class="various"' : ""}><td><span class="swatch" ` +
+        `style="background:${r.color || cvar(i)}"></span>${ESC(r.label)}</td>` +
+        `<td class="n">${th(r.count)}</td><td class="n">${f1(r.pct)}%</td></tr>`);
     });
-    h.push(`<tr><td><b>Total</b></td><td class="n"><b>${total}</b></td>` +
+    h.push(`<tr><td><b>Total</b></td><td class="n"><b>${th(total)}</b></td>` +
       `<td class="n"><b>100.0%</b></td></tr></tbody></table></div>`);
     return h.join("");
   }
 
   const legend = rows => '<div class="legend">' + rows.map((r, i) =>
-    `<span><span class="swatch" style="background:${cvar(i)}"></span>${ESC(r.label)}</span>`).join("") + "</div>";
+    `<span><span class="swatch" style="background:${r.color || cvar(i)}"></span>` +
+    `${ESC(r.label)}</span>`).join("") + "</div>";
 
   /* Collapse a {bucket: [values]} map onto the driver set, rolling every
      non-driver bucket into the single Various row - so every chart in the
@@ -474,10 +476,11 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     return d.label + " — " + th(d.count) + " cases (" + f1(d.pct) + "%) across " +
       det.length + " categories: " + head + more;
   }
+  /* the roll-up is a bag of leftovers, not a driver to look at, so it recedes */
   const withTips = drivers => drivers.map(d => {
     const row = { label: d.label, count: d.count, pct: d.pct };
     const t = rolledTip(d);
-    if (t) row.tip = t;
+    if (t) { row.tip = t; row.color = "var(--rollup)"; }
     return row;
   });
 
@@ -492,13 +495,14 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       const vr = d.volume_rank ? `#${d.volume_rank} of ${d.driver_count || 0}` : "—";
       h.push(`<tr${d.rolled ? ' class="various"' : ""}>` +
         `<td class="n">${d.rolled ? "—" : d.rank}</td>` +
-        `<td${tip}><span class="swatch" style="background:${cvar(i)}"></span>${ESC(d.label)}` +
+        `<td${tip}><span class="swatch" style="background:${d.rolled ? "var(--rollup)" : cvar(i)}">` +
+        `</span>${ESC(d.label)}` +
         (d.rolled ? ` <span style='color:var(--text-3)'>(${d.rolled.length} categories)</span>` : "") +
         (d.pinned ? ' <span class="pill p3" style="font-size:.6rem">always shown</span>' : "") +
-        `</td><td class="n">${vr}</td><td class="n">${d.count}</td>` +
+        `</td><td class="n">${vr}</td><td class="n">${th(d.count)}</td>` +
         `<td class="n">${f1(d.pct)}%</td></tr>`);
     });
-    h.push(`<tr><td></td><td><b>Total</b></td><td></td><td class="n"><b>${total}</b></td>` +
+    h.push(`<tr><td></td><td><b>Total</b></td><td></td><td class="n"><b>${th(total)}</b></td>` +
       `<td class="n"><b>100.0%</b></td></tr></tbody></table></div>`);
     return h.join("");
   }
@@ -519,32 +523,32 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     if (b.length) {
       const t = b[0];
       f.push([`Demand concentrates in ${t.label}`,
-        `${t.count} of ${n} cases (${f1(t.pct)}%) carry ${t.label} as their primary category. ` +
-        `The top two buckets together account for ` +
+        `${th(t.count)} of ${th(n)} cases (${f1(t.pct)}%) carry ${t.label} as their primary ` +
+        `category. The top two buckets together account for ` +
         `${f1(b.slice(0, 2).reduce((a, x) => a + x.pct, 0))}% of all contacts.`]);
     }
     const tl = V.tag_load;
     if (tl.mean_tags_per_case > 1.2) {
       f.push(["Cases are multi-issue, so single-category routing understates real demand",
         `Cases carry ${f2(tl.mean_tags_per_case)} category tags on average and ` +
-        `${f1(tl.multi_tag_pct)}% carry more than one (${tl.distinct_tags} distinct labels in use). ` +
-        `Counting only the primary category hides ${tl.total_tags - n} secondary topic tags that ` +
-        `agents still had to handle.`]);
+        `${f1(tl.multi_tag_pct)}% carry more than one (${th(tl.distinct_tags)} distinct labels ` +
+        `in use). Counting only the primary category hides ${th(tl.total_tags - n)} secondary ` +
+        `topic tags that agents still had to handle.`]);
     }
     if (V.origin.computable && V.origin.rows.length) {
       const t = V.origin.rows[0];
       f.push([`${t.label} dominates contact volume`,
-        `${t.count} of ${n} cases (${f1(t.pct)}%) arrive via ${t.label} across ` +
+        `${th(t.count)} of ${th(n)} cases (${f1(t.pct)}%) arrive via ${t.label} across ` +
         `${V.origin.rows.length} origin(s) in use. Deflection and self-service capacity should be ` +
         `sized against that channel first.`]);
     }
     const rc = C.repeat_contact || {};
     if (rc.computable && rc.members_with_multiple_cases > 0) {
       f.push(["Repeat contact is measurable at member level",
-        `${rc.members_with_multiple_cases} of ${rc.members} members (${f1(rc.pct_members_repeat)}%) ` +
-        `opened more than one case, generating ${rc.cases_from_repeat_members} cases ` +
-        `(${f1(rc.pct_cases_from_repeat)}% of volume); the highest single member opened ` +
-        `${rc.max_cases_one_member}.`]);
+        `${th(rc.members_with_multiple_cases)} of ${th(rc.members)} members ` +
+        `(${f1(rc.pct_members_repeat)}%) opened more than one case, generating ` +
+        `${th(rc.cases_from_repeat_members)} cases (${f1(rc.pct_cases_from_repeat)}% of volume); ` +
+        `the highest single member opened ${th(rc.max_cases_one_member)}.`]);
     }
     for (const k of ["chain_hw_inactivity", "chain_activity_withdraw", "chain_reward_dupes",
                      "chain_bounce_withdraw", "chain_google_lockout", "chain_field_service"]) {
@@ -645,7 +649,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A('<header class="rpt"><p class="eyebrow">Executive report · Panelist Support Operations</p>' +
       '<h1>Panelist Support: Case Volume, Correlations &amp; Four-Quarter Outlook</h1>' +
       `<p class="sub">${ESC(V.date_min ? "Coverage " + V.date_min + " to " + V.date_max
-        : "No usable date field")} &nbsp;·&nbsp; ${n} case record(s) from ` +
+        : "No usable date field")} &nbsp;·&nbsp; ${th(n)} case record(s) from ` +
       `${meta.file_count} source file(s) &nbsp;·&nbsp; Generated ` +
       `${new Date().toISOString().slice(0, 10)}</p></header>`);
 
@@ -661,11 +665,11 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       f2(n / V.unique_members) + " cases per member"]);
     if (V.bucket.rows.length) {
       const t = V.bucket.rows[0];
-      tiles.push(["Top category", f0(t.pct) + "%", `${t.label} (${t.count} cases)`]);
+      tiles.push(["Top category", f0(t.pct) + "%", `${t.label} (${th(t.count)} cases)`]);
     }
     if (V.origin.computable && V.origin.rows.length) {
       const t = V.origin.rows[0];
-      tiles.push(["Top origin", f0(t.pct) + "%", `${t.label} (${t.count} cases)`]);
+      tiles.push(["Top origin", f0(t.pct) + "%", `${t.label} (${th(t.count)} cases)`]);
     }
     tiles.push(["Topics per case", f2(V.tag_load.mean_tags_per_case),
       f0(V.tag_load.multi_tag_pct) + "% of cases carry 2+ topic tags"]);
@@ -680,13 +684,13 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     if (MR) {
       A("<h3>Most received cases</h3>");
       const bits = [`<div class="mr"><div class="lead"><b>${ESC(MR.label)}</b> is the largest ` +
-        `driver at <b>${MR.count} cases</b> (${f1(MR.pct)}% of all volume)` +
-        (MR.members ? ` raised by ${MR.members} distinct members` : "") + ".</div>"];
+        `driver at <b>${th(MR.count)} cases</b> (${f1(MR.pct)}% of all volume)` +
+        (MR.members ? ` raised by ${th(MR.members)} distinct members` : "") + ".</div>"];
       bits.push("<ul>");
       if (MR.top_labels.length) bits.push("<li>Most common labels inside it: " +
-        MR.top_labels.map(l => `${ESC(l.label)} (${l.count})`).join("; ") + "</li>");
+        MR.top_labels.map(l => `${ESC(l.label)} (${th(l.count)})`).join("; ") + "</li>");
       if (MR.origin) bits.push(`<li>Arrives mainly on <b>${ESC(MR.origin.label)}</b> — ` +
-        `${MR.origin.count} of its ${MR.count} cases (${f1(MR.origin.pct)}%)</li>`);
+        `${th(MR.origin.count)} of its ${th(MR.count)} cases (${f1(MR.origin.pct)}%)</li>`);
       bits.push("</ul></div>");
       A(bits.join(""));
     }
@@ -740,7 +744,7 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
       const chartRows = DR.map(d => {
         const row = { label: d.rank + ". " + d.label, count: d.count, pct: d.pct };
         const t = rolledTip(d);
-        if (t) row.tip = t;
+        if (t) { row.tip = t; row.color = "var(--rollup)"; }
         return row;
       });
       A('<div id="driverBlock">');

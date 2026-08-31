@@ -188,3 +188,78 @@ details.dd > summary .mt{color:var(--text-3);font-size:.83rem;margin-left:auto;w
   font-variant-numeric:tabular-nums}
 details.dd .body{padding:2px 15px 16px}
 @media print{details.dd{break-inside:avoid}details.dd > summary::before{content:""}}
+
+/* ============================================================ navigation
+   The report runs to tens of screens. A sticky rail gives it a spine: where
+   you are, what else there is, and a way back. Built at runtime from the
+   section headings, so neither renderer has to know about it. */
+.tocbar{position:sticky;top:0;z-index:40;isolation:isolate;margin:0 0 22px;padding:9px 0 8px;
+  background:color-mix(in srgb, var(--bg) 88%, transparent);
+  border-bottom:1px solid var(--border);backdrop-filter:saturate(1.4) blur(10px);
+  -webkit-backdrop-filter:saturate(1.4) blur(10px)}
+@supports not (backdrop-filter:blur(1px)){.tocbar{background:var(--bg)}}
+.tocbar::before,.tocbar::after{content:"";position:absolute;top:0;bottom:0;width:34px;
+  pointer-events:none;opacity:0;transition:opacity .15s;z-index:1}
+.tocbar::before{left:0;background:linear-gradient(90deg,var(--bg),transparent)}
+.tocbar::after{right:0;background:linear-gradient(270deg,var(--bg),transparent)}
+.tocbar.fade-l::before,.tocbar.fade-r::after{opacity:1}
+.tocbar .inner{display:flex;gap:6px;align-items:center;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none;padding-bottom:2px}
+.tocbar .inner::-webkit-scrollbar{display:none}
+.tocbar a{flex:none;display:inline-flex;align-items:center;gap:7px;
+  font-size:.79rem;line-height:1;color:var(--text-2);text-decoration:none;
+  padding:7px 11px;border-radius:8px;white-space:nowrap;border:1px solid transparent}
+.tocbar a:hover{background:var(--surface-2);color:var(--text)}
+.tocbar a .n{font-size:.66rem;font-weight:700;color:var(--text-3);
+  font-variant-numeric:tabular-nums}
+.tocbar a[aria-current="true"]{background:var(--accent);color:#fff;font-weight:620}
+.tocbar a[aria-current="true"] .n{color:#fff;opacity:.75}
+.totop{position:fixed;right:18px;bottom:18px;z-index:45;width:40px;height:40px;
+  border-radius:50%;border:1px solid var(--border-strong);background:var(--surface);
+  color:var(--text-2);cursor:pointer;font-size:1rem;line-height:1;box-shadow:var(--shadow);
+  opacity:0;pointer-events:none;transition:opacity .18s;font-family:inherit}
+.totop.on{opacity:1;pointer-events:auto}
+.totop:hover{color:var(--text);border-color:var(--accent)}
+
+/* ============================================================ hierarchy
+   The executive summary is the page most readers will ever look at, so it
+   reads as a dashboard; everything after it reads as supporting evidence. */
+section.card{scroll-margin-top:70px}
+section.card:first-of-type{border-top:3px solid var(--accent);
+  padding-top:24px;background:linear-gradient(var(--surface-2),var(--surface) 220px)}
+section.card:first-of-type > h2{font-size:clamp(1.4rem,3.4vw,1.9rem)}
+section.card:first-of-type .stats{gap:14px}
+section.card:first-of-type .stat{padding:15px 16px}
+section.card:first-of-type .stat:first-child{border-color:var(--accent);
+  background:var(--surface)}
+section.card:first-of-type .stat:first-child .v{color:var(--accent)}
+h2 .secnum{box-shadow:0 1px 3px rgba(0,0,0,.18)}
+h3{scroll-margin-top:70px;display:flex;align-items:baseline;gap:9px}
+h3::before{content:"";flex:none;width:3px;height:.95em;border-radius:2px;
+  background:var(--border-strong);align-self:center}
+section.card:first-of-type h3::before{background:var(--accent)}
+h4{scroll-margin-top:70px}
+
+/* a stat whose value opens with a sign is a change, and reads as one */
+.stat.dir-up .v{color:var(--warn)}
+.stat.dir-down .v{color:var(--accent)}
+.stat.dir-up .k::after,.stat.dir-down .k::after{font-size:.9em;margin-left:5px}
+.stat.dir-up .k::after{content:"\2191"}
+.stat.dir-down .k::after{content:"\2193"}
+
+/* the roll-up row is not a driver, so it should not be the loudest thing on the
+   chart - it recedes and lets the named drivers carry the colour */
+:root{--rollup:#9a9a92}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--rollup:#6f6f68}}
+:root[data-theme="dark"]{--rollup:#6f6f68}
+tr.various td:first-child,tr.various td:nth-child(2){color:var(--text-2)}
+
+@media (max-width:600px){
+  .tocbar{margin-bottom:16px}
+  .tocbar a{font-size:.74rem;padding:6px 9px}
+  .totop{right:12px;bottom:12px}
+}
+@media print{
+  .tocbar,.totop,.wkdetail .hint{display:none!important}
+  section.card:first-of-type{background:none;border-top:1px solid #bbb}
+}

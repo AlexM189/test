@@ -240,3 +240,116 @@ window.__explorerInit = function (root) {
 if (document.readyState === 'loading')
   document.addEventListener('DOMContentLoaded', function () { window.__explorerInit(document); });
 else window.__explorerInit(document);
+
+/* ------------------------------------------------------------------ chrome
+   Section rail, scroll spy, back-to-top and change-direction colouring on the
+   stat tiles. All of it is derived from the rendered DOM, so the Python and
+   JavaScript renderers stay byte-identical and cannot drift apart here. */
+window.__chromeInit = function (root) {
+  root = root || document;
+  var wrap = root.querySelector('.wrap');
+  if (!wrap || wrap.querySelector('.tocbar')) return;
+  var sections = [].slice.call(wrap.querySelectorAll('section.card'));
+  if (sections.length < 3) return;
+
+  var esc = function (s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#x27;' })[c];
+    });
+  };
+
+  var items = sections.map(function (sec, i) {
+    if (!sec.id) sec.id = 'section-' + (i + 1);
+    var h2 = sec.querySelector('h2');
+    var badge = h2 && h2.querySelector('.secnum');
+    // the badge is the section number; the rest of the heading is its name
+    var num = badge ? badge.textContent.trim() : '';
+    var name = h2 ? h2.textContent.replace(/^\s*\d+\s*/, '').trim() : sec.id;
+    var short = name.split(/\s+[-—]\s+/)[0];
+    if (short.length > 30) short = short.slice(0, 29).trim() + '…';
+    return { id: sec.id, el: sec, num: num, label: short, full: name };
+  });
+
+  var bar = document.createElement('nav');
+  bar.className = 'tocbar';
+  bar.setAttribute('aria-label', 'Report sections');
+  bar.innerHTML = '<div class="inner">' + items.map(function (it) {
+    return '<a href="#' + it.id + '" title="' + esc(it.full) + '">' +
+      (it.num ? '<span class="n">' + esc(it.num) + '</span>' : '') + esc(it.label) + '</a>';
+  }).join('') + '</div>';
+  wrap.insertBefore(bar, wrap.firstChild.nextSibling || wrap.firstChild);
+
+  var links = [].slice.call(bar.querySelectorAll('a'));
+  links.forEach(function (a, i) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var top = items[i].el.getBoundingClientRect().top + window.pageYOffset - 62;
+      window.scrollTo({ top: top, behavior: 'smooth' });
+      history.replaceState(null, '', '#' + items[i].id);
+    });
+  });
+
+  var current = -1;
+  function spy() {
+    var y = window.pageYOffset + 90;
+    var idx = 0;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].el.offsetTop <= y) idx = i;
+    }
+    if (idx !== current) {
+      current = idx;
+      links.forEach(function (a, i) {
+        if (i === idx) a.setAttribute('aria-current', 'true');
+        else a.removeAttribute('aria-current');
+      });
+      var a = links[idx];
+      if (a && a.offsetLeft < bar.firstChild.scrollLeft) bar.firstChild.scrollLeft = a.offsetLeft - 12;
+      else if (a && a.offsetLeft + a.offsetWidth > bar.firstChild.scrollLeft + bar.firstChild.clientWidth)
+        bar.firstChild.scrollLeft = a.offsetLeft + a.offsetWidth - bar.firstChild.clientWidth + 12;
+      edges();
+    }
+    top.classList.toggle('on', window.pageYOffset > 600);
+  }
+
+  var top = document.createElement('button');
+  top.className = 'totop';
+  top.type = 'button';
+  top.setAttribute('aria-label', 'Back to top');
+  top.innerHTML = '↑';
+  top.addEventListener('click', function () {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.body.appendChild(top);
+
+  // the rail scrolls sideways when the sections do not fit; fade the edge that
+  // still has links behind it so it does not look truncated
+  var inner = bar.firstChild;
+  function edges() {
+    var over = inner.scrollWidth - inner.clientWidth;
+    bar.classList.toggle('fade-l', over > 2 && inner.scrollLeft > 2);
+    bar.classList.toggle('fade-r', over > 2 && inner.scrollLeft < over - 2);
+  }
+  inner.addEventListener('scroll', edges, { passive: true });
+  window.addEventListener('resize', edges, { passive: true });
+  edges();
+
+  var ticking = false;
+  window.addEventListener('scroll', function () {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(function () { spy(); ticking = false; });
+  }, { passive: true });
+  spy();
+
+  // a tile whose value opens with a sign is a change - colour it like one
+  root.querySelectorAll('.stat').forEach(function (st) {
+    var v = st.querySelector('.v');
+    if (!v) return;
+    var t = v.textContent.trim();
+    if (/^\+/.test(t)) st.classList.add('dir-up');
+    else if (/^[-−]/.test(t)) st.classList.add('dir-down');
+  });
+};
+if (document.readyState === 'loading')
+  document.addEventListener('DOMContentLoaded', function () { window.__chromeInit(document); });
+else window.__chromeInit(document);

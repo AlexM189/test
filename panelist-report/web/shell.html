@@ -9,45 +9,69 @@
 </head>
 <body>
 <div class="tool">
-  <header>
-    <div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">
-      <div style="flex:1;min-width:240px">
-        <p class="eyebrow">Panelist Support Operations</p>
-        <h1 style="font-size:clamp(1.5rem,4vw,2.1rem);margin:0 0 .2em">Executive Report Builder</h1>
-        <p class="sub" style="margin:0">Drop a case export in and get the full report — volume and
-          category breakdown, correlation tests, a four-quarter forecast, risk ranking and a
-          prioritised action plan.</p>
-      </div>
+  <header class="brand">
+    <div class="mark" aria-hidden="true">PS</div>
+    <div class="who">
+      <p class="eyebrow">Panelist Support Operations</p>
+      <h1>Executive Report Builder</h1>
+      <p class="lede">Drop in a case export and get the full report — call drivers, weekly and
+        monthly movement, a deep dive per category family, correlations, a four-quarter
+        outlook and a prioritised action plan. Everything runs on this machine.</p>
+    </div>
+    <div class="tools">
       <button class="ghost" id="toolThemeBtn" type="button">Light / dark</button>
     </div>
   </header>
 
-  <div class="drop" id="drop" tabindex="0" role="button"
-       aria-label="Choose or drop case export files">
-    <div class="big">Drop your case export here, or click to choose</div>
-    <div class="small">.xlsx &nbsp;·&nbsp; .xlsm &nbsp;·&nbsp; .csv &nbsp;·&nbsp; .tsv
-      &nbsp;— several files at once are reconciled into one dataset</div>
-  </div>
-  <input type="file" id="fileInput" multiple accept=".xlsx,.xlsm,.xltx,.csv,.tsv,.txt" class="hidden">
+  <ol class="steps">
+    <li class="step" id="step1" data-state="active">
+      <div class="sh"><span class="sn">1</span><span class="t">Add your export</span>
+        <span class="hint">.xlsx · .csv</span></div>
+      <div class="drop" id="drop" tabindex="0" role="button"
+           aria-label="Choose or drop case export files">
+        <div class="ico" aria-hidden="true">&#128193;</div>
+        <div class="big">Drop files here, or click to choose</div>
+        <div class="small">.xlsx &middot; .xlsm &middot; .csv &middot; .tsv<br>
+          Several files at once are reconciled into one dataset</div>
+      </div>
+      <input type="file" id="fileInput" multiple accept=".xlsx,.xlsm,.xltx,.csv,.tsv,.txt"
+             class="hidden">
+      <ul class="files hidden" id="fileList"></ul>
+    </li>
 
-  <ul class="files hidden" id="fileList"></ul>
+    <li class="step" id="step2" data-state="todo">
+      <div class="sh"><span class="sn">2</span><span class="t">Build the report</span></div>
+      <p class="small" style="color:var(--text-2);font-size:.83rem;margin:0 0 4px">
+        Parsing, category mapping against the knowledge base, and every chart are computed
+        here in the page. A large export takes a few seconds.</p>
+      <div class="btnrow">
+        <button class="primary" id="runBtn" type="button" disabled>Build report</button>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="err hidden" id="error"></div>
+    </li>
 
-  <div class="actions">
-    <button class="primary" id="runBtn" type="button" disabled>Build report</button>
-    <button class="ghost hidden" id="downloadBtn" type="button">Download report (.html)</button>
-    <button class="ghost hidden" id="pptBtn" type="button">Download deck (.pptx)</button>
-    <button class="ghost" id="resetBtn" type="button">Start over</button>
-  </div>
-
-  <div class="status" id="status"></div>
-  <div class="err hidden" id="error"></div>
+    <li class="step" id="step3" data-state="todo">
+      <div class="sh"><span class="sn">3</span><span class="t">Take it away</span></div>
+      <p class="small" style="color:var(--text-2);font-size:.83rem;margin:0 0 4px">
+        The HTML keeps every chart and table and stays interactive offline. The deck carries
+        the headline slides for presenting.</p>
+      <div class="btnrow" style="flex-direction:column;align-items:stretch">
+        <button class="ghost wide hidden" id="downloadBtn" type="button">
+          <span class="ico" aria-hidden="true">&#128196;</span> Download full report (.html)</button>
+        <button class="ghost wide hidden" id="pptBtn" type="button">
+          <span class="ico" aria-hidden="true">&#128202;</span> Download deck (.pptx)</button>
+        <button class="ghost wide" id="resetBtn" type="button">Start over</button>
+      </div>
+    </li>
+  </ol>
 
   <div class="privacy">
     <span aria-hidden="true">&#128274;</span>
     <span><b>Your data stays on this machine.</b> Files are read and analysed inside this page —
-      nothing is uploaded, and this page makes no network requests at all. Member identifiers are
-      used only to group cases and never appear in the report. You can work offline; saving this
-      file and opening it without a connection works exactly the same.</span>
+      nothing is uploaded, and this page makes no network requests at all. Member identifiers
+      group cases but never appear in the report, and no case text is reproduced anywhere.
+      Saving this file and opening it offline works exactly the same.</span>
   </div>
 
   <div class="report-host hidden" id="reportHost"></div>

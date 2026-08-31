@@ -23,8 +23,11 @@ function renderFileList() {
     state.files.splice(+b.dataset.i, 1);
     renderFileList();
   }));
-  $("runBtn").disabled = state.files.length === 0;
-  $("fileList").classList.toggle("hidden", state.files.length === 0);
+  const has = state.files.length > 0;
+  $("runBtn").disabled = !has;
+  $("fileList").classList.toggle("hidden", !has);
+  setStep(1, has ? "done" : "active");
+  if (!state.doc) setStep(2, has ? "active" : "todo");
 }
 
 const escapeHtml = s => String(s).replace(/[&<>"']/g,
@@ -52,7 +55,18 @@ function showError(title, msg) {
   $("error").classList.remove("hidden");
 }
 const clearError = () => $("error").classList.add("hidden");
-const setStatus = s => { $("status").textContent = s; };
+function setStatus(s, kind) {
+  const el = $("status");
+  el.textContent = s;
+  el.className = "status" + (kind ? " " + kind : "");
+}
+
+/* The three steps show where you are: what is done, what is next, what is not
+   reachable yet. Without it a long build looks like nothing happened. */
+function setStep(n, state) {
+  const el = $("step" + n);
+  if (el) el.dataset.state = state;
+}
 const yield_ = () => new Promise(r => setTimeout(r, 0));
 
 async function run() {
@@ -63,14 +77,14 @@ async function run() {
   try {
     const tables = [];
     for (const f of state.files) {
-      setStatus("Reading " + f.name + " …");
+      setStatus("Reading " + f.name + " …", "busy");
       await yield_();
       const parsed = await readFile(f);
       tables.push(...parsed);
     }
     if (!tables.length) throw new Error("No readable sheet was found in the selected file(s).");
 
-    setStatus("Mapping columns and de-duplicating …");
+    setStatus("Mapping columns and de-duplicating …", "busy");
     await yield_();
     const { recs, prov, stats } = engine.buildRecords(tables);
     if (!recs.length) {
@@ -79,11 +93,11 @@ async function run() {
         "column to be treated as case data. Headers found: " + (seen.slice(0, 400) || "(none)"));
     }
 
-    setStatus("Analysing " + recs.length.toLocaleString("en-US") + " case(s) …");
+    setStatus("Analysing " + recs.length.toLocaleString("en-US") + " case(s) …", "busy");
     await yield_();
     const res = engine.run(recs);
 
-    setStatus("Rendering report …");
+    setStatus("Rendering report …", "busy");
     await yield_();
     const meta = { prov, stats, file_count: state.files.length };
     const host = $("reportHost");
@@ -93,6 +107,7 @@ async function run() {
     // the report body is injected after page load, so the explorer has to be
     // wired up here rather than on DOMContentLoaded
     if (window.__explorerInit) window.__explorerInit(host);
+    if (window.__chromeInit) window.__chromeInit(host);
 
     // full standalone document for download
     state.doc = renderer.buildDocument(res, meta);
@@ -106,14 +121,17 @@ async function run() {
     $("pptBtn").classList.remove("hidden");
 
     const skipped = prov.filter(p => p.status !== "loaded").length;
-    setStatus("Done — " + recs.length.toLocaleString("en-US") + " case(s) analysed from " +
+    setStatus(recs.length.toLocaleString("en-US") + " case(s) analysed from " +
       prov.filter(p => p.status === "loaded").length + " sheet(s)" +
       (skipped ? ", " + skipped + " sheet(s) skipped as non-case tables" : "") +
       (stats.exact_duplicates_removed ? ", " + stats.exact_duplicates_removed +
-        " duplicate row(s) removed" : "") + ".");
+        " duplicate row(s) removed" : "") + ".", "done");
+    setStep(2, "done");
+    setStep(3, "active");
     host.scrollIntoView({ behavior: "smooth", block: "start" });
   } catch (e) {
     setStatus("");
+    setStep(2, "active");
     showError("Could not build the report", e && e.message ? e.message : String(e));
   } finally {
     $("runBtn").disabled = state.files.length === 0;
@@ -122,12 +140,12 @@ async function run() {
 
 function downloadPpt() {
   try {
-    setStatus("Building the deck …");
+    setStatus("Building the deck …", "busy");
     const bytes = buildDeck(state.res, state.meta);
     saveBlob(bytes,
       "application/vnd.openxmlformats-officedocument.presentationml.presentation",
       "panelist-support-deck-" + new Date().toISOString().slice(0, 10) + ".pptx");
-    setStatus("Deck downloaded — " + (bytes.length / 1024).toFixed(0) + " KB.");
+    setStatus("Deck downloaded — " + (bytes.length / 1024).toFixed(0) + " KB.", "done");
   } catch (e) {
     showError("Could not build the deck", e && e.message ? e.message : String(e));
   }
@@ -170,12 +188,15 @@ $("runBtn").addEventListener("click", run);
 $("downloadBtn").addEventListener("click", download);
 $("pptBtn").addEventListener("click", downloadPpt);
 $("resetBtn").addEventListener("click", () => {
-  state.files = []; state.doc = null;
+  state.files = []; state.doc = null; state.res = null;
   renderFileList(); clearError(); setStatus("");
   $("reportHost").classList.add("hidden");
   $("reportHost").innerHTML = "";
   $("downloadBtn").classList.add("hidden");
   $("pptBtn").classList.add("hidden");
+  setStep(1, "active"); setStep(2, "todo"); setStep(3, "todo");
+  const t = document.querySelector(".totop");
+  if (t) t.remove();
   window.scrollTo({ top: 0, behavior: "smooth" });
 });
 $("toolThemeBtn").addEventListener("click", () => {

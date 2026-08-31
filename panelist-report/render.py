@@ -56,10 +56,11 @@ def svg_donut(rows, total, cx=132, r_out=118, r_in=72):
              % (x0, y0, r_out, r_out, big, x1, y1, x2, y2, r_in, r_in, big, x3, y3))
         tip = rrow.get("tip") or ("%s — %d cases (%.1f%%)"
                                   % (rrow["label"], rrow["count"], rrow["pct"]))
-        parts.append('<path d="%s" fill="%s" data-tip="%s"/>' % (d, cvar(i), ESC(tip)))
+        parts.append('<path d="%s" fill="%s" data-tip="%s"/>'
+                     % (d, rrow.get("color") or cvar(i), ESC(tip)))
     parts.append('<text x="%d" y="%d" text-anchor="middle" font-size="30" font-weight="700" '
-                 'fill="var(--text)" style="font-variant-numeric:tabular-nums">%d</text>'
-                 % (cx, H / 2 + 2, total))
+                 'fill="var(--text)" style="font-variant-numeric:tabular-nums">%s</text>'
+                 % (cx, H / 2 + 2, "{:,}".format(total)))
     parts.append('<text x="%d" y="%d" text-anchor="middle" font-size="11.5" fill="var(--text-3)" '
                  'letter-spacing=".07em">CASES</text>' % (cx, H / 2 + 22))
     return '<svg viewBox="0 0 %d %d" role="img" style="max-width:300px;margin:0 auto">%s</svg>' % (
@@ -78,7 +79,7 @@ def svg_hbar(rows, total, series_color=None, label_w=178, W=720):
     for i, rrow in enumerate(rows):
         y = i * (rowh + gap)
         w = max(bar_w * rrow["count"] / mx, 3)
-        col = series_color or cvar(i)
+        col = rrow.get("color") or series_color or cvar(i)
         lbl = rrow["label"]
         short = lbl if len(lbl) <= 30 else lbl[:29] + "…"
         p.append('<text x="%d" y="%.1f" text-anchor="end" font-size="12.5" fill="var(--text-2)">%s'
@@ -87,9 +88,9 @@ def svg_hbar(rows, total, series_color=None, label_w=178, W=720):
         p.append('<rect x="%d" y="%.1f" width="%.2f" height="%d" rx="4" fill="%s" data-tip="%s"/>'
                  % (bar_x, y, w, rowh, col, ESC(tip)))
         p.append('<text x="%.1f" y="%.1f" font-size="12.5" font-weight="640" fill="var(--text)" '
-                 'style="font-variant-numeric:tabular-nums">%d <tspan fill="var(--text-3)" '
+                 'style="font-variant-numeric:tabular-nums">%s <tspan fill="var(--text-3)" '
                  'font-weight="400">(%.1f%%)</tspan></text>'
-                 % (bar_x + w + 9, y + rowh * .68, rrow["count"], rrow["pct"]))
+                 % (bar_x + w + 9, y + rowh * .68, "{:,}".format(rrow["count"]), rrow["pct"]))
     return ('<svg class="chart" viewBox="0 0 %d %d" style="max-width:%dpx" '
             'preserveAspectRatio="xMinYMid meet" role="img">%s</svg>' % (W, H, W, "".join(p)))
 
@@ -435,11 +436,14 @@ def dist_table(rows, total, head="Label"):
     h = ['<div class="scroll"><table><thead><tr><th>%s</th><th class="n">Cases</th>'
          '<th class="n">%% of total</th></tr></thead><tbody>' % ESC(head)]
     for i, r in enumerate(rows):
-        h.append('<tr><td><span class="swatch" style="background:%s"></span>%s</td>'
-                 '<td class="n">%d</td><td class="n">%.1f%%</td></tr>'
-                 % (cvar(i), ESC(r["label"]), r["count"], r["pct"]))
-    h.append('<tr><td><b>Total</b></td><td class="n"><b>%d</b></td>'
-             '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>' % total)
+        h.append('<tr%s><td><span class="swatch" style="background:%s"></span>%s</td>'
+                 '<td class="n">%s</td><td class="n">%.1f%%</td></tr>'
+                 % (' class="various"' if r.get("color") else "",
+                    r.get("color") or cvar(i), ESC(r["label"]),
+                    "{:,}".format(r["count"]), r["pct"]))
+    h.append('<tr><td><b>Total</b></td><td class="n"><b>%s</b></td>'
+             '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>'
+             % "{:,}".format(total))
     return "".join(h)
 
 
@@ -461,13 +465,15 @@ def rolled_tip(d, top=5):
 
 
 def with_tips(drivers):
-    """Chart rows for the driver list, with the roll-up carrying its contents."""
+    """Chart rows for the driver list, with the roll-up carrying its contents and a
+    muted colour - it is a bag of leftovers, not a driver to look at."""
     out = []
     for d in drivers:
         row = {"label": d["label"], "count": d["count"], "pct": d["pct"]}
         t = rolled_tip(d)
         if t:
             row["tip"] = t
+            row["color"] = "var(--rollup)"
         out.append(row)
     return out
 
@@ -522,17 +528,19 @@ def drivers_table(drivers, total):
         vr = ("#%d of %d" % (d["volume_rank"], d.get("driver_count", 0))
               if d.get("volume_rank") else "—")
         h.append('<tr%s><td class="n">%s</td><td%s><span class="swatch" style="background:%s">'
-                 '</span>%s%s%s</td><td class="n">%s</td><td class="n">%d</td>'
+                 '</span>%s%s%s</td><td class="n">%s</td><td class="n">%s</td>'
                  '<td class="n">%.1f%%</td></tr>'
                  % (' class="various"' if rolled else "",
-                    ("—" if rolled else str(d["rank"])), tip, cvar(i), ESC(d["label"]),
+                    ("—" if rolled else str(d["rank"])), tip,
+                    ("var(--rollup)" if rolled else cvar(i)), ESC(d["label"]),
                     (" <span style='color:var(--text-3)'>(%d categories)</span>" % len(rolled))
                     if rolled else "",
                     ' <span class="pill p3" style="font-size:.6rem">always shown</span>'
                     if d.get("pinned") else "",
-                    vr, d["count"], d["pct"]))
-    h.append('<tr><td></td><td><b>Total</b></td><td></td><td class="n"><b>%d</b></td>'
-             '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>' % total)
+                    vr, "{:,}".format(d["count"]), d["pct"]))
+    h.append('<tr><td></td><td><b>Total</b></td><td></td><td class="n"><b>%s</b></td>'
+             '<td class="n"><b>100.0%%</b></td></tr></tbody></table></div>'
+             % "{:,}".format(total))
     return "".join(h)
 
 
@@ -564,33 +572,35 @@ def build_findings(V, C, preview):
     if b:
         top = b[0]
         f.append(("Demand concentrates in %s" % top["label"],
-                  "%d of %d cases (%.1f%%) carry %s as their primary category. "
+                  "%s of %s cases (%.1f%%) carry %s as their primary category. "
                   "The top two buckets together account for %.1f%% of all contacts."
-                  % (top["count"], n, top["pct"], top["label"],
+                  % ("{:,}".format(top["count"]), "{:,}".format(n), top["pct"], top["label"],
                      sum(x["pct"] for x in b[:2]))))
     tl = V["tag_load"]
     if tl["mean_tags_per_case"] > 1.2:
         f.append(("Cases are multi-issue, so single-category routing understates real demand",
                   "Cases carry %.2f category tags on average and %.1f%% carry more than one "
-                  "(%d distinct labels in use). Counting only the primary category hides "
-                  "%d secondary topic tags that agents still had to handle."
-                  % (tl["mean_tags_per_case"], tl["multi_tag_pct"], tl["distinct_tags"],
-                     tl["total_tags"] - n)))
+                  "(%s distinct labels in use). Counting only the primary category hides "
+                  "%s secondary topic tags that agents still had to handle."
+                  % (tl["mean_tags_per_case"], tl["multi_tag_pct"],
+                     "{:,}".format(tl["distinct_tags"]), "{:,}".format(tl["total_tags"] - n))))
     o = V["origin"]
     if o.get("computable") and o["rows"]:
         t = o["rows"][0]
         f.append(("%s dominates contact volume" % t["label"],
-                  "%d of %d cases (%.1f%%) arrive via %s across %d origin(s) in use. "
+                  "%s of %s cases (%.1f%%) arrive via %s across %d origin(s) in use. "
                   "Deflection and self-service capacity should be sized against that channel first."
-                  % (t["count"], n, t["pct"], t["label"], len(o["rows"]))))
+                  % ("{:,}".format(t["count"]), "{:,}".format(n), t["pct"], t["label"],
+                     len(o["rows"]))))
     rc = C.get("repeat_contact", {})
     if rc.get("computable") and rc["members_with_multiple_cases"] > 0:
         f.append(("Repeat contact is measurable at member level",
-                  "%d of %d members (%.1f%%) opened more than one case, generating %d cases "
-                  "(%.1f%% of volume); the highest single member opened %d."
-                  % (rc["members_with_multiple_cases"], rc["members"], rc["pct_members_repeat"],
-                     rc["cases_from_repeat_members"], rc["pct_cases_from_repeat"],
-                     rc["max_cases_one_member"])))
+                  "%s of %s members (%.1f%%) opened more than one case, generating %s cases "
+                  "(%.1f%% of volume); the highest single member opened %s."
+                  % ("{:,}".format(rc["members_with_multiple_cases"]),
+                     "{:,}".format(rc["members"]), rc["pct_members_repeat"],
+                     "{:,}".format(rc["cases_from_repeat_members"]), rc["pct_cases_from_repeat"],
+                     "{:,}".format(rc["max_cases_one_member"]))))
     for k in ("chain_hw_inactivity", "chain_activity_withdraw", "chain_reward_dupes",
               "chain_bounce_withdraw", "chain_google_lockout", "chain_field_service"):
         ch = C.get(k, {})
@@ -699,11 +709,11 @@ def build(res, meta):
     A('<div class="wrap">')
     A('<header class="rpt"><p class="eyebrow">Executive report · Panelist Support Operations</p>'
       '<h1>Panelist Support: Case Volume, Correlations &amp; Four-Quarter Outlook</h1>'
-      '<p class="sub">%s &nbsp;·&nbsp; %d case record(s) from %d source file(s) &nbsp;·&nbsp; '
+      '<p class="sub">%s &nbsp;·&nbsp; %s case record(s) from %d source file(s) &nbsp;·&nbsp; '
       'Generated %s</p></header>'
       % (ESC(("Coverage %s to %s" % (V["date_min"], V["date_max"])) if V["date_min"]
               else "No usable date field"),
-         n, meta["file_count"], datetime.date.today().isoformat()))
+         "{:,}".format(n), meta["file_count"], datetime.date.today().isoformat()))
 
     if preview:
         A('<div class="callout"><div class="t">Small sample — read as a layout preview</div>'
@@ -719,10 +729,10 @@ def build(res, meta):
                       "%.2f cases per member" % (n / V["unique_members"])))
     if V["bucket"]["rows"]:
         t = V["bucket"]["rows"][0]
-        tiles.append(("Top category", f0(t["pct"]) + "%", "%s (%d cases)" % (t["label"], t["count"])))
+        tiles.append(("Top category", f0(t["pct"]) + "%", "%s (%s cases)" % (t["label"], "{:,}".format(t["count"]))))
     if V["origin"].get("computable") and V["origin"]["rows"]:
         t = V["origin"]["rows"][0]
-        tiles.append(("Top origin", f0(t["pct"]) + "%", "%s (%d cases)" % (t["label"], t["count"])))
+        tiles.append(("Top origin", f0(t["pct"]) + "%", "%s (%s cases)" % (t["label"], "{:,}".format(t["count"]))))
     tiles.append(("Topics per case", "%.2f" % V["tag_load"]["mean_tags_per_case"],
                   f0(V["tag_load"]["multi_tag_pct"]) + "% of cases carry 2+ topic tags"))
     rc = C.get("repeat_contact", {})
@@ -737,18 +747,19 @@ def build(res, meta):
     if MR:
         A("<h3>Most received cases</h3>")
         bits = ['<div class="mr"><div class="lead"><b>%s</b> is the largest driver at '
-                '<b>%d cases</b> (%.1f%% of all volume)%s.</div>'
-                % (ESC(MR["label"]), MR["count"], MR["pct"],
-                   (" raised by %d distinct members" % MR["members"]) if MR["members"] else "")]
+                '<b>%s cases</b> (%.1f%% of all volume)%s.</div>'
+                % (ESC(MR["label"]), "{:,}".format(MR["count"]), MR["pct"],
+                   (" raised by %s distinct members" % "{:,}".format(MR["members"]))
+                   if MR["members"] else "")]
         bits.append("<ul>")
         if MR["top_labels"]:
             bits.append("<li>Most common labels inside it: "
-                        + "; ".join("%s (%d)" % (ESC(l["label"]), l["count"])
+                        + "; ".join("%s (%s)" % (ESC(l["label"]), "{:,}".format(l["count"]))
                                     for l in MR["top_labels"]) + "</li>")
         if MR["origin"]:
-            bits.append("<li>Arrives mainly on <b>%s</b> — %d of its %d cases (%.1f%%)</li>"
-                        % (ESC(MR["origin"]["label"]), MR["origin"]["count"], MR["count"],
-                           MR["origin"]["pct"]))
+            bits.append("<li>Arrives mainly on <b>%s</b> — %s of its %s cases (%.1f%%)</li>"
+                        % (ESC(MR["origin"]["label"]), "{:,}".format(MR["origin"]["count"]),
+                           "{:,}".format(MR["count"]), MR["origin"]["pct"]))
         bits.append("</ul></div>")
         A("".join(bits))
 
@@ -807,6 +818,7 @@ def build(res, meta):
             t = rolled_tip(d)
             if t:
                 row["tip"] = t
+                row["color"] = "var(--rollup)"
             chart_rows.append(row)
         A('<div id="driverBlock">')
         A('<div class="drivers"><figure>' + svg_hbar(chart_rows, n, label_w=196, W=560)
