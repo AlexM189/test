@@ -708,8 +708,8 @@ export function makeEngine(RULES) {
       if (a !== undefined && b !== undefined) tot[a][b]++;
     }
     out.total = tot;
-    for (const [freq, key] of [["W", "week"], ["M", "month"], ["Q", "quarter"]]) {
-      const { keys } = series(recs, freq);
+    for (const [freq, key] of [["D", "day"], ["W", "week"], ["M", "month"], ["Q", "quarter"]]) {
+      const keys = denseKeys(recs, freq);
       out.periods[key] = keys;
       if (!keys.length) { out.counts[key] = []; continue; }
       const pos = new Map(keys.map((k, i) => [k, i]));
@@ -774,10 +774,35 @@ export function makeEngine(RULES) {
     const q = Math.floor(d.getUTCMonth() / 3);
     return [Date.UTC(d.getUTCFullYear(), q * 3, 1), Date.UTC(d.getUTCFullYear(), q * 3 + 3, 0)];
   };
-  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d)
+  const dayBounds = d => { const t = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(),
+                                              d.getUTCDate()); return [t, t]; };
+  const dayKey = d => d.toISOString().slice(0, 10);
+  const plabel = (d, freq) => freq === "W" ? isoWeekLabel(d) : freq === "D" ? dayKey(d)
     : freq === "Q" ? qKey(d) : monKey(d);
-  const pbounds = (d, freq) => freq === "W" ? weekBounds(d)
+  const pbounds = (d, freq) => freq === "W" ? weekBounds(d) : freq === "D" ? dayBounds(d)
     : freq === "Q" ? quarterBounds(d) : monthBounds(d);
+
+  /* Every complete calendar period between the first and last case date, including
+     periods with no cases at all. series() lists only periods that carry cases,
+     which is right for a trend fit but wrong for a picker: a quiet Sunday has to be
+     a flat bar you can still select, not a missing column. */
+  function denseKeys(recs, freq) {
+    let lo = Infinity, hi = -Infinity;
+    for (const r of recs) {
+      if (!r._date) continue;
+      const t = Date.UTC(r._date.getUTCFullYear(), r._date.getUTCMonth(), r._date.getUTCDate());
+      if (t < lo) lo = t;
+      if (t > hi) hi = t;
+    }
+    if (lo > hi) return [];
+    const keys = [];
+    for (let t = lo; t <= hi;) {
+      const d = new Date(t), b = pbounds(d, freq);
+      if (b[0] >= lo && b[1] <= hi) keys.push(plabel(d, freq));
+      t = b[1] + dayMs;
+    }
+    return keys;
+  }
 
   function series(recs, freq) {
     const withD = recs.filter(r => r._date);

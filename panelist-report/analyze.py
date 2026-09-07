@@ -631,8 +631,8 @@ def build_cube(df, V):
     d = df.dropna(subset=["_date"]).copy()
     if d.empty:
         return out
-    for freq, key in (("W", "week"), ("M", "month"), ("Q", "quarter")):
-        keys, _ = _series(df, freq)
+    for freq, key in (("D", "day"), ("W", "week"), ("M", "month"), ("Q", "quarter")):
+        keys = _dense_keys(df, freq)
         if not keys:
             out["periods"][key] = []
             out["counts"][key] = []
@@ -678,11 +678,29 @@ def top_drivers(V):
 
 
 def _plabel(p, freq):
-    """Readable period label: 2026-W30 weeks, 2026-06 months, 2026Q3 quarters."""
+    """Readable period label: 2026-08-01 days, 2026-W30 weeks, 2026-06 months,
+    2026Q3 quarters - str() on a pandas Period already gives the last three."""
     if freq == "W":
         iso = p.start_time.isocalendar()
         return "%d-W%02d" % (iso[0], iso[1])
     return str(p)
+
+
+def _dense_keys(df, freq):
+    """Every complete calendar period between the first and last case date,
+    including periods with no cases at all. _series lists only periods that
+    carry cases, which is right for a trend fit but wrong for a picker: a quiet
+    Sunday has to be a flat bar you can still select, not a missing column."""
+    d = df.dropna(subset=["_date"])
+    if d.empty:
+        return []
+    lo, hi = d["_date"].min().normalize(), d["_date"].max().normalize()
+    keys, p = [], pd.Period(lo, freq=freq)
+    while p.start_time.normalize() <= hi:
+        if p.start_time.normalize() >= lo and p.end_time.normalize() <= hi:
+            keys.append(_plabel(p, freq))
+        p += 1
+    return keys
 
 
 def _series(df, freq):

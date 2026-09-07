@@ -767,13 +767,8 @@ def build(res, meta):
     CUBE = res.get("cube") or {}
     A("<h3>Movement watch</h3>")
     if CUBE.get("periods", {}).get("week"):
-        A('<div id="explorer"><div class="slicer" id="originSlicer" role="group" '
-          'aria-label="Filter by case origin"></div><div id="weeklyChart"></div>'
-          '<div id="weekDetail"><p class="nojs">Weekly breakdown requires JavaScript; the '
-          'tables and charts below cover the same period without it.</p></div></div>')
-        A('<p class="sub">Contacts per complete week. Pick a case origin to filter every '
-          'figure in this block and the call-driver ranking below it; click a bar to see that '
-          'week\'s top drivers.</p>')
+        A('<p class="sub">Contacts over time. Choose the time grain, then click a bar or drag across the chart to scope every figure in this block - and the call-driver ranking below it - to that range, case origin and topic.</p>')
+        A('<div id="explorer"><div class="slicer" id="granSlicer" role="group" aria-label="Time grain"></div><div class="slicer" id="originSlicer" role="group" aria-label="Filter by case origin"></div><div class="slicer" id="topicSlicer" role="group" aria-label="Filter by topic"></div><div class="slicer rangebar" id="rangeBar" role="group" aria-label="Date range"></div><div id="xChart"></div><div id="xDetail"><p class="nojs">The interactive breakdown requires JavaScript; the tables and charts below cover the same period without it.</p></div></div>')
     if AN.get("alerts"):
         A('<div class="alerts">' + "".join(
             '<div class="alert %s"><span class="dir">%s</span><span>%s</span></div>'

@@ -166,10 +166,35 @@ td.delta-down{color:var(--accent);font-weight:640}
 .wkdetail .hd{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;margin-bottom:.55em}
 .wkdetail .hd b{font-size:1rem}
 .wkdetail .hint{font-size:.8rem;color:var(--text-3)}
+.rangebar .fromto{display:flex;gap:9px;align-items:center;flex-wrap:wrap;
+  font-size:.82rem;color:var(--text-2)}
+.rangebar label{display:inline-flex;gap:5px;align-items:center}
+.slicer select{font-family:inherit;font-size:.82rem;padding:5px 8px;border-radius:8px;
+  background:var(--surface-2);color:var(--text);border:1px solid var(--border-strong);
+  max-width:min(280px,60vw)}
+.slicer select:hover{border-color:var(--accent)}
+/* the chart is the control surface: let it scroll rather than shrink to an
+   unreadable strip, and claim horizontal drags while leaving the page free to
+   scroll vertically under a finger */
+#xChart{overflow-x:auto;touch-action:pan-y;margin:2px 0 4px}
+.xchart{min-width:660px}
+.xchart .xslot:hover{fill:var(--text);fill-opacity:.05}
+.xstats{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.xstat{display:flex;flex-direction:column;gap:1px;background:var(--surface);
+  border:1px solid var(--border);border-radius:9px;padding:7px 11px;min-width:104px}
+.xstat .k{font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);
+  font-weight:700}
+.xstat .v{font-size:1rem;font-weight:660;font-variant-numeric:tabular-nums}
+.xstat .n{font-size:.74rem;color:var(--text-3);font-variant-numeric:tabular-nums}
+.xstat.up .v{color:var(--warn)}
+.xstat.down .v{color:var(--accent)}
 .mini{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px}
 .mini li{display:grid;grid-template-columns:18px 1fr auto;gap:9px;align-items:center;font-size:.86rem}
 .mini .rk{color:var(--text-3);font-size:.76rem;font-weight:700;text-align:right}
 .mini .bar{height:20px;border-radius:4px;min-width:3px}
+.mini li.roll .t{color:var(--text-2)}
+.mini .bag{width:100px;height:20px;border-radius:4px;flex:none;
+  border:1px dashed var(--border-strong);opacity:.7}
 .mini .nm{display:flex;align-items:center;gap:8px;min-width:0}
 .mini .nm span.t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini .vl{font-variant-numeric:tabular-nums;color:var(--text-2);white-space:nowrap;font-size:.82rem}

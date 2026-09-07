@@ -22,6 +22,8 @@ const out={
   fc_method:F.method, fc_slope:F.slope_cases_per_month,
   fc_hist:(F.history||[]).map(h=>[h.label,h.point]),
   fc_q:(F.quarters||[]).map(q=>[q.label,q.point,q.low,q.high,q.fitted_months]),
+  cube_p:Object.fromEntries(Object.entries(r.cube.periods).map(([k,v])=>[k,[v.length,v.length?v[0]:null,v.length?v[v.length-1]:null]])),
+  cube_d:r.cube.counts.day.map(o=>o.reduce((a,p)=>a+p.reduce((x,y)=>x+y,0),0)),
   prc:[r.volume.primary_raw_clean.excluded_cases, r.volume.primary_raw_clean.rows.map(x=>[x.label,x.count])],
   map_distinct:r.mapping.distinct, map_unmapped:r.mapping.unmapped_count,
   inf:[r.inference.from_category,r.inference.from_subject,r.inference.unresolved,r.inference.pct_from_subject],
