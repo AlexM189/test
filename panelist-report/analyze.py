@@ -416,6 +416,132 @@ def inference_audit(df):
             "keywords": rows[:40], "by_bucket": by_bucket}
 
 
+# Severity order: the first problem a case trips is the one worth naming. A case
+# with no category at all is a worse problem than one that merely fell outside
+# the knowledge base, and listing every problem per row makes the sheet unusable
+# for the thing it is for - sorting and filtering a cleanup queue.
+WORKLIST_PROBLEMS = [
+    "No category value",
+    "Placeholder value only",
+    "Contains a placeholder value",
+    "Label not in the knowledge base",
+    "Placed from the subject line",
+    "Not mapped to a driver",
+]
+
+
+def _classify_case(tags, tags_clean, junk_toks, primary, bucket, source):
+    """(problem, offending values) for one case, or (None, '') when it is clean."""
+    if not tags:
+        return "No category value", ""
+    if junk_toks and not tags_clean:
+        return "Placeholder value only", "; ".join(junk_toks)
+    if junk_toks:
+        return "Contains a placeholder value", "; ".join(junk_toks)
+    if source == "rule":
+        return "Label not in the knowledge base", primary
+    if source == "subject":
+        return "Placed from the subject line", ""
+    if bucket == UNMAPPED:
+        return "Not mapped to a driver", primary
+    return None, ""
+
+
+def cleanup_worklist(df, prov=None):
+    """Every case whose Category value needs a human, as rows ready for a
+    spreadsheet. This is the one place the tool emits case-level records, because
+    a cleanup queue you cannot trace back to a row is not actionable. It carries
+    the file, sheet and row number to find the case in the export the user
+    already has - never a member number, a name or any free text."""
+    has_id = "case_id" in df.columns
+    cols = ["Source file", "Sheet", "Row in file"]
+    if has_id:
+        cols.append("Case number")
+    cols += ["Date", "Case origin", "Category cell (raw)", "Problem",
+             "Offending value(s)", "Counted under", "Placed by"]
+    placed_by = {"kb": "Exact category match", "rule": "Keyword rule on the category",
+                 "subject": "Keyword rule on the subject", "none": "Nothing matched"}
+    rows, labels, counts = [], defaultdict(lambda: [0, None]), Counter()
+    raw_col = df["category"] if "category" in df else pd.Series([""] * len(df), index=df.index)
+    date_txt = (df["_date"].dt.strftime("%Y-%m-%d").fillna("")
+                if "_date" in df else pd.Series([""] * len(df), index=df.index))
+    origin = (df["case_origin"] if "case_origin" in df
+              else pd.Series([""] * len(df), index=df.index))
+    for i in range(len(df)):
+        r = df.iloc[i]
+        prob, bad = _classify_case(r["tags"], r["tags_clean"], r["junk_tokens"],
+                                   r["primary_category"], r["bucket"], r["bucket_source"])
+        if not prob:
+            continue
+        row = [str(r.get("_source_file", "")), str(r.get("_source_sheet", "")),
+               int(r.get("_source_row", 0) or 0)]
+        if has_id:
+            row.append(str(r.get("case_id", "")))
+        row += [str(date_txt.iloc[i]), str(origin.iloc[i]), str(raw_col.iloc[i]), prob,
+                bad, str(r["bucket"]), placed_by.get(r["bucket_source"], r["bucket_source"])]
+        rows.append(row)
+        counts[prob] += 1
+        # one line per offending label, so the picklist can be fixed at source
+        for tok in ([t for t in bad.split("; ") if t] or ([""] if prob == "No category value"
+                                                          else [])):
+            k = (tok, prob)
+            labels[k][0] += 1
+            if labels[k][1] is None:
+                labels[k][1] = int(r.get("_source_row", 0) or 0)
+    rows.sort(key=lambda x: (WORKLIST_PROBLEMS.index(x[cols.index("Problem")]),
+                             x[0], x[2]))
+    lab = sorted(([k[0] or "(blank)", k[1], v[0], v[1] or 0] for k, v in labels.items()),
+                 key=lambda x: (-x[2], x[0]))
+    summary = [[p, counts[p]] for p in WORKLIST_PROBLEMS if counts[p]]
+    return {"columns": cols, "rows": rows, "labels": lab, "summary": summary,
+            "total_cases": len(df), "flagged": len(rows), "has_case_id": has_id,
+            "pct_flagged": pct(len(rows), len(df))}
+
+
+def worklist_sheets(w, meta=None):
+    """The worklist as sheet specs - [{name, header, rows, widths}] - so the Python
+    and browser writers serialise exactly the same workbook."""
+    meta = meta or {}
+    files = meta.get("files") or ""
+    note = ("Every case below needs its Category value corrected at source. "
+            "Find it with the file, sheet and row number: open your export and go "
+            "to that row. No member number, name or case text is reproduced here.")
+    summary = [
+        ["Cases in the export", w["total_cases"]],
+        ["Cases needing a category fix", w["flagged"]],
+        ["Share of the export", "%s%%" % _r(w["pct_flagged"], 1)],
+        ["", ""],
+        ["Problem", "Cases"],
+    ] + [[p_, c] for p_, c in w["summary"]] + [
+        ["", ""],
+        ["Source file(s)", files],
+        ["Generated", meta.get("generated", "")],
+        ["", ""],
+        ["How to use this", note],
+    ]
+    return [
+        {"name": "Summary", "header": ["Item", "Value"], "rows": summary,
+         "widths": [30, 74], "filter": False},
+        {"name": "Cases to fix", "header": w["columns"], "rows": w["rows"],
+         "widths": _auto_widths(w["columns"], w["rows"]), "filter": True},
+        {"name": "Labels to fix",
+         "header": ["Category value", "Problem", "Cases affected", "First row in file"],
+         "rows": w["labels"],
+         "widths": _auto_widths(["Category value", "Problem", "Cases affected",
+                                 "First row in file"], w["labels"]),
+         "filter": True},
+    ]
+
+
+def _auto_widths(header, rows, cap=52):
+    w = [len(str(h)) + 2 for h in header]
+    for r in rows[:400]:
+        for i, v in enumerate(r):
+            if i < len(w):
+                w[i] = max(w[i], min(len(str(v)) + 2, cap))
+    return w
+
+
 def data_quality(df):
     """Category values in the export that the KB does not contain, plus labels that
     carry no meaning at all. This is the cleanup list, sized."""
@@ -938,4 +1064,5 @@ def run(df):
             "quality": data_quality(df),
             "deep_dives": all_deep_dives(df, vol),
             "cube": build_cube(df, vol),
+            "worklist": cleanup_worklist(df),
             "buckets": BUCKETS}

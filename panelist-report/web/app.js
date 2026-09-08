@@ -119,6 +119,16 @@ async function run() {
     state.meta = meta;
     $("downloadBtn").classList.remove("hidden");
     $("pptBtn").classList.remove("hidden");
+    // the cleanup sheet only earns a button when there is something on it
+    const wl = res.worklist;
+    const xb = $("xlsxBtn");
+    if (wl && wl.flagged) {
+      xb.classList.remove("hidden");
+      xb.querySelector(".n").textContent =
+        wl.flagged.toLocaleString("en-US") + " case(s)";
+    } else {
+      xb.classList.add("hidden");
+    }
 
     const skipped = prov.filter(p => p.status !== "loaded").length;
     setStatus(recs.length.toLocaleString("en-US") + " case(s) analysed from " +
@@ -148,6 +158,24 @@ function downloadPpt() {
     setStatus("Deck downloaded — " + (bytes.length / 1024).toFixed(0) + " KB.", "done");
   } catch (e) {
     showError("Could not build the deck", e && e.message ? e.message : String(e));
+  }
+}
+
+function downloadWorklist() {
+  try {
+    setStatus("Building the cleanup sheet …", "busy");
+    const sheets = engine.worklistSheets(state.res.worklist, {
+      files: state.files.map(f => f.name).join(", "),
+      generated: new Date().toISOString().slice(0, 10),
+    });
+    const bytes = buildWorkbook(sheets);
+    saveBlob(bytes,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "category-cleanup-worklist-" + new Date().toISOString().slice(0, 10) + ".xlsx");
+    setStatus(state.res.worklist.flagged.toLocaleString("en-US") +
+      " case(s) listed for cleanup.", "done");
+  } catch (e) {
+    showError("Could not build the cleanup sheet", e && e.message ? e.message : String(e));
   }
 }
 
@@ -187,6 +215,7 @@ drop.addEventListener("drop", e => {
 $("runBtn").addEventListener("click", run);
 $("downloadBtn").addEventListener("click", download);
 $("pptBtn").addEventListener("click", downloadPpt);
+$("xlsxBtn").addEventListener("click", downloadWorklist);
 $("resetBtn").addEventListener("click", () => {
   state.files = []; state.doc = null; state.res = null;
   renderFileList(); clearError(); setStatus("");
@@ -194,6 +223,7 @@ $("resetBtn").addEventListener("click", () => {
   $("reportHost").innerHTML = "";
   $("downloadBtn").classList.add("hidden");
   $("pptBtn").classList.add("hidden");
+  $("xlsxBtn").classList.add("hidden");
   setStep(1, "active"); setStep(2, "todo"); setStep(3, "todo");
   const t = document.querySelector(".totop");
   if (t) t.remove();

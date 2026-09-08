@@ -23,7 +23,7 @@ function crc32(buf) {
 
 const utf8 = s => new TextEncoder().encode(s);
 
-function zipStore(files) {
+export function zipStore(files) {
   const enc = files.map(f => {
     const name = utf8(f.name);
     const data = typeof f.data === "string" ? utf8(f.data) : f.data;

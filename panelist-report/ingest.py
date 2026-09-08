@@ -132,6 +132,10 @@ def load_paths(paths):
                 continue                                   # not a case table
             sub = df[list(mapping)].rename(columns=mapping).copy()
             sub["_source_file"] = os.path.basename(p)
+            sub["_source_sheet"] = df.attrs.get("sheet", "")
+            # the row number as Excel shows it, so a cleanup list can point at the
+            # exact line to fix rather than describing it
+            sub["_source_row"] = range(2, len(sub) + 2)
             frames.append(sub)
             prov.append({"file": os.path.basename(p),
                          "sheet": df.attrs.get("sheet", ""),

@@ -811,7 +811,8 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A('<p class="sub">The five most-used real category labels out of ' + V.tag_load.distinct_tags +
       " distinct labels seen in the Category field. <b>" + th(PRC.excluded_cases || 0) +
       " case(s)</b> whose primary value is a placeholder are excluded here and sized in the " +
-      "data-quality panel below. Percentages are of all " + n + " cases, so these five do not " +
+      "data-quality panel below. Percentages are of all " + th(n) + " cases, so these five " +
+      "do not " +
       "sum to 100%.</p>");
 
     if (Q.kb_size) {
@@ -833,6 +834,17 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
          Q.junk_distinct + " placeholder + " + Q.unknown_distinct + " unknown label(s)"],
       ].slice(0, 5).map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
         `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
+      const WL = res.worklist || {};
+      if (WL.flagged) {
+        A('<div class="callout"><div class="t">Get the list of cases to fix</div>' +
+          `The <b>${th(WL.flagged)} case(s)</b> counted above (${f1(WL.pct_flagged)}% of the ` +
+          'export) are listed one per row in the <b>cleanup list (.xlsx)</b> you can download ' +
+          'from the builder: source file, sheet and row number, the raw Category cell, what is ' +
+          'wrong with it and where the case was counted instead. Sort or filter it by Problem ' +
+          'to work through one kind at a time, and use the <i>Labels to fix</i> sheet to ' +
+          'correct the picklist at source. It carries no member number, name or case text — ' +
+          'the row number points at the line in the export you already have.</div>');
+      }
       if ((Q.junk_labels || []).length || (Q.unknown_labels || []).length) {
         A("<h4>Where these values come from</h4>");
         A('<p class="sub">The Category cell is split on commas, so a single cell can produce ' +

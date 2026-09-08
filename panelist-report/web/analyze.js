@@ -151,7 +151,9 @@ export function makeEngine(RULES) {
       for (let i = 1; i < t.rows.length; i++) {
         const row = t.rows[i];
         if (!row.some(c => String(c ?? "").trim() !== "")) continue;
-        const r = { _source_file: t.file };
+        // the row number as Excel shows it, so a cleanup list can point at the
+        // exact line to fix rather than describing it
+        const r = { _source_file: t.file, _source_sheet: t.sheet || "", _source_row: i + 1 };
         for (const ci of Object.keys(mapping)) r[mapping[ci]] = ws(row[+ci]);
         recs.push(r); n++;
       }
@@ -192,6 +194,7 @@ export function makeEngine(RULES) {
       // dropped before anything is counted - they stay visible only in the data-quality
       // panel, which reports them against the raw cell they came from.
       r.tags_clean = r.tags.filter(t => !isJunkLabel(t));
+      r.junk_tokens = r.tags.filter(t => isJunkLabel(t));
       r.primary_category = r.tags_clean[0] || "";
       const [b0, s0] = r.primary_category ? bucketSrc(r.primary_category) : [UNMAPPED, "none"];
       r.bucket = b0;
@@ -500,6 +503,119 @@ export function makeEngine(RULES) {
 
   /* Category values the KB does not contain, plus labels that carry no meaning
      at all. This is the cleanup list, sized. */
+  /* Severity order: the first problem a case trips is the one worth naming. A case
+     with no category at all is a worse problem than one that merely fell outside the
+     knowledge base, and listing every problem per row makes the sheet unusable for
+     the thing it is for - sorting and filtering a cleanup queue. */
+  const WORKLIST_PROBLEMS = [
+    "No category value",
+    "Placeholder value only",
+    "Contains a placeholder value",
+    "Label not in the knowledge base",
+    "Placed from the subject line",
+    "Not mapped to a driver",
+  ];
+
+  function classifyCase(r) {
+    if (!r.tags.length) return ["No category value", ""];
+    if (r.junk_tokens.length && !r.tags_clean.length)
+      return ["Placeholder value only", r.junk_tokens.join("; ")];
+    if (r.junk_tokens.length)
+      return ["Contains a placeholder value", r.junk_tokens.join("; ")];
+    if (r.bucket_source === "rule")
+      return ["Label not in the knowledge base", r.primary_category];
+    if (r.bucket_source === "subject") return ["Placed from the subject line", ""];
+    if (r.bucket === UNMAPPED) return ["Not mapped to a driver", r.primary_category];
+    return [null, ""];
+  }
+
+  /* Every case whose Category value needs a human, as rows ready for a spreadsheet.
+     This is the one place the tool emits case-level records, because a cleanup queue
+     you cannot trace back to a row is not actionable. It carries the file, sheet and
+     row number to find the case in the export the user already has - never a member
+     number, a name or any free text. */
+  function cleanupWorklist(recs) {
+    const hasId = recs.some(r => (r.case_id ?? "") !== "");
+    const cols = ["Source file", "Sheet", "Row in file"];
+    if (hasId) cols.push("Case number");
+    cols.push("Date", "Case origin", "Category cell (raw)", "Problem",
+              "Offending value(s)", "Counted under", "Placed by");
+    const placedBy = { kb: "Exact category match", rule: "Keyword rule on the category",
+                       subject: "Keyword rule on the subject", none: "Nothing matched" };
+    const probIdx = cols.indexOf("Problem");
+    const rows = [], labels = new Map(), counts = new Map();
+    for (const r of recs) {
+      const [prob, bad] = classifyCase(r);
+      if (!prob) continue;
+      const row = [String(r._source_file ?? ""), String(r._source_sheet ?? ""),
+                   +(r._source_row || 0)];
+      if (hasId) row.push(String(r.case_id ?? ""));
+      row.push(r._date ? r._date.toISOString().slice(0, 10) : "",
+               String(r.case_origin ?? ""), String(r.category ?? ""), prob, bad,
+               String(r.bucket), placedBy[r.bucket_source] || r.bucket_source);
+      rows.push(row);
+      counts.set(prob, (counts.get(prob) || 0) + 1);
+      // one line per offending label, so the picklist can be fixed at source
+      let toks = bad ? bad.split("; ").filter(Boolean) : [];
+      if (!toks.length && prob === "No category value") toks = [""];
+      for (const tok of toks) {
+        const k = tok + "\u0000" + prob;
+        const e = labels.get(k);
+        if (e) e[2]++;
+        else labels.set(k, [tok || "(blank)", prob, 1, +(r._source_row || 0)]);
+      }
+    }
+    rows.sort((a, b) => WORKLIST_PROBLEMS.indexOf(a[probIdx]) -
+                        WORKLIST_PROBLEMS.indexOf(b[probIdx]) ||
+                        (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0) || a[2] - b[2]);
+    const lab = [...labels.values()].sort((a, b) => b[2] - a[2] ||
+      (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const summary = WORKLIST_PROBLEMS.filter(p => counts.get(p)).map(p => [p, counts.get(p)]);
+    return { columns: cols, rows, labels: lab, summary, total_cases: recs.length,
+             flagged: rows.length, has_case_id: hasId,
+             pct_flagged: pct(rows.length, recs.length) };
+  }
+
+  function autoWidths(header, rows, cap) {
+    cap = cap || 52;
+    const w = header.map(h => String(h).length + 2);
+    rows.slice(0, 400).forEach(r => r.forEach((v, i) => {
+      if (i < w.length) w[i] = Math.max(w[i], Math.min(String(v).length + 2, cap));
+    }));
+    return w;
+  }
+
+  /* The worklist as sheet specs, so the Python and browser writers serialise
+     exactly the same workbook. */
+  function worklistSheets(w, meta) {
+    meta = meta || {};
+    const note = "Every case below needs its Category value corrected at source. " +
+      "Find it with the file, sheet and row number: open your export and go to that " +
+      "row. No member number, name or case text is reproduced here.";
+    const summary = [
+      ["Cases in the export", w.total_cases],
+      ["Cases needing a category fix", w.flagged],
+      ["Share of the export", (Math.round(w.pct_flagged * 10) / 10).toFixed(1) + "%"],
+      ["", ""],
+      ["Problem", "Cases"],
+    ].concat(w.summary.map(x => [x[0], x[1]])).concat([
+      ["", ""],
+      ["Source file(s)", meta.files || ""],
+      ["Generated", meta.generated || ""],
+      ["", ""],
+      ["How to use this", note],
+    ]);
+    const labHdr = ["Category value", "Problem", "Cases affected", "First row in file"];
+    return [
+      { name: "Summary", header: ["Item", "Value"], rows: summary,
+        widths: [30, 74], filter: false },
+      { name: "Cases to fix", header: w.columns, rows: w.rows,
+        widths: autoWidths(w.columns, w.rows), filter: true },
+      { name: "Labels to fix", header: labHdr, rows: w.labels,
+        widths: autoWidths(labHdr, w.labels), filter: true },
+    ];
+  }
+
   function dataQuality(recs) {
     const n = recs.length;
     const unknown = new Map(), junk = new Map();
@@ -1023,7 +1139,7 @@ export function makeEngine(RULES) {
   }
 
   return {
-    buildRecords,
+    buildRecords, worklistSheets,
     run(recs) {
       const dateCol = derive(recs);
       const volume = volumeSection(recs, dateCol);
@@ -1036,6 +1152,7 @@ export function makeEngine(RULES) {
                  quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
                },
                quality: dataQuality(recs), cube: buildCube(recs, volume),
+               worklist: cleanupWorklist(recs),
                deep_dives: allDeepDives(recs, volume) };
     },
   };

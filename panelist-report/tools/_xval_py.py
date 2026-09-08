@@ -35,6 +35,11 @@ out={
  "inf2":[r["inference"]["from_kb"],r["inference"]["from_rule"],r["inference"]["pct_from_kb"],r["inference"]["pct_from_rule"]],
  "cube":[r["cube"]["origins"],r["cube"]["drivers"],len(r["cube"]["periods"]["week"]),len(r["cube"]["periods"]["month"]),len(r["cube"]["periods"]["quarter"]),
          [sum(sum(p) for p in o) for o in r["cube"]["counts"]["week"]]],
+ "wl":[r["worklist"]["flagged"],r["worklist"]["pct_flagged"],r["worklist"]["has_case_id"],
+       r["worklist"]["columns"],r["worklist"]["summary"],r["worklist"]["labels"],
+       r["worklist"]["rows"][:40],r["worklist"]["rows"][-10:]],
+ "wl_sheets":[[sh["name"],sh["header"],sh["widths"],sh["filter"],len(sh["rows"]),sh["rows"][:6]]
+              for sh in analyze.worklist_sheets(r["worklist"], {"files":"F","generated":"G"})],
  "cube_p":{k:[len(v),(v[0] if v else None),(v[-1] if v else None)] for k,v in r["cube"]["periods"].items()},
  "cube_d":[sum(sum(p) for p in o) for o in r["cube"]["counts"]["day"]],
  "dd":[[d["id"],d.get("facet_set"),d["cases"],d["pct_of_total"],d.get("with_free_text"),

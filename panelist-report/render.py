@@ -890,9 +890,10 @@ def build(res, meta):
     A(svg_hbar(prows, n, series_color="var(--s1)", label_w=240))
     A('<p class="sub">The five most-used real category labels out of %d distinct labels seen '
       'in the Category field. <b>%s case(s)</b> whose primary value is a placeholder are '
-      'excluded here and sized in the data-quality panel below. Percentages are of all %d '
+      'excluded here and sized in the data-quality panel below. Percentages are of all %s '
       'cases, so these five do not sum to 100%%.</p>'
-      % (V["tag_load"]["distinct_tags"], "{:,}".format(PRC.get("excluded_cases", 0)), n))
+      % (V["tag_load"]["distinct_tags"], "{:,}".format(PRC.get("excluded_cases", 0)),
+         "{:,}".format(n)))
 
     if Q:
         A("<h3>Data quality — what the category field cannot tell you</h3>")
@@ -918,6 +919,18 @@ def build(res, meta):
                 ("Distinct problems", "{:,}".format(Q["junk_distinct"] + Q["unknown_distinct"]),
                  "%d placeholder + %d unknown label(s)"
                  % (Q["junk_distinct"], Q["unknown_distinct"]))][:5]) + "</div>")
+        WL = res.get("worklist") or {}
+        if WL.get("flagged"):
+            A('<div class="callout"><div class="t">Get the list of cases to fix</div>'
+              'The <b>%s case(s)</b> counted above (%.1f%% of the export) are listed one per '
+              'row in <b>category-cleanup-worklist.xlsx</b>, alongside this report: source '
+              'file, sheet and row number, the raw Category cell, what is wrong with it and '
+              'where the case was counted instead. Sort or filter it by Problem to work '
+              'through one kind at a time, and use the <i>Labels to fix</i> sheet to correct '
+              'the picklist at source. It carries no member number, name or case text — the '
+              'row number points at the line in the export you already have.</div>'
+              % ("{:,}".format(WL["flagged"]), WL["pct_flagged"]))
+
         if Q.get("junk_labels") or Q.get("unknown_labels"):
             A("<h4>Where these values come from</h4>")
             A('<p class="sub">The Category cell is split on commas, so a single cell can '

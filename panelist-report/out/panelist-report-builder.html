@@ -359,6 +359,10 @@ tr.various td:first-child,tr.various td:nth-child(2){color:var(--text-2)}
 .ghost:hover{color:var(--text);border-color:var(--accent)}
 .ghost.wide{width:100%;justify-content:center}
 .ghost .ico{opacity:.8}
+.ghost .n{margin-left:auto;font-size:.78rem;color:var(--text-3);
+  font-variant-numeric:tabular-nums}
+.ghost.wide{justify-content:flex-start}
+.ghost.wide > span:nth-child(2){flex:1;text-align:left}
 
 .status{margin-top:12px;font-size:.85rem;color:var(--text-2);min-height:1.3em;
   display:flex;gap:8px;align-items:flex-start}
@@ -441,12 +445,17 @@ tr.various td:first-child,tr.various td:nth-child(2){color:var(--text-2)}
       <div class="sh"><span class="sn">3</span><span class="t">Take it away</span></div>
       <p class="small" style="color:var(--text-2);font-size:.83rem;margin:0 0 4px">
         The HTML keeps every chart and table and stays interactive offline. The deck carries
-        the headline slides for presenting.</p>
+        the headline slides for presenting. The cleanup list names every case whose
+        Category value needs fixing, by row number in your own export.</p>
       <div class="btnrow" style="flex-direction:column;align-items:stretch">
         <button class="ghost wide hidden" id="downloadBtn" type="button">
           <span class="ico" aria-hidden="true">&#128196;</span> Download full report (.html)</button>
         <button class="ghost wide hidden" id="pptBtn" type="button">
           <span class="ico" aria-hidden="true">&#128202;</span> Download deck (.pptx)</button>
+        <button class="ghost wide hidden" id="xlsxBtn" type="button">
+          <span class="ico" aria-hidden="true">&#129529;</span>
+          <span>Download cleanup list (.xlsx)</span>
+          <span class="n"></span></button>
         <button class="ghost wide" id="resetBtn" type="button">Start over</button>
       </div>
     </li>
@@ -1587,7 +1596,9 @@ function makeEngine(RULES) {
       for (let i = 1; i < t.rows.length; i++) {
         const row = t.rows[i];
         if (!row.some(c => String(c ?? "").trim() !== "")) continue;
-        const r = { _source_file: t.file };
+        // the row number as Excel shows it, so a cleanup list can point at the
+        // exact line to fix rather than describing it
+        const r = { _source_file: t.file, _source_sheet: t.sheet || "", _source_row: i + 1 };
         for (const ci of Object.keys(mapping)) r[mapping[ci]] = ws(row[+ci]);
         recs.push(r); n++;
       }
@@ -1628,6 +1639,7 @@ function makeEngine(RULES) {
       // dropped before anything is counted - they stay visible only in the data-quality
       // panel, which reports them against the raw cell they came from.
       r.tags_clean = r.tags.filter(t => !isJunkLabel(t));
+      r.junk_tokens = r.tags.filter(t => isJunkLabel(t));
       r.primary_category = r.tags_clean[0] || "";
       const [b0, s0] = r.primary_category ? bucketSrc(r.primary_category) : [UNMAPPED, "none"];
       r.bucket = b0;
@@ -1936,6 +1948,119 @@ function makeEngine(RULES) {
 
   /* Category values the KB does not contain, plus labels that carry no meaning
      at all. This is the cleanup list, sized. */
+  /* Severity order: the first problem a case trips is the one worth naming. A case
+     with no category at all is a worse problem than one that merely fell outside the
+     knowledge base, and listing every problem per row makes the sheet unusable for
+     the thing it is for - sorting and filtering a cleanup queue. */
+  const WORKLIST_PROBLEMS = [
+    "No category value",
+    "Placeholder value only",
+    "Contains a placeholder value",
+    "Label not in the knowledge base",
+    "Placed from the subject line",
+    "Not mapped to a driver",
+  ];
+
+  function classifyCase(r) {
+    if (!r.tags.length) return ["No category value", ""];
+    if (r.junk_tokens.length && !r.tags_clean.length)
+      return ["Placeholder value only", r.junk_tokens.join("; ")];
+    if (r.junk_tokens.length)
+      return ["Contains a placeholder value", r.junk_tokens.join("; ")];
+    if (r.bucket_source === "rule")
+      return ["Label not in the knowledge base", r.primary_category];
+    if (r.bucket_source === "subject") return ["Placed from the subject line", ""];
+    if (r.bucket === UNMAPPED) return ["Not mapped to a driver", r.primary_category];
+    return [null, ""];
+  }
+
+  /* Every case whose Category value needs a human, as rows ready for a spreadsheet.
+     This is the one place the tool emits case-level records, because a cleanup queue
+     you cannot trace back to a row is not actionable. It carries the file, sheet and
+     row number to find the case in the export the user already has - never a member
+     number, a name or any free text. */
+  function cleanupWorklist(recs) {
+    const hasId = recs.some(r => (r.case_id ?? "") !== "");
+    const cols = ["Source file", "Sheet", "Row in file"];
+    if (hasId) cols.push("Case number");
+    cols.push("Date", "Case origin", "Category cell (raw)", "Problem",
+              "Offending value(s)", "Counted under", "Placed by");
+    const placedBy = { kb: "Exact category match", rule: "Keyword rule on the category",
+                       subject: "Keyword rule on the subject", none: "Nothing matched" };
+    const probIdx = cols.indexOf("Problem");
+    const rows = [], labels = new Map(), counts = new Map();
+    for (const r of recs) {
+      const [prob, bad] = classifyCase(r);
+      if (!prob) continue;
+      const row = [String(r._source_file ?? ""), String(r._source_sheet ?? ""),
+                   +(r._source_row || 0)];
+      if (hasId) row.push(String(r.case_id ?? ""));
+      row.push(r._date ? r._date.toISOString().slice(0, 10) : "",
+               String(r.case_origin ?? ""), String(r.category ?? ""), prob, bad,
+               String(r.bucket), placedBy[r.bucket_source] || r.bucket_source);
+      rows.push(row);
+      counts.set(prob, (counts.get(prob) || 0) + 1);
+      // one line per offending label, so the picklist can be fixed at source
+      let toks = bad ? bad.split("; ").filter(Boolean) : [];
+      if (!toks.length && prob === "No category value") toks = [""];
+      for (const tok of toks) {
+        const k = tok + "\u0000" + prob;
+        const e = labels.get(k);
+        if (e) e[2]++;
+        else labels.set(k, [tok || "(blank)", prob, 1, +(r._source_row || 0)]);
+      }
+    }
+    rows.sort((a, b) => WORKLIST_PROBLEMS.indexOf(a[probIdx]) -
+                        WORKLIST_PROBLEMS.indexOf(b[probIdx]) ||
+                        (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0) || a[2] - b[2]);
+    const lab = [...labels.values()].sort((a, b) => b[2] - a[2] ||
+      (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+    const summary = WORKLIST_PROBLEMS.filter(p => counts.get(p)).map(p => [p, counts.get(p)]);
+    return { columns: cols, rows, labels: lab, summary, total_cases: recs.length,
+             flagged: rows.length, has_case_id: hasId,
+             pct_flagged: pct(rows.length, recs.length) };
+  }
+
+  function autoWidths(header, rows, cap) {
+    cap = cap || 52;
+    const w = header.map(h => String(h).length + 2);
+    rows.slice(0, 400).forEach(r => r.forEach((v, i) => {
+      if (i < w.length) w[i] = Math.max(w[i], Math.min(String(v).length + 2, cap));
+    }));
+    return w;
+  }
+
+  /* The worklist as sheet specs, so the Python and browser writers serialise
+     exactly the same workbook. */
+  function worklistSheets(w, meta) {
+    meta = meta || {};
+    const note = "Every case below needs its Category value corrected at source. " +
+      "Find it with the file, sheet and row number: open your export and go to that " +
+      "row. No member number, name or case text is reproduced here.";
+    const summary = [
+      ["Cases in the export", w.total_cases],
+      ["Cases needing a category fix", w.flagged],
+      ["Share of the export", (Math.round(w.pct_flagged * 10) / 10).toFixed(1) + "%"],
+      ["", ""],
+      ["Problem", "Cases"],
+    ].concat(w.summary.map(x => [x[0], x[1]])).concat([
+      ["", ""],
+      ["Source file(s)", meta.files || ""],
+      ["Generated", meta.generated || ""],
+      ["", ""],
+      ["How to use this", note],
+    ]);
+    const labHdr = ["Category value", "Problem", "Cases affected", "First row in file"];
+    return [
+      { name: "Summary", header: ["Item", "Value"], rows: summary,
+        widths: [30, 74], filter: false },
+      { name: "Cases to fix", header: w.columns, rows: w.rows,
+        widths: autoWidths(w.columns, w.rows), filter: true },
+      { name: "Labels to fix", header: labHdr, rows: w.labels,
+        widths: autoWidths(labHdr, w.labels), filter: true },
+    ];
+  }
+
   function dataQuality(recs) {
     const n = recs.length;
     const unknown = new Map(), junk = new Map();
@@ -2459,7 +2584,7 @@ function makeEngine(RULES) {
   }
 
   return {
-    buildRecords,
+    buildRecords, worklistSheets,
     run(recs) {
       const dateCol = derive(recs);
       const volume = volumeSection(recs, dateCol);
@@ -2472,6 +2597,7 @@ function makeEngine(RULES) {
                  quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
                },
                quality: dataQuality(recs), cube: buildCube(recs, volume),
+               worklist: cleanupWorklist(recs),
                deep_dives: allDeepDives(recs, volume) };
     },
   };
@@ -3291,7 +3417,8 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
     A('<p class="sub">The five most-used real category labels out of ' + V.tag_load.distinct_tags +
       " distinct labels seen in the Category field. <b>" + th(PRC.excluded_cases || 0) +
       " case(s)</b> whose primary value is a placeholder are excluded here and sized in the " +
-      "data-quality panel below. Percentages are of all " + n + " cases, so these five do not " +
+      "data-quality panel below. Percentages are of all " + th(n) + " cases, so these five " +
+      "do not " +
       "sum to 100%.</p>");
 
     if (Q.kb_size) {
@@ -3313,6 +3440,17 @@ function makeRenderer(RULES, CSS, RUNTIME_JS) {
          Q.junk_distinct + " placeholder + " + Q.unknown_distinct + " unknown label(s)"],
       ].slice(0, 5).map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
         `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
+      const WL = res.worklist || {};
+      if (WL.flagged) {
+        A('<div class="callout"><div class="t">Get the list of cases to fix</div>' +
+          `The <b>${th(WL.flagged)} case(s)</b> counted above (${f1(WL.pct_flagged)}% of the ` +
+          'export) are listed one per row in the <b>cleanup list (.xlsx)</b> you can download ' +
+          'from the builder: source file, sheet and row number, the raw Category cell, what is ' +
+          'wrong with it and where the case was counted instead. Sort or filter it by Problem ' +
+          'to work through one kind at a time, and use the <i>Labels to fix</i> sheet to ' +
+          'correct the picklist at source. It carries no member number, name or case text — ' +
+          'the row number points at the line in the export you already have.</div>');
+      }
       if ((Q.junk_labels || []).length || (Q.unknown_labels || []).length) {
         A("<h4>Where these values come from</h4>");
         A('<p class="sub">The Category cell is split on commas, so a single cell can produce ' +
@@ -4165,6 +4303,122 @@ function buildDeck(res, meta) {
   return pkg(slides);
 }
 
+/* --- web/xlsx.js --- */
+/* Minimal XLSX writer - no dependencies, mirrors xlsx.py part for part.
+
+   An .xlsx is a ZIP of OOXML parts, so it reuses the ZIP writer the deck already
+   needs. Strings are written inline rather than through a shared-strings table:
+   it costs a few bytes and removes a whole class of index bugs, and these sheets
+   are a cleanup queue, not a data warehouse. */
+
+const XE = s => String(s ?? "").replace(/[&<>"]/g,
+  c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
+  // Excel rejects most control characters outright; drop them rather than
+  // producing a workbook that will not open
+  .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "");
+
+function colName(i) {
+  let s = "", n = i + 1;
+  while (n) { const r = (n - 1) % 26; s = String.fromCharCode(65 + r) + s; n = (n - r - 1) / 26; }
+  return s;
+}
+
+const isNum = v => typeof v === "number" && isFinite(v);
+
+function cell(ref, v, style) {
+  const st = style ? ` s="${style}"` : "";
+  if (v === null || v === undefined || v === "") return `<c r="${ref}"${st}/>`;
+  if (isNum(v)) return `<c r="${ref}"${st}><v>${v}</v></c>`;
+  return `<c r="${ref}"${st} t="inlineStr"><is><t xml:space="preserve">${XE(v)}</t></is></c>`;
+}
+
+function sheetXml(spec) {
+  const header = spec.header || [], rows = spec.rows || [], widths = spec.widths || [];
+  const p = ['<?xml version="1.0" encoding="UTF-8" standalone="yes"?>',
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">',
+    '<sheetViews><sheetView workbookViewId="0">' +
+    '<pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>' +
+    '</sheetView></sheetViews>'];
+  if (widths.length) {
+    p.push("<cols>" + widths.map((w, i) =>
+      `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("") + "</cols>");
+  }
+  p.push("<sheetData>");
+  p.push('<row r="1">' + header.map((h, i) => cell(colName(i) + "1", h, 1)).join("") + "</row>");
+  rows.forEach((r, n) => {
+    const rn = n + 2;
+    p.push(`<row r="${rn}">` + r.map((v, i) => cell(colName(i) + rn, v, 0)).join("") + "</row>");
+  });
+  p.push("</sheetData>");
+  if (spec.filter && (header.length || rows.length)) {
+    p.push(`<autoFilter ref="A1:${colName(header.length - 1)}${rows.length + 1}"/>`);
+  }
+  p.push("</worksheet>");
+  return p.join("");
+}
+
+const STYLES =
+  '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+  '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+  '<fonts count="2">' +
+  '<font><sz val="11"/><name val="Calibri"/></font>' +
+  '<font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>' +
+  '</fonts>' +
+  '<fills count="3">' +
+  '<fill><patternFill patternType="none"/></fill>' +
+  '<fill><patternFill patternType="gray125"/></fill>' +
+  '<fill><patternFill patternType="solid"><fgColor rgb="FF2F6FB5"/>' +
+  '<bgColor indexed="64"/></patternFill></fill>' +
+  '</fills>' +
+  '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+  '<cellXfs count="2">' +
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>' +
+  '</cellXfs>' +
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+  "</styleSheet>";
+
+/* sheets: [{name, header, rows, widths, filter}] -> Uint8Array of an .xlsx */
+function buildWorkbook(sheets) {
+  const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.' +
+    'relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-' +
+    'officedocument.spreadsheetml.sheet.main+xml"/>' +
+    sheets.map((_, i) => `<Override PartName="/xl/worksheets/sheet${i + 1}.xml" ` +
+      'ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>')
+      .join("") +
+    '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-' +
+    'officedocument.spreadsheetml.styles+xml"/></Types>';
+  const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/' +
+    'relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>';
+  const wb = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>' +
+    sheets.map((s, i) => `<sheet name="${XE(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`)
+      .join("") + "</sheets></workbook>";
+  const wbrels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+    sheets.map((_, i) => `<Relationship Id="rId${i + 1}" Type="http://schemas.openxmlformats.` +
+      `org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i + 1}.xml"/>`)
+      .join("") +
+    `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/` +
+    'officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
+
+  return zipStore([
+    { name: "[Content_Types].xml", data: ct },
+    { name: "_rels/.rels", data: rels },
+    { name: "xl/workbook.xml", data: wb },
+    { name: "xl/_rels/workbook.xml.rels", data: wbrels },
+    { name: "xl/styles.xml", data: STYLES },
+  ].concat(sheets.map((s, i) =>
+    ({ name: `xl/worksheets/sheet${i + 1}.xml`, data: sheetXml(s) }))));
+}
+
 /* --- web/app.js --- */
 /* Upload tool controller. Everything runs in the page: files are read with the
    FileReader/ArrayBuffer APIs, parsed, analysed and rendered locally. No network
@@ -4287,6 +4541,16 @@ async function run() {
     state.meta = meta;
     $("downloadBtn").classList.remove("hidden");
     $("pptBtn").classList.remove("hidden");
+    // the cleanup sheet only earns a button when there is something on it
+    const wl = res.worklist;
+    const xb = $("xlsxBtn");
+    if (wl && wl.flagged) {
+      xb.classList.remove("hidden");
+      xb.querySelector(".n").textContent =
+        wl.flagged.toLocaleString("en-US") + " case(s)";
+    } else {
+      xb.classList.add("hidden");
+    }
 
     const skipped = prov.filter(p => p.status !== "loaded").length;
     setStatus(recs.length.toLocaleString("en-US") + " case(s) analysed from " +
@@ -4316,6 +4580,24 @@ function downloadPpt() {
     setStatus("Deck downloaded — " + (bytes.length / 1024).toFixed(0) + " KB.", "done");
   } catch (e) {
     showError("Could not build the deck", e && e.message ? e.message : String(e));
+  }
+}
+
+function downloadWorklist() {
+  try {
+    setStatus("Building the cleanup sheet …", "busy");
+    const sheets = engine.worklistSheets(state.res.worklist, {
+      files: state.files.map(f => f.name).join(", "),
+      generated: new Date().toISOString().slice(0, 10),
+    });
+    const bytes = buildWorkbook(sheets);
+    saveBlob(bytes,
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "category-cleanup-worklist-" + new Date().toISOString().slice(0, 10) + ".xlsx");
+    setStatus(state.res.worklist.flagged.toLocaleString("en-US") +
+      " case(s) listed for cleanup.", "done");
+  } catch (e) {
+    showError("Could not build the cleanup sheet", e && e.message ? e.message : String(e));
   }
 }
 
@@ -4355,6 +4637,7 @@ drop.addEventListener("drop", e => {
 $("runBtn").addEventListener("click", run);
 $("downloadBtn").addEventListener("click", download);
 $("pptBtn").addEventListener("click", downloadPpt);
+$("xlsxBtn").addEventListener("click", downloadWorklist);
 $("resetBtn").addEventListener("click", () => {
   state.files = []; state.doc = null; state.res = null;
   renderFileList(); clearError(); setStatus("");
@@ -4362,6 +4645,7 @@ $("resetBtn").addEventListener("click", () => {
   $("reportHost").innerHTML = "";
   $("downloadBtn").classList.add("hidden");
   $("pptBtn").classList.add("hidden");
+  $("xlsxBtn").classList.add("hidden");
   setStep(1, "active"); setStep(2, "todo"); setStep(3, "todo");
   const t = document.querySelector(".totop");
   if (t) t.remove();

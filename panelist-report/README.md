@@ -34,8 +34,10 @@ python3 run.py
 python3 run.py '/path/to/*.xlsx' /path/to/site-b.csv
 ```
 
-Output: `out/panelist-support-report.html`. The CLI additionally reads **PDF and
-PPTX** table exports, which the browser tool does not.
+Outputs: `out/panelist-support-report.html`, plus
+`out/category-cleanup-worklist.xlsx` whenever any case has a Category value that
+needs fixing. The CLI additionally reads **PDF and PPTX** table exports, which
+the browser tool does not.
 
 With no files in `data/`, it falls back to `sample/` (3 rows transcribed from the
 export header screenshot) and renders a clearly-labelled preview. The member
@@ -115,6 +117,28 @@ four-quarter outlook, and the recommendations.
 `tools/validate_pptx.py deck.pptx` checks the relationship graph, content-type
 coverage and XML well-formedness of every part — the things that actually break
 PowerPoint, and which python-pptx is too lenient to catch.
+
+## Category cleanup worklist
+
+The report sizes the bad category values; this names them. `analyze.cleanup_worklist`
+flags every case whose Category value needs a human and writes three sheets
+(`xlsx.py` in the CLI, `web/xlsx.js` in the builder — the same sheet spec, so the
+two workbooks are content-identical):
+
+| Sheet | What it holds |
+|---|---|
+| Summary | Totals, the count per problem, and how to use the list |
+| Cases to fix | One row per case: source file, sheet, **row number in the file**, date, origin, the raw Category cell, the problem, the offending value(s), where the case was counted and how it got there |
+| Labels to fix | One row per bad label with its case count — the picklist fix list |
+
+Problems, in the order a case is tested against them: *No category value*,
+*Placeholder value only*, *Contains a placeholder value*, *Label not in the
+knowledge base*, *Placed from the subject line*, *Not mapped to a driver*. Each
+case is named once, by the worst problem it trips, so the sheet stays sortable.
+
+This is the only case-level output. It carries no member number, name or case
+text: the file/sheet/row pointer is what makes a case findable, in the export the
+user already has. Both sheets are filterable and freeze their header row.
 
 ## Category deep dives
 
