@@ -24,10 +24,11 @@ const out={
   fc_method:F.method, fc_slope:F.slope_cases_per_month,
   fc_hist:(F.history||[]).map(h=>[h.label,h.point]),
   fc_q:(F.quarters||[]).map(q=>[q.label,q.point,q.low,q.high,q.fitted_months]),
-  wl:[r.worklist.flagged,r.worklist.pct_flagged,r.worklist.has_case_id,
-      r.worklist.columns,r.worklist.summary,r.worklist.labels,
-      r.worklist.rows.slice(0,40),r.worklist.rows.slice(-10)],
-  wl_sheets:eng.worklistSheets(r.worklist,{files:"F",generated:"G"})
+  fit:[r.fit.fitted,r.fit.not_fitted,r.fit.pct_fitted,r.fit.kb_size,
+       r.fit.has_case_id,r.fit.columns,r.fit.nofit_columns,
+       r.fit.fits,r.fit.reasons,r.fit.values,
+       r.fit.rows.slice(0,40),r.fit.rows.slice(-10),r.fit.nofit.slice(0,20)],
+  fit_sheets:eng.fitSheets(r.fit,{files:"F",generated:"G"})
     .map(sh=>[sh.name,sh.header,sh.widths,sh.filter,sh.rows.length,sh.rows.slice(0,6)]),
   cube_p:Object.fromEntries(Object.entries(r.cube.periods).map(([k,v])=>[k,[v.length,v.length?v[0]:null,v.length?v[v.length-1]:null]])),
   cube_d:r.cube.counts.day.map(o=>o.reduce((a,p)=>a+p.reduce((x,y)=>x+y,0),0)),

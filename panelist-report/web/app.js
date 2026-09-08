@@ -119,16 +119,11 @@ async function run() {
     state.meta = meta;
     $("downloadBtn").classList.remove("hidden");
     $("pptBtn").classList.remove("hidden");
-    // the cleanup sheet only earns a button when there is something on it
-    const wl = res.worklist;
     const xb = $("xlsxBtn");
-    if (wl && wl.flagged) {
-      xb.classList.remove("hidden");
-      xb.querySelector(".n").textContent =
-        wl.flagged.toLocaleString("en-US") + " case(s)";
-    } else {
-      xb.classList.add("hidden");
-    }
+    xb.classList.remove("hidden");
+    xb.querySelector(".n").textContent = res.fit.not_fitted
+      ? res.fit.not_fitted.toLocaleString("en-US") + " not fitted"
+      : "all fitted";
 
     const skipped = prov.filter(p => p.status !== "loaded").length;
     setStatus(recs.length.toLocaleString("en-US") + " case(s) analysed from " +
@@ -161,21 +156,23 @@ function downloadPpt() {
   }
 }
 
-function downloadWorklist() {
+async function downloadFit() {
   try {
-    setStatus("Building the cleanup sheet …", "busy");
-    const sheets = engine.worklistSheets(state.res.worklist, {
+    setStatus("Building the category fit …", "busy");
+    await yield_();
+    const fit = state.res.fit;
+    const sheets = engine.fitSheets(fit, {
       files: state.files.map(f => f.name).join(", "),
       generated: new Date().toISOString().slice(0, 10),
     });
-    const bytes = buildWorkbook(sheets);
+    const bytes = await buildWorkbook(sheets);
     saveBlob(bytes,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "category-cleanup-worklist-" + new Date().toISOString().slice(0, 10) + ".xlsx");
-    setStatus(state.res.worklist.flagged.toLocaleString("en-US") +
-      " case(s) listed for cleanup.", "done");
+      "category-fit-" + new Date().toISOString().slice(0, 10) + ".xlsx");
+    setStatus(fit.fitted.toLocaleString("en-US") + " case(s) fitted to a category, " +
+      fit.not_fitted.toLocaleString("en-US") + " not fitted.", "done");
   } catch (e) {
-    showError("Could not build the cleanup sheet", e && e.message ? e.message : String(e));
+    showError("Could not build the category fit", e && e.message ? e.message : String(e));
   }
 }
 
@@ -215,7 +212,7 @@ drop.addEventListener("drop", e => {
 $("runBtn").addEventListener("click", run);
 $("downloadBtn").addEventListener("click", download);
 $("pptBtn").addEventListener("click", downloadPpt);
-$("xlsxBtn").addEventListener("click", downloadWorklist);
+$("xlsxBtn").addEventListener("click", downloadFit);
 $("resetBtn").addEventListener("click", () => {
   state.files = []; state.doc = null; state.res = null;
   renderFileList(); clearError(); setStatus("");

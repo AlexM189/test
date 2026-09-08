@@ -23,14 +23,36 @@ function crc32(buf) {
 
 const utf8 = s => new TextEncoder().encode(s);
 
+/* Same package, deflated. CompressionStream is present everywhere the rest of this
+   tool already works; where it is not, the caller falls back to stored entries, which
+   every reader accepts - it is only bigger. */
+export async function zipDeflate(files) {
+  const out = [];
+  for (const f of files) {
+    const data = typeof f.data === "string" ? utf8(f.data) : f.data;
+    let comp = null;
+    try {
+      const cs = new CompressionStream("deflate-raw");
+      const buf = await new Response(new Blob([data]).stream().pipeThrough(cs)).arrayBuffer();
+      const z = new Uint8Array(buf);
+      if (z.length < data.length) comp = z;      // never let "compression" grow a part
+    } catch (e) { comp = null; }
+    out.push({ name: f.name, data, deflated: comp });
+  }
+  return zipStore(out);
+}
+
 export function zipStore(files) {
   const enc = files.map(f => {
     const name = utf8(f.name);
     const data = typeof f.data === "string" ? utf8(f.data) : f.data;
-    return { name, data, crc: crc32(data) };
+    // the CRC and the uncompressed size always describe the original bytes; only the
+    // stored payload and its length change when a part arrives deflated
+    return { name, data, crc: crc32(data), body: f.deflated || data,
+             method: f.deflated ? 8 : 0 };
   });
   let size = 0;
-  for (const e of enc) size += 30 + e.name.length + e.data.length + 46 + e.name.length;
+  for (const e of enc) size += 30 + e.name.length + e.body.length + 46 + e.name.length;
   size += 22;
   const out = new Uint8Array(size);
   const dv = new DataView(out.buffer);
@@ -41,29 +63,29 @@ export function zipStore(files) {
     dv.setUint32(off, 0x04034b50, true);
     dv.setUint16(off + 4, 20, true);      // version needed
     dv.setUint16(off + 6, 0, true);       // flags
-    dv.setUint16(off + 8, 0, true);       // method 0 = stored
+    dv.setUint16(off + 8, e.method, true);// 0 = stored, 8 = deflated
     dv.setUint16(off + 10, 0, true);      // time
     dv.setUint16(off + 12, 0x21, true);   // date (1996-01-01, fixed for reproducibility)
     dv.setUint32(off + 14, e.crc, true);
-    dv.setUint32(off + 18, e.data.length, true);
+    dv.setUint32(off + 18, e.body.length, true);
     dv.setUint32(off + 22, e.data.length, true);
     dv.setUint16(off + 26, e.name.length, true);
     dv.setUint16(off + 28, 0, true);
     off += 30;
     out.set(e.name, off); off += e.name.length;
-    out.set(e.data, off); off += e.data.length;
+    out.set(e.body, off); off += e.body.length;
   }
   const cdStart = off;
   enc.forEach((e, i) => {
     dv.setUint32(off, 0x02014b50, true);
-    dv.setUint16(off + 4, 20, true);
-    dv.setUint16(off + 6, 20, true);
-    dv.setUint16(off + 8, 0, true);
-    dv.setUint16(off + 10, 0, true);
-    dv.setUint16(off + 12, 0, true);
-    dv.setUint16(off + 14, 0x21, true);
+    dv.setUint16(off + 4, 20, true);      // version made by
+    dv.setUint16(off + 6, 20, true);      // version needed
+    dv.setUint16(off + 8, 0, true);       // flags
+    dv.setUint16(off + 10, e.method, true);   // method sits at +10 here, not +8
+    dv.setUint16(off + 12, 0, true);      // time
+    dv.setUint16(off + 14, 0x21, true);   // date
     dv.setUint32(off + 16, e.crc, true);
-    dv.setUint32(off + 20, e.data.length, true);
+    dv.setUint32(off + 20, e.body.length, true);
     dv.setUint32(off + 24, e.data.length, true);
     dv.setUint16(off + 28, e.name.length, true);
     dv.setUint16(off + 30, 0, true);

@@ -36,15 +36,14 @@ def main(argv):
     os.makedirs(os.path.dirname(out), exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
         f.write(render.build(res, {"prov": prov, "stats": stats, "file_count": len(paths)}))
-    # the cleanup queue as a spreadsheet: the one output that is case-level, so the
-    # bad Category values can actually be found and fixed in the source system
-    wl = res["worklist"]
-    wl_path = ""
-    if wl["flagged"]:
-        wl_path = os.path.join(HERE, "out", "category-cleanup-worklist.xlsx")
-        xlsx.write(wl_path, analyze.worklist_sheets(wl, {
-            "files": ", ".join(os.path.basename(p) for p in paths),
-            "generated": datetime.date.today().isoformat()}))
+    # every case fitted to one of the supplied categories, as a spreadsheet: the one
+    # output that is case-level, so an assignment can be checked and a case that
+    # could not be fitted can be found and fixed in the source system
+    fit = res["fit"]
+    fit_path = os.path.join(HERE, "out", "category-fit.xlsx")
+    xlsx.write(fit_path, analyze.fit_sheets(fit, {
+        "files": ", ".join(os.path.basename(p) for p in paths),
+        "generated": datetime.date.today().isoformat()}))
 
     v = res["volume"]
     print("\n  cases        : %d" % v["total_cases"])
@@ -54,11 +53,11 @@ def main(argv):
     print("  buckets      : %s" % ", ".join("%s %d" % (r["label"], r["count"]) for r in v["bucket"]["rows"]))
     print("  labels       : %d distinct, %d unmapped" % (res["mapping"]["distinct"], res["mapping"]["unmapped_count"]))
     print("  forecast     : %s" % res["forecast"]["method"])
-    print("  to fix       : %d case(s) with a bad Category value (%.1f%%)"
-          % (wl["flagged"], wl["pct_flagged"]))
+    print("  fitted       : %d of %d case(s) to a supplied category (%.1f%%)"
+          % (fit["fitted"], fit["total_cases"], fit["pct_fitted"]))
+    print("  not fitted   : %d case(s) (%.1f%%)" % (fit["not_fitted"], fit["pct_not_fitted"]))
     print("\nWrote %s (%.1f KB)" % (out, os.path.getsize(out) / 1024))
-    if wl_path:
-        print("Wrote %s (%.1f KB)" % (wl_path, os.path.getsize(wl_path) / 1024))
+    print("Wrote %s (%.1f KB)" % (fit_path, os.path.getsize(fit_path) / 1024))
 
 
 if __name__ == "__main__":

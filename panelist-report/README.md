@@ -34,10 +34,9 @@ python3 run.py
 python3 run.py '/path/to/*.xlsx' /path/to/site-b.csv
 ```
 
-Outputs: `out/panelist-support-report.html`, plus
-`out/category-cleanup-worklist.xlsx` whenever any case has a Category value that
-needs fixing. The CLI additionally reads **PDF and PPTX** table exports, which
-the browser tool does not.
+Outputs: `out/panelist-support-report.html` and `out/category-fit.xlsx`. The CLI
+additionally reads **PDF and PPTX** table exports, which the browser tool does
+not.
 
 With no files in `data/`, it falls back to `sample/` (3 rows transcribed from the
 export header screenshot) and renders a clearly-labelled preview. The member
@@ -118,29 +117,47 @@ four-quarter outlook, and the recommendations.
 coverage and XML well-formedness of every part — the things that actually break
 PowerPoint, and which python-pptx is too lenient to catch.
 
-## Category cleanup worklist
+## Category fit
 
-The report sizes the bad category values; this names them. `analyze.cleanup_worklist`
-flags every case whose Category value needs a human and writes three sheets
-(`xlsx.py` in the CLI, `web/xlsx.js` in the builder — the same sheet spec, so the
-two workbooks are content-identical):
+Every case is fitted to one of the supplied categories, or marked with the reason
+it could not be. `analyze.category_fit` writes four sheets (`xlsx.py` in the CLI,
+`web/xlsx.js` in the builder — the same sheet spec, so the two workbooks are
+content-identical):
 
 | Sheet | What it holds |
 |---|---|
-| Summary | Totals, the count per problem, and how to use the list |
-| Cases to fix | One row per case: source file, sheet, **row number in the file**, date, origin, the raw Category cell, the problem, the offending value(s), where the case was counted and how it got there |
-| Labels to fix | One row per bad label with its case count — the picklist fix list |
+| Summary | How many cases fitted, by which route, and how many did not, by reason |
+| All cases | Every case: source file, sheet, **row number in the file**, date, origin, its category values, the category it was fitted to, the driver family, and how it was matched |
+| Not fitted | Only the cases needing a decision, each with its reason and a suggested family read off its own text |
+| Values to fix | Every value standing between a case and a category, with case counts |
 
-Problems, in the order a case is tested against them: *No category value*,
-*Placeholder value only*, *Contains a placeholder value*, *Label not in the
-knowledge base*, *Placed from the subject line*, *Not mapped to a driver*. Each
-case is named once, by the worst problem it trips, so the sheet stays sortable.
+`fit_category` tries each value in the cell in order and returns a knowledge-base
+category or nothing — never a driver family, never a guess:
+
+1. **Exact match on the primary value** — the first value is a real category.
+2. **Exact match on a later value in the same cell** — the primary is not on the
+   list but a later value is, so a case is no longer thrown away because someone
+   typed a retired label in front of a good one.
+3. **Matched after normalising spacing and punctuation** — a punctuation-blind key
+   catches `Setup / Link Request  Google iOS` for `Setup/Link Request - Google_iOS`.
+   Built only because the 442 names collide under that key exactly zero times; a
+   collision would make it a guess.
+
+Otherwise the case is not fitted, with one of three reasons: the cell is empty, it
+holds only placeholder values, or no value in it is on the list. The category
+column shows the values with placeholders removed — `1` is not a category and is
+not displayed as one; it is counted on *Values to fix* instead.
+
+The same order decides the primary category everywhere else in the report, so a
+case that fits by a later value is counted under that category's family rather
+than falling into *Other / Unmapped*.
 
 This is the only case-level output. It carries no member number, name or case
 text: the file/sheet/row pointer is what makes a case findable, in the export the
-user already has. Both sheets are filterable and freeze their header row.
+user already has. The suggested family on *Not fitted* is read from the subject
+and then the description but only ever emits a family name, never the text.
 
-## Category deep dives
+## Category deep dives## Category deep dives
 
 `rules.json` carries a `deep_dives` list. Each entry names a family of drivers and a
 set of **facets** — a fixed vocabulary of labelled regular expressions matched against

@@ -4,7 +4,7 @@
    needs. Strings are written inline rather than through a shared-strings table:
    it costs a few bytes and removes a whole class of index bugs, and these sheets
    are a cleanup queue, not a data warehouse. */
-import { zipStore } from "./pptx.js";
+import { zipDeflate } from "./pptx.js";
 
 const XE = s => String(s ?? "").replace(/[&<>"]/g,
   c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]))
@@ -74,8 +74,10 @@ const STYLES =
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
   "</styleSheet>";
 
-/* sheets: [{name, header, rows, widths, filter}] -> Uint8Array of an .xlsx */
-export function buildWorkbook(sheets) {
+/* sheets: [{name, header, rows, widths, filter}] -> Uint8Array of an .xlsx.
+   Async because the sheet holding every case is megabytes of XML that has no business
+   travelling uncompressed. */
+export async function buildWorkbook(sheets) {
   const ct = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.' +
@@ -104,7 +106,7 @@ export function buildWorkbook(sheets) {
     `<Relationship Id="rId${sheets.length + 1}" Type="http://schemas.openxmlformats.org/` +
     'officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>';
 
-  return zipStore([
+  return zipDeflate([
     { name: "[Content_Types].xml", data: ct },
     { name: "_rels/.rels", data: rels },
     { name: "xl/workbook.xml", data: wb },

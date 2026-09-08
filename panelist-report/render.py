@@ -919,17 +919,21 @@ def build(res, meta):
                 ("Distinct problems", "{:,}".format(Q["junk_distinct"] + Q["unknown_distinct"]),
                  "%d placeholder + %d unknown label(s)"
                  % (Q["junk_distinct"], Q["unknown_distinct"]))][:5]) + "</div>")
-        WL = res.get("worklist") or {}
-        if WL.get("flagged"):
-            A('<div class="callout"><div class="t">Get the list of cases to fix</div>'
-              'The <b>%s case(s)</b> counted above (%.1f%% of the export) are listed one per '
-              'row in <b>category-cleanup-worklist.xlsx</b>, alongside this report: source '
-              'file, sheet and row number, the raw Category cell, what is wrong with it and '
-              'where the case was counted instead. Sort or filter it by Problem to work '
-              'through one kind at a time, and use the <i>Labels to fix</i> sheet to correct '
-              'the picklist at source. It carries no member number, name or case text — the '
-              'row number points at the line in the export you already have.</div>'
-              % ("{:,}".format(WL["flagged"]), WL["pct_flagged"]))
+        FIT = res.get("fit") or {}
+        if FIT.get("total_cases"):
+            A('<div class="callout"><div class="t">Every case, fitted to one of your '
+              'categories</div><b>%s of %s cases (%.1f%%)</b> carry a value that is on the '
+              '%d-category list; <b>%s (%.1f%%)</b> could not be fitted. '
+              '<b>category-fit.xlsx</b>, alongside this report, has the case-by-case '
+              'assignment: <i>All cases</i> gives every case its fitted category and how it '
+              'was matched, <i>Not fitted</i> is just the cases that need a decision with the '
+              'reason for each, and <i>Values to fix</i> counts the values standing in the '
+              'way. Placeholder values are stripped from the category column — they are not '
+              'categories. It carries no member number, name or case text: the row number '
+              'points at the line in the export you already have.</div>'
+              % ("{:,}".format(FIT["fitted"]), "{:,}".format(FIT["total_cases"]),
+                 FIT["pct_fitted"], FIT.get("kb_size", 0),
+                 "{:,}".format(FIT["not_fitted"]), FIT["pct_not_fitted"]))
 
         if Q.get("junk_labels") or Q.get("unknown_labels"):
             A("<h4>Where these values come from</h4>")

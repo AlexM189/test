@@ -834,16 +834,19 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
          Q.junk_distinct + " placeholder + " + Q.unknown_distinct + " unknown label(s)"],
       ].slice(0, 5).map(([k, v, d]) => `<div class="stat"><div class="k">${k}</div>` +
         `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
-      const WL = res.worklist || {};
-      if (WL.flagged) {
-        A('<div class="callout"><div class="t">Get the list of cases to fix</div>' +
-          `The <b>${th(WL.flagged)} case(s)</b> counted above (${f1(WL.pct_flagged)}% of the ` +
-          'export) are listed one per row in the <b>cleanup list (.xlsx)</b> you can download ' +
-          'from the builder: source file, sheet and row number, the raw Category cell, what is ' +
-          'wrong with it and where the case was counted instead. Sort or filter it by Problem ' +
-          'to work through one kind at a time, and use the <i>Labels to fix</i> sheet to ' +
-          'correct the picklist at source. It carries no member number, name or case text — ' +
-          'the row number points at the line in the export you already have.</div>');
+      const FIT = res.fit || {};
+      if (FIT.total_cases) {
+        A('<div class="callout"><div class="t">Every case, fitted to one of your ' +
+          `categories</div><b>${th(FIT.fitted)} of ${th(FIT.total_cases)} cases ` +
+          `(${f1(FIT.pct_fitted)}%)</b> carry a value that is on the ${FIT.kb_size || 0}-` +
+          `category list; <b>${th(FIT.not_fitted)} (${f1(FIT.pct_not_fitted)}%)</b> could ` +
+          'not be fitted. The <b>category fit (.xlsx)</b> you can download from the builder ' +
+          'has the case-by-case assignment: <i>All cases</i> gives every case its fitted ' +
+          'category and how it was matched, <i>Not fitted</i> is just the cases that need a ' +
+          'decision with the reason for each, and <i>Values to fix</i> counts the values ' +
+          'standing in the way. Placeholder values are stripped from the category column — ' +
+          'they are not categories. It carries no member number, name or case text: the row ' +
+          'number points at the line in the export you already have.</div>');
       }
       if ((Q.junk_labels || []).length || (Q.unknown_labels || []).length) {
         A("<h4>Where these values come from</h4>");

@@ -15,6 +15,15 @@ BUCKETS         = DRIVERS + ["Other / Unmapped"]
 _catnorm        = lambda s: re.sub(r"\s*/\s*", "/", re.sub(r"\s+", " ", str(s or ""))).strip().lower()
 CATEGORY_MAP    = {_catnorm(k): v for k, v in RULES["category_map"].items()}
 KB_NAMES        = {_catnorm(k): k for k in RULES["category_map"]}
+# a punctuation-blind key, so "Setup/Link Request - Google_iOS" still finds its
+# category when the export writes it "Setup / Link Request  Google iOS". Built
+# only because the 442 names collide under it exactly zero times; a collision
+# would make this a guess rather than a match.
+_catloose      = lambda s: re.sub(r"[^a-z0-9]+", "", str(s or "").lower())
+KB_LOOSE        = {}
+for _k in RULES["category_map"]:
+    KB_LOOSE.setdefault(_catloose(_k), []).append(_k)
+KB_LOOSE        = {k: v[0] for k, v in KB_LOOSE.items() if len(v) == 1}
 SIGNALS         = RULES["signals"]
 SUBJECT_RULES   = [(n, p) for n, p in RULES["subject_rules"]]
 TOP_DRIVERS     = RULES["gates"]["top_drivers"]
@@ -65,6 +74,35 @@ def bucket_src(tag):
     return "Other / Unmapped", "none"
 
 
+# How a case was fitted to one of the supplied categories, and why it could not be.
+FIT_EXACT   = "Exact match on the primary value"
+FIT_LATER   = "Exact match on a later value in the same cell"
+FIT_LOOSE   = "Matched after normalising spacing and punctuation"
+NOFIT_EMPTY = "The Category cell is empty"
+NOFIT_JUNK  = "The Category cell holds only placeholder values, so there is nothing to map"
+NOFIT_UNK   = "No value in the cell is on the supplied category list"
+
+
+def fit_category(tags_clean, tags=None):
+    """Fit a case to one of the supplied categories, or say why not.
+
+    Only the 442 categories from the knowledge base can come out of this - never a
+    driver family, never a guess. Values are tried in the order they appear, so the
+    primary category still wins whenever it is a real one; a later value is only
+    reached when the primary is not on the list."""
+    if not tags_clean:
+        return "", "", (NOFIT_EMPTY if not (tags or []) else NOFIT_JUNK)
+    for i, t in enumerate(tags_clean):
+        hit = KB_NAMES.get(_catnorm(t))
+        if hit:
+            return hit, (FIT_EXACT if i == 0 else FIT_LATER), ""
+    for t in tags_clean:
+        hit = KB_LOOSE.get(_catloose(t))
+        if hit:
+            return hit, FIT_LOOSE, ""
+    return "", "", NOFIT_UNK
+
+
 def is_junk_label(tag):
     """Labels that carry no reportable meaning - pure numbers, single characters,
     placeholders. These are a data-entry problem, not a category."""
@@ -93,6 +131,19 @@ def bucket_from_subject(subject):
     return None, None
 
 
+def suggest_family(subject, description):
+    """A hint for a case that could not be fitted: which driver family its own text
+    points at. Used only on the not-fitted sheet, and only ever emits a family name -
+    never the text it was read from, and never a category, because a family is not
+    specific enough to be one. Falls through to the description because a case with
+    no usable category often has no usable subject either."""
+    for t in (subject, description):
+        fam, _kw = bucket_from_subject(t)
+        if fam:
+            return fam
+    return ""
+
+
 def derive(df):
     df = df.copy()
     df["tags"] = df.get("category", "").apply(split_tags)
@@ -102,7 +153,16 @@ def derive(df):
     # which reports them against the raw cell they came from.
     df["tags_clean"] = df["tags"].apply(lambda ts: [t for t in ts if not is_junk_label(t)])
     df["junk_tokens"] = df["tags"].apply(lambda ts: [t for t in ts if is_junk_label(t)])
-    df["primary_category"] = df["tags_clean"].apply(lambda t: t[0] if t else "")
+    # Fit each case to one of the supplied categories. The primary value still wins
+    # whenever it is a real category; only when it is not does a later value in the
+    # same cell get a look, so a case is no longer thrown away because someone typed
+    # a retired label in front of a good one.
+    fits = [fit_category(c, t) for c, t in zip(df["tags_clean"], df["tags"])]
+    df["kb_category"] = [f[0] for f in fits]
+    df["kb_fit"] = [f[1] for f in fits]
+    df["kb_reason"] = [f[2] for f in fits]
+    df["primary_category"] = [kb or (c[0] if c else "")
+                              for kb, c in zip(df["kb_category"], df["tags_clean"])]
     src = df["primary_category"].apply(lambda t: bucket_src(t) if t else (UNMAPPED, "none"))
     df["bucket"] = [b for b, _ in src]
     df["bucket_source"] = [s2 if s2 != "none" else "none" for _, s2 in src]
@@ -416,120 +476,113 @@ def inference_audit(df):
             "keywords": rows[:40], "by_bucket": by_bucket}
 
 
-# Severity order: the first problem a case trips is the one worth naming. A case
-# with no category at all is a worse problem than one that merely fell outside
-# the knowledge base, and listing every problem per row makes the sheet unusable
-# for the thing it is for - sorting and filtering a cleanup queue.
-WORKLIST_PROBLEMS = [
-    "No category value",
-    "Placeholder value only",
-    "Contains a placeholder value",
-    "Label not in the knowledge base",
-    "Placed from the subject line",
-    "Not mapped to a driver",
-]
+def category_fit(df):
+    """Every case, fitted to one of the supplied categories or marked with the reason
+    it could not be.
 
-
-def _classify_case(tags, tags_clean, junk_toks, primary, bucket, source):
-    """(problem, offending values) for one case, or (None, '') when it is clean."""
-    if not tags:
-        return "No category value", ""
-    if junk_toks and not tags_clean:
-        return "Placeholder value only", "; ".join(junk_toks)
-    if junk_toks:
-        return "Contains a placeholder value", "; ".join(junk_toks)
-    if source == "rule":
-        return "Label not in the knowledge base", primary
-    if source == "subject":
-        return "Placed from the subject line", ""
-    if bucket == UNMAPPED:
-        return "Not mapped to a driver", primary
-    return None, ""
-
-
-def cleanup_worklist(df, prov=None):
-    """Every case whose Category value needs a human, as rows ready for a
-    spreadsheet. This is the one place the tool emits case-level records, because
-    a cleanup queue you cannot trace back to a row is not actionable. It carries
-    the file, sheet and row number to find the case in the export the user
-    already has - never a member number, a name or any free text."""
+    This is the one place the tool emits case-level records, because an assignment
+    you cannot trace back to a row is not checkable. It carries the file, sheet and
+    row number to find the case in the export the user already has - never a member
+    number, a name or any free text. Placeholder values are stripped from the
+    category column: they are not categories and have no business being shown as
+    though they were."""
     has_id = "case_id" in df.columns
-    cols = ["Source file", "Sheet", "Row in file"]
+    head = ["Source file", "Sheet", "Row in file"]
     if has_id:
-        cols.append("Case number")
-    cols += ["Date", "Case origin", "Category cell (raw)", "Problem",
-             "Offending value(s)", "Counted under", "Placed by"]
-    placed_by = {"kb": "Exact category match", "rule": "Keyword rule on the category",
-                 "subject": "Keyword rule on the subject", "none": "Nothing matched"}
-    rows, labels, counts = [], defaultdict(lambda: [0, None]), Counter()
-    raw_col = df["category"] if "category" in df else pd.Series([""] * len(df), index=df.index)
+        head.append("Case number")
+    head += ["Date", "Case origin", "Category values"]
+    cols = head + ["Fitted category", "Driver family", "How it was fitted", "Why not fitted"]
+    nofit_cols = head + ["Why not fitted", "Suggested family (from subject)"]
+
+    raw = df["category"] if "category" in df else pd.Series([""] * len(df), index=df.index)
     date_txt = (df["_date"].dt.strftime("%Y-%m-%d").fillna("")
                 if "_date" in df else pd.Series([""] * len(df), index=df.index))
     origin = (df["case_origin"] if "case_origin" in df
               else pd.Series([""] * len(df), index=df.index))
+    subj = df["subject"] if "subject" in df else pd.Series([""] * len(df), index=df.index)
+    desc = (df["description"] if "description" in df
+            else pd.Series([""] * len(df), index=df.index))
+
+    rows, nofit, fits, reasons = [], [], Counter(), Counter()
+    bad = defaultdict(lambda: [0, 0])          # offending value -> [cases, first row]
     for i in range(len(df)):
         r = df.iloc[i]
-        prob, bad = _classify_case(r["tags"], r["tags_clean"], r["junk_tokens"],
-                                   r["primary_category"], r["bucket"], r["bucket_source"])
-        if not prob:
-            continue
-        row = [str(r.get("_source_file", "")), str(r.get("_source_sheet", "")),
-               int(r.get("_source_row", 0) or 0)]
+        base = [str(r.get("_source_file", "")), str(r.get("_source_sheet", "")),
+                int(r.get("_source_row", 0) or 0)]
         if has_id:
-            row.append(str(r.get("case_id", "")))
-        row += [str(date_txt.iloc[i]), str(origin.iloc[i]), str(raw_col.iloc[i]), prob,
-                bad, str(r["bucket"]), placed_by.get(r["bucket_source"], r["bucket_source"])]
-        rows.append(row)
-        counts[prob] += 1
-        # one line per offending label, so the picklist can be fixed at source
-        for tok in ([t for t in bad.split("; ") if t] or ([""] if prob == "No category value"
-                                                          else [])):
-            k = (tok, prob)
-            labels[k][0] += 1
-            if labels[k][1] is None:
-                labels[k][1] = int(r.get("_source_row", 0) or 0)
-    rows.sort(key=lambda x: (WORKLIST_PROBLEMS.index(x[cols.index("Problem")]),
-                             x[0], x[2]))
-    lab = sorted(([k[0] or "(blank)", k[1], v[0], v[1] or 0] for k, v in labels.items()),
-                 key=lambda x: (-x[2], x[0]))
-    summary = [[p, counts[p]] for p in WORKLIST_PROBLEMS if counts[p]]
-    return {"columns": cols, "rows": rows, "labels": lab, "summary": summary,
-            "total_cases": len(df), "flagged": len(rows), "has_case_id": has_id,
-            "pct_flagged": pct(len(rows), len(df))}
+            base.append(str(r.get("case_id", "")))
+        # the category column shows what is left after placeholders are dropped -
+        # never the placeholder itself
+        base += [str(date_txt.iloc[i]), str(origin.iloc[i]), ", ".join(r["tags_clean"])]
+        rows.append(base + [r["kb_category"], r["bucket"] if r["kb_category"] else "",
+                            r["kb_fit"], r["kb_reason"]])
+        if r["kb_category"]:
+            fits[r["kb_fit"]] += 1
+            continue
+        reasons[r["kb_reason"]] += 1
+        nofit.append(base + [r["kb_reason"],
+                             suggest_family(subj.iloc[i], desc.iloc[i])])
+        # every value standing between this case and a category, counted once per case
+        for t in (r["tags_clean"] or r["tags"] or [""]):
+            e = bad[t or "(blank cell)"]
+            e[0] += 1
+            if not e[1]:
+                e[1] = int(r.get("_source_row", 0) or 0)
+
+    fitted = len(rows) - len(nofit)
+    values = sorted(([k, ("not on the list" if k not in ("(blank cell)",) and
+                          not is_junk_label(k) else "not a category value"), v[0], v[1]]
+                     for k, v in bad.items()), key=lambda x: (-x[2], x[0]))
+    return {"columns": cols, "rows": rows,
+            "nofit_columns": nofit_cols, "nofit": nofit,
+            "values": values,
+            "fits": [[k, fits[k]] for k in (FIT_EXACT, FIT_LATER, FIT_LOOSE) if fits[k]],
+            "reasons": [[k, reasons[k]] for k in (NOFIT_EMPTY, NOFIT_JUNK, NOFIT_UNK)
+                        if reasons[k]],
+            "total_cases": len(df), "fitted": fitted, "not_fitted": len(nofit),
+            "has_case_id": has_id, "kb_size": len(CATEGORY_MAP),
+            "pct_fitted": pct(fitted, len(df)),
+            "pct_not_fitted": pct(len(nofit), len(df))}
 
 
-def worklist_sheets(w, meta=None):
-    """The worklist as sheet specs - [{name, header, rows, widths}] - so the Python
-    and browser writers serialise exactly the same workbook."""
+def fit_sheets(w, meta=None):
+    """The fit as sheet specs - [{name, header, rows, widths}] - so the Python and
+    browser writers serialise exactly the same workbook."""
     meta = meta or {}
-    files = meta.get("files") or ""
-    note = ("Every case below needs its Category value corrected at source. "
-            "Find it with the file, sheet and row number: open your export and go "
-            "to that row. No member number, name or case text is reproduced here.")
+    note = ("Every case in the export is on 'All cases', fitted to one of your "
+            "categories or left blank with the reason why. 'Not fitted' is just "
+            "those cases, so they can be worked through on their own. Find any case "
+            "with the file, sheet and row number: open your export and go to that "
+            "row. Placeholder values are stripped from the category column - they "
+            "are counted on 'Values to fix' instead. No member number, name or case "
+            "text is reproduced here.")
     summary = [
         ["Cases in the export", w["total_cases"]],
-        ["Cases needing a category fix", w["flagged"]],
-        ["Share of the export", "%s%%" % _r(w["pct_flagged"], 1)],
+        ["Categories supplied", w["kb_size"]],
         ["", ""],
-        ["Problem", "Cases"],
-    ] + [[p_, c] for p_, c in w["summary"]] + [
+        ["Fitted to one of your categories", w["fitted"]],
+        ["Share fitted", "%s%%" % _r(w["pct_fitted"], 1)],
+    ] + [["   " + k, v] for k, v in w["fits"]] + [
         ["", ""],
-        ["Source file(s)", files],
+        ["Not fitted", w["not_fitted"]],
+        ["Share not fitted", "%s%%" % _r(w["pct_not_fitted"], 1)],
+    ] + [["   " + k, v] for k, v in w["reasons"]] + [
+        ["", ""],
+        ["Source file(s)", meta.get("files", "")],
         ["Generated", meta.get("generated", "")],
         ["", ""],
         ["How to use this", note],
     ]
+    vhdr = ["Category value", "Why it blocks a fit", "Cases affected", "First row in file"]
     return [
         {"name": "Summary", "header": ["Item", "Value"], "rows": summary,
-         "widths": [30, 74], "filter": False},
-        {"name": "Cases to fix", "header": w["columns"], "rows": w["rows"],
+         "widths": [46, 74], "filter": False},
+        {"name": "All cases", "header": w["columns"], "rows": w["rows"],
          "widths": _auto_widths(w["columns"], w["rows"]), "filter": True},
-        {"name": "Labels to fix",
-         "header": ["Category value", "Problem", "Cases affected", "First row in file"],
-         "rows": w["labels"],
-         "widths": _auto_widths(["Category value", "Problem", "Cases affected",
-                                 "First row in file"], w["labels"]),
-         "filter": True},
+        {"name": "Not fitted", "header": w["nofit_columns"], "rows": w["nofit"],
+         "widths": _auto_widths(w["nofit_columns"], w["nofit"]), "filter": True},
+        {"name": "Values to fix", "header": vhdr, "rows": w["values"],
+         "widths": _auto_widths(vhdr, w["values"]), "filter": True},
     ]
 
 
@@ -1064,5 +1117,5 @@ def run(df):
             "quality": data_quality(df),
             "deep_dives": all_deep_dives(df, vol),
             "cube": build_cube(df, vol),
-            "worklist": cleanup_worklist(df),
+            "fit": category_fit(df),
             "buckets": BUCKETS}

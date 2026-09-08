@@ -11,6 +11,49 @@ export function makeEngine(RULES) {
   const DRIVERS = RULES.drivers;
   const catnorm = s => String(s ?? "").replace(/\s+/g, " ").replace(/\s*\/\s*/g, "/").trim().toLowerCase();
   const CATEGORY_MAP = new Map(Object.entries(RULES.category_map).map(([k, v]) => [catnorm(k), v]));
+  const KB_NAMES = new Map(Object.keys(RULES.category_map).map(k => [catnorm(k), k]));
+  // a punctuation-blind key, so "Setup/Link Request - Google_iOS" still finds its
+  // category when the export writes it "Setup / Link Request  Google iOS". Built only
+  // because the names collide under it exactly zero times; a collision would make
+  // this a guess rather than a match.
+  const catloose = s => String(s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+  const KB_LOOSE = (() => {
+    const g = new Map();
+    for (const k of Object.keys(RULES.category_map)) {
+      const lk = catloose(k);
+      if (g.has(lk)) g.set(lk, null); else g.set(lk, k);
+    }
+    const out = new Map();
+    for (const [k, v] of g) if (v) out.set(k, v);
+    return out;
+  })();
+
+  // How a case was fitted to one of the supplied categories, and why it could not be.
+  const FIT_EXACT = "Exact match on the primary value";
+  const FIT_LATER = "Exact match on a later value in the same cell";
+  const FIT_LOOSE = "Matched after normalising spacing and punctuation";
+  const NOFIT_EMPTY = "The Category cell is empty";
+  const NOFIT_JUNK =
+    "The Category cell holds only placeholder values, so there is nothing to map";
+  const NOFIT_UNK = "No value in the cell is on the supplied category list";
+
+  /* Fit a case to one of the supplied categories, or say why not. Only the knowledge
+     base categories can come out of this - never a driver family, never a guess.
+     Values are tried in the order they appear, so the primary category still wins
+     whenever it is a real one; a later value is only reached when the primary is
+     not on the list. */
+  function fitCategory(tagsClean, tags) {
+    if (!tagsClean.length) return ["", "", (tags || []).length ? NOFIT_JUNK : NOFIT_EMPTY];
+    for (let i = 0; i < tagsClean.length; i++) {
+      const hit = KB_NAMES.get(catnorm(tagsClean[i]));
+      if (hit) return [hit, i === 0 ? FIT_EXACT : FIT_LATER, ""];
+    }
+    for (const t of tagsClean) {
+      const hit = KB_LOOSE.get(catloose(t));
+      if (hit) return [hit, FIT_LOOSE, ""];
+    }
+    return ["", "", NOFIT_UNK];
+  }
   const SIGNALS = Object.entries(RULES.signals).map(([k, p]) => [k, new RegExp(p, "i")]);
   const SUBJECT_RULES = RULES.subject_rules.map(([n, p]) => [n, new RegExp(p, "i")]);
   const TOP_DRIVERS = G.top_drivers;
@@ -125,6 +168,19 @@ export function makeEngine(RULES) {
      bucket rule: read the intent off the subject line instead. Only the matched
      keyword is ever surfaced - never the subject text, which can carry
      identifying detail. */
+  /* A hint for a case that could not be fitted: which driver family its own text
+     points at. Used only on the not-fitted sheet, and only ever emits a family name -
+     never the text it was read from, and never a category, because a family is not
+     specific enough to be one. Falls through to the description because a case with
+     no usable category often has no usable subject either. */
+  function suggestFamily(subject, description) {
+    for (const t of [subject, description]) {
+      const [fam] = bucketFromSubject(t);
+      if (fam) return fam;
+    }
+    return "";
+  }
+
   function bucketFromSubject(subject) {
     const t = ws(subject).toLowerCase();
     if (!t) return [null, null];
@@ -195,7 +251,13 @@ export function makeEngine(RULES) {
       // panel, which reports them against the raw cell they came from.
       r.tags_clean = r.tags.filter(t => !isJunkLabel(t));
       r.junk_tokens = r.tags.filter(t => isJunkLabel(t));
-      r.primary_category = r.tags_clean[0] || "";
+      // Fit the case to one of the supplied categories. The primary value still wins
+      // whenever it is a real category; only when it is not does a later value in the
+      // same cell get a look, so a case is no longer thrown away because someone typed
+      // a retired label in front of a good one.
+      const fit = fitCategory(r.tags_clean, r.tags);
+      r.kb_category = fit[0]; r.kb_fit = fit[1]; r.kb_reason = fit[2];
+      r.primary_category = r.kb_category || r.tags_clean[0] || "";
       const [b0, s0] = r.primary_category ? bucketSrc(r.primary_category) : [UNMAPPED, "none"];
       r.bucket = b0;
       r.bucket_source = s0;
@@ -503,77 +565,61 @@ export function makeEngine(RULES) {
 
   /* Category values the KB does not contain, plus labels that carry no meaning
      at all. This is the cleanup list, sized. */
-  /* Severity order: the first problem a case trips is the one worth naming. A case
-     with no category at all is a worse problem than one that merely fell outside the
-     knowledge base, and listing every problem per row makes the sheet unusable for
-     the thing it is for - sorting and filtering a cleanup queue. */
-  const WORKLIST_PROBLEMS = [
-    "No category value",
-    "Placeholder value only",
-    "Contains a placeholder value",
-    "Label not in the knowledge base",
-    "Placed from the subject line",
-    "Not mapped to a driver",
-  ];
-
-  function classifyCase(r) {
-    if (!r.tags.length) return ["No category value", ""];
-    if (r.junk_tokens.length && !r.tags_clean.length)
-      return ["Placeholder value only", r.junk_tokens.join("; ")];
-    if (r.junk_tokens.length)
-      return ["Contains a placeholder value", r.junk_tokens.join("; ")];
-    if (r.bucket_source === "rule")
-      return ["Label not in the knowledge base", r.primary_category];
-    if (r.bucket_source === "subject") return ["Placed from the subject line", ""];
-    if (r.bucket === UNMAPPED) return ["Not mapped to a driver", r.primary_category];
-    return [null, ""];
-  }
-
-  /* Every case whose Category value needs a human, as rows ready for a spreadsheet.
-     This is the one place the tool emits case-level records, because a cleanup queue
-     you cannot trace back to a row is not actionable. It carries the file, sheet and
-     row number to find the case in the export the user already has - never a member
-     number, a name or any free text. */
-  function cleanupWorklist(recs) {
+  /* Every case, fitted to one of the supplied categories or marked with the reason it
+     could not be. This is the one place the tool emits case-level records, because an
+     assignment you cannot trace back to a row is not checkable. It carries the file,
+     sheet and row number to find the case in the export the user already has - never a
+     member number, a name or any free text. Placeholder values are stripped from the
+     category column: they are not categories and have no business being shown as
+     though they were. */
+  function categoryFit(recs) {
     const hasId = recs.some(r => (r.case_id ?? "") !== "");
-    const cols = ["Source file", "Sheet", "Row in file"];
-    if (hasId) cols.push("Case number");
-    cols.push("Date", "Case origin", "Category cell (raw)", "Problem",
-              "Offending value(s)", "Counted under", "Placed by");
-    const placedBy = { kb: "Exact category match", rule: "Keyword rule on the category",
-                       subject: "Keyword rule on the subject", none: "Nothing matched" };
-    const probIdx = cols.indexOf("Problem");
-    const rows = [], labels = new Map(), counts = new Map();
+    const head = ["Source file", "Sheet", "Row in file"];
+    if (hasId) head.push("Case number");
+    head.push("Date", "Case origin", "Category values");
+    const cols = head.concat(["Fitted category", "Driver family", "How it was fitted",
+                              "Why not fitted"]);
+    const nofitCols = head.concat(["Why not fitted", "Suggested family (from subject)"]);
+
+    const rows = [], nofit = [], fits = new Map(), reasons = new Map(), bad = new Map();
     for (const r of recs) {
-      const [prob, bad] = classifyCase(r);
-      if (!prob) continue;
-      const row = [String(r._source_file ?? ""), String(r._source_sheet ?? ""),
-                   +(r._source_row || 0)];
-      if (hasId) row.push(String(r.case_id ?? ""));
-      row.push(r._date ? r._date.toISOString().slice(0, 10) : "",
-               String(r.case_origin ?? ""), String(r.category ?? ""), prob, bad,
-               String(r.bucket), placedBy[r.bucket_source] || r.bucket_source);
-      rows.push(row);
-      counts.set(prob, (counts.get(prob) || 0) + 1);
-      // one line per offending label, so the picklist can be fixed at source
-      let toks = bad ? bad.split("; ").filter(Boolean) : [];
-      if (!toks.length && prob === "No category value") toks = [""];
-      for (const tok of toks) {
-        const k = tok + "\u0000" + prob;
-        const e = labels.get(k);
+      const base = [String(r._source_file ?? ""), String(r._source_sheet ?? ""),
+                    +(r._source_row || 0)];
+      if (hasId) base.push(String(r.case_id ?? ""));
+      // the category column shows what is left after placeholders are dropped -
+      // never the placeholder itself
+      base.push(r._date ? r._date.toISOString().slice(0, 10) : "",
+                String(r.case_origin ?? ""), r.tags_clean.join(", "));
+      rows.push(base.concat([r.kb_category, r.kb_category ? r.bucket : "",
+                             r.kb_fit, r.kb_reason]));
+      if (r.kb_category) {
+        fits.set(r.kb_fit, (fits.get(r.kb_fit) || 0) + 1);
+        continue;
+      }
+      reasons.set(r.kb_reason, (reasons.get(r.kb_reason) || 0) + 1);
+      nofit.push(base.concat([r.kb_reason, suggestFamily(r.subject, r.description)]));
+      // every value standing between this case and a category, counted once per case
+      const toks = (r.tags_clean.length ? r.tags_clean : r.tags).length
+        ? (r.tags_clean.length ? r.tags_clean : r.tags) : [""];
+      for (const t of toks) {
+        const k = t || "(blank cell)";
+        const e = bad.get(k);
         if (e) e[2]++;
-        else labels.set(k, [tok || "(blank)", prob, 1, +(r._source_row || 0)]);
+        else bad.set(k, [k, (k !== "(blank cell)" && !isJunkLabel(k))
+          ? "not on the list" : "not a category value", 1, +(r._source_row || 0)]);
       }
     }
-    rows.sort((a, b) => WORKLIST_PROBLEMS.indexOf(a[probIdx]) -
-                        WORKLIST_PROBLEMS.indexOf(b[probIdx]) ||
-                        (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0) || a[2] - b[2]);
-    const lab = [...labels.values()].sort((a, b) => b[2] - a[2] ||
+    const values = [...bad.values()].sort((a, b) => b[2] - a[2] ||
       (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-    const summary = WORKLIST_PROBLEMS.filter(p => counts.get(p)).map(p => [p, counts.get(p)]);
-    return { columns: cols, rows, labels: lab, summary, total_cases: recs.length,
-             flagged: rows.length, has_case_id: hasId,
-             pct_flagged: pct(rows.length, recs.length) };
+    const fitted = rows.length - nofit.length;
+    const pick = (m, ks) => ks.filter(k => m.get(k)).map(k => [k, m.get(k)]);
+    return { columns: cols, rows, nofit_columns: nofitCols, nofit, values,
+             fits: pick(fits, [FIT_EXACT, FIT_LATER, FIT_LOOSE]),
+             reasons: pick(reasons, [NOFIT_EMPTY, NOFIT_JUNK, NOFIT_UNK]),
+             total_cases: recs.length, fitted, not_fitted: nofit.length,
+             has_case_id: hasId, kb_size: CATEGORY_MAP.size,
+             pct_fitted: pct(fitted, recs.length),
+             pct_not_fitted: pct(nofit.length, recs.length) };
   }
 
   function autoWidths(header, rows, cap) {
@@ -585,34 +631,45 @@ export function makeEngine(RULES) {
     return w;
   }
 
-  /* The worklist as sheet specs, so the Python and browser writers serialise
-     exactly the same workbook. */
-  function worklistSheets(w, meta) {
+  /* The fit as sheet specs, so the Python and browser writers serialise exactly the
+     same workbook. */
+  function fitSheets(w, meta) {
     meta = meta || {};
-    const note = "Every case below needs its Category value corrected at source. " +
-      "Find it with the file, sheet and row number: open your export and go to that " +
-      "row. No member number, name or case text is reproduced here.";
+    const note = "Every case in the export is on 'All cases', fitted to one of your " +
+      "categories or left blank with the reason why. 'Not fitted' is just those cases, " +
+      "so they can be worked through on their own. Find any case with the file, sheet " +
+      "and row number: open your export and go to that row. Placeholder values are " +
+      "stripped from the category column - they are counted on 'Values to fix' " +
+      "instead. No member number, name or case text is reproduced here.";
+    const f1v = n => (Math.round(n * 10) / 10).toFixed(1);
     const summary = [
       ["Cases in the export", w.total_cases],
-      ["Cases needing a category fix", w.flagged],
-      ["Share of the export", (Math.round(w.pct_flagged * 10) / 10).toFixed(1) + "%"],
+      ["Categories supplied", w.kb_size],
       ["", ""],
-      ["Problem", "Cases"],
-    ].concat(w.summary.map(x => [x[0], x[1]])).concat([
+      ["Fitted to one of your categories", w.fitted],
+      ["Share fitted", f1v(w.pct_fitted) + "%"],
+    ].concat(w.fits.map(x => ["   " + x[0], x[1]])).concat([
+      ["", ""],
+      ["Not fitted", w.not_fitted],
+      ["Share not fitted", f1v(w.pct_not_fitted) + "%"],
+    ]).concat(w.reasons.map(x => ["   " + x[0], x[1]])).concat([
       ["", ""],
       ["Source file(s)", meta.files || ""],
       ["Generated", meta.generated || ""],
       ["", ""],
       ["How to use this", note],
     ]);
-    const labHdr = ["Category value", "Problem", "Cases affected", "First row in file"];
+    const vhdr = ["Category value", "Why it blocks a fit", "Cases affected",
+                  "First row in file"];
     return [
       { name: "Summary", header: ["Item", "Value"], rows: summary,
-        widths: [30, 74], filter: false },
-      { name: "Cases to fix", header: w.columns, rows: w.rows,
+        widths: [46, 74], filter: false },
+      { name: "All cases", header: w.columns, rows: w.rows,
         widths: autoWidths(w.columns, w.rows), filter: true },
-      { name: "Labels to fix", header: labHdr, rows: w.labels,
-        widths: autoWidths(labHdr, w.labels), filter: true },
+      { name: "Not fitted", header: w.nofit_columns, rows: w.nofit,
+        widths: autoWidths(w.nofit_columns, w.nofit), filter: true },
+      { name: "Values to fix", header: vhdr, rows: w.values,
+        widths: autoWidths(vhdr, w.values), filter: true },
     ];
   }
 
@@ -1139,7 +1196,7 @@ export function makeEngine(RULES) {
   }
 
   return {
-    buildRecords, worklistSheets,
+    buildRecords, fitSheets,
     run(recs) {
       const dateCol = derive(recs);
       const volume = volumeSection(recs, dateCol);
@@ -1152,7 +1209,7 @@ export function makeEngine(RULES) {
                  quarterly: periodMovement(recs, volume, "Q", "quarter", topDrivers(volume)),
                },
                quality: dataQuality(recs), cube: buildCube(recs, volume),
-               worklist: cleanupWorklist(recs),
+               fit: categoryFit(recs),
                deep_dives: allDeepDives(recs, volume) };
     },
   };
