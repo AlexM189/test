@@ -131,19 +131,6 @@ def bucket_from_subject(subject):
     return None, None
 
 
-def suggest_family(subject, description):
-    """A hint for a case that could not be fitted: which driver family its own text
-    points at. Used only on the not-fitted sheet, and only ever emits a family name -
-    never the text it was read from, and never a category, because a family is not
-    specific enough to be one. Falls through to the description because a case with
-    no usable category often has no usable subject either."""
-    for t in (subject, description):
-        fam, _kw = bucket_from_subject(t)
-        if fam:
-            return fam
-    return ""
-
-
 def derive(df):
     df = df.copy()
     df["tags"] = df.get("category", "").apply(split_tags)
@@ -167,15 +154,19 @@ def derive(df):
     df["bucket"] = [b for b, _ in src]
     df["bucket_source"] = [s2 if s2 != "none" else "none" for _, s2 in src]
     df["inferred_keyword"] = ""
-    # anything the category field could not place gets a second pass over the subject
-    needs = df["bucket"] == UNMAPPED
-    if needs.any() and "subject" in df:
-        got = df.loc[needs, "subject"].apply(bucket_from_subject)
+    df.loc[df["bucket"] == UNMAPPED, "bucket_source"] = "none"
+    # Anything the category field could not place gets a pass over its own text:
+    # the subject first, then the description, because a case with no usable
+    # category very often has no usable subject either. A driver family is all this
+    # can honestly produce - it is never specific enough to name a category.
+    for field in ("subject", "description"):
+        needs = df["bucket"] == UNMAPPED
+        if not needs.any() or field not in df:
+            continue
+        got = df.loc[needs, field].apply(bucket_from_subject)
         df.loc[needs, "bucket"] = [b if b else UNMAPPED for b, _ in got]
-        df.loc[needs, "bucket_source"] = ["subject" if b else "none" for b, _ in got]
+        df.loc[needs, "bucket_source"] = [field if b else "none" for b, _ in got]
         df.loc[needs, "inferred_keyword"] = [k or "" for _, k in got]
-    elif needs.any():
-        df.loc[needs, "bucket_source"] = "none"
     df["tag_count"] = df["tags_clean"].apply(len)
     # signal flags evaluated over the whole tag list + subject (never the description body)
     hay = df.apply(lambda r: (" | ".join(r["tags_clean"]) + " | "
@@ -458,31 +449,46 @@ def inference_audit(df):
     from_rule = int(src.get("rule", 0))
     from_cat = from_kb + from_rule
     from_sub = int(src.get("subject", 0))
+    from_desc = int(src.get("description", 0))
+    from_text = from_sub + from_desc
     none = int(src.get("none", 0))
+    txt = df[df["bucket_source"].isin(["subject", "description"])]
     rows = []
-    if from_sub:
-        sub = df[df["bucket_source"] == "subject"]
-        for (b, kw), c in sub.groupby(["bucket", "inferred_keyword"]).size().items():
+    if from_text:
+        for (b, kw), c in txt.groupby(["bucket", "inferred_keyword"]).size().items():
             rows.append({"bucket": b, "keyword": kw, "count": int(c)})
         rows.sort(key=lambda r: (-r["count"], r["bucket"], r["keyword"]))
     by_bucket = []
-    if from_sub:
-        for b, c in df[df["bucket_source"] == "subject"]["bucket"].value_counts().items():
-            by_bucket.append({"label": b, "count": int(c), "pct": pct(int(c), from_sub)})
+    if from_text:
+        for b, c in txt["bucket"].value_counts().items():
+            by_bucket.append({"label": b, "count": int(c), "pct": pct(int(c), from_text)})
     return {"total": n, "from_category": from_cat, "from_kb": from_kb, "from_rule": from_rule,
             "pct_from_kb": pct(from_kb, n), "pct_from_rule": pct(from_rule, n),
-            "from_subject": from_sub, "unresolved": none,
-            "pct_from_subject": pct(from_sub, n), "pct_unresolved": pct(none, n),
+            "from_subject": from_sub, "from_description": from_desc, "from_text": from_text,
+            "unresolved": none,
+            "pct_from_subject": pct(from_text, n), "pct_from_text": pct(from_text, n),
+            "pct_unresolved": pct(none, n),
             "keywords": rows[:40], "by_bucket": by_bucket}
 
 
-def category_fit(df):
-    """Every case, fitted to one of the supplied categories or marked with the reason
-    it could not be.
+PLACED_SUBJ = "Family read from the subject"
+PLACED_DESC = "Family read from the description"
+NOPLACE     = "Nothing in the case text points at a family either"
 
-    This is the one place the tool emits case-level records, because an assignment
-    you cannot trace back to a row is not checkable. It carries the file, sheet and
-    row number to find the case in the export the user already has - never a member
+
+def category_fit(df):
+    """Every case placed as precisely as the data allows, or marked with the reason it
+    could not be placed at all.
+
+    Three tiers, and the distinction between them is the whole point. A case is
+    fitted to one of the supplied categories, or - failing that - to a driver family
+    read off its own text, which is coarser and says so; or it is left for a human.
+    A family is never written into the category column, because a family is not a
+    category and presenting one as the other is how a report starts lying.
+
+    This is the one place the tool emits case-level records, because a placement you
+    cannot trace back to a row is not checkable. It carries the file, sheet and row
+    number to find the case in the export the user already has - never a member
     number, a name or any free text. Placeholder values are stripped from the
     category column: they are not categories and have no business being shown as
     though they were."""
@@ -491,19 +497,18 @@ def category_fit(df):
     if has_id:
         head.append("Case number")
     head += ["Date", "Case origin", "Category values"]
-    cols = head + ["Fitted category", "Driver family", "How it was fitted", "Why not fitted"]
-    nofit_cols = head + ["Why not fitted", "Suggested family (from subject)"]
+    cols = head + ["Fitted category", "Driver family", "How it was placed", "Matched on",
+                   "Why no category"]
+    text_cols = head + ["Driver family", "Read from", "Matched on", "Why no category"]
+    none_cols = head + ["Why it could not be placed"]
 
-    raw = df["category"] if "category" in df else pd.Series([""] * len(df), index=df.index)
     date_txt = (df["_date"].dt.strftime("%Y-%m-%d").fillna("")
                 if "_date" in df else pd.Series([""] * len(df), index=df.index))
     origin = (df["case_origin"] if "case_origin" in df
               else pd.Series([""] * len(df), index=df.index))
-    subj = df["subject"] if "subject" in df else pd.Series([""] * len(df), index=df.index)
-    desc = (df["description"] if "description" in df
-            else pd.Series([""] * len(df), index=df.index))
 
-    rows, nofit, fits, reasons = [], [], Counter(), Counter()
+    rows, by_text, no_place = [], [], []
+    fits, reads, reasons = Counter(), Counter(), Counter()
     bad = defaultdict(lambda: [0, 0])          # offending value -> [cases, first row]
     for i in range(len(df)):
         r = df.iloc[i]
@@ -514,48 +519,65 @@ def category_fit(df):
         # the category column shows what is left after placeholders are dropped -
         # never the placeholder itself
         base += [str(date_txt.iloc[i]), str(origin.iloc[i]), ", ".join(r["tags_clean"])]
-        rows.append(base + [r["kb_category"], r["bucket"] if r["kb_category"] else "",
-                            r["kb_fit"], r["kb_reason"]])
+
         if r["kb_category"]:
             fits[r["kb_fit"]] += 1
+            rows.append(base + [r["kb_category"], r["bucket"], r["kb_fit"], "", ""])
             continue
-        reasons[r["kb_reason"]] += 1
-        nofit.append(base + [r["kb_reason"],
-                             suggest_family(subj.iloc[i], desc.iloc[i])])
-        # every value standing between this case and a category, counted once per case
+
+        # no category on the list: count what stood in the way, whichever tier follows
         for t in (r["tags_clean"] or r["tags"] or [""]):
             e = bad[t or "(blank cell)"]
             e[0] += 1
             if not e[1]:
                 e[1] = int(r.get("_source_row", 0) or 0)
 
-    fitted = len(rows) - len(nofit)
-    values = sorted(([k, ("not on the list" if k not in ("(blank cell)",) and
-                          not is_junk_label(k) else "not a category value"), v[0], v[1]]
+        srcf = r["bucket_source"]
+        if srcf in ("subject", "description"):
+            how = PLACED_SUBJ if srcf == "subject" else PLACED_DESC
+            reads[how] += 1
+            rows.append(base + ["", r["bucket"], how, r["inferred_keyword"], r["kb_reason"]])
+            by_text.append(base + [r["bucket"], "Subject" if srcf == "subject" else "Description",
+                                   r["inferred_keyword"], r["kb_reason"]])
+        else:
+            reasons[r["kb_reason"]] += 1
+            rows.append(base + ["", "", "", "", r["kb_reason"]])
+            no_place.append(base + [r["kb_reason"] + "; " + NOPLACE.lower()])
+
+    fitted = len(rows) - len(by_text) - len(no_place)
+    values = sorted(([k, ("not on the list" if k != "(blank cell)" and not is_junk_label(k)
+                          else "not a category value"), v[0], v[1]]
                      for k, v in bad.items()), key=lambda x: (-x[2], x[0]))
     return {"columns": cols, "rows": rows,
-            "nofit_columns": nofit_cols, "nofit": nofit,
+            "text_columns": text_cols, "by_text": by_text,
+            "none_columns": none_cols, "no_place": no_place,
             "values": values,
             "fits": [[k, fits[k]] for k in (FIT_EXACT, FIT_LATER, FIT_LOOSE) if fits[k]],
+            "reads": [[k, reads[k]] for k in (PLACED_SUBJ, PLACED_DESC) if reads[k]],
             "reasons": [[k, reasons[k]] for k in (NOFIT_EMPTY, NOFIT_JUNK, NOFIT_UNK)
                         if reasons[k]],
-            "total_cases": len(df), "fitted": fitted, "not_fitted": len(nofit),
-            "has_case_id": has_id, "kb_size": len(CATEGORY_MAP),
+            "total_cases": len(df), "fitted": fitted, "placed_by_text": len(by_text),
+            "not_placed": len(no_place), "has_case_id": has_id, "kb_size": len(CATEGORY_MAP),
             "pct_fitted": pct(fitted, len(df)),
-            "pct_not_fitted": pct(len(nofit), len(df))}
+            "pct_placed_by_text": pct(len(by_text), len(df)),
+            "pct_not_placed": pct(len(no_place), len(df))}
 
 
 def fit_sheets(w, meta=None):
     """The fit as sheet specs - [{name, header, rows, widths}] - so the Python and
     browser writers serialise exactly the same workbook."""
     meta = meta or {}
-    note = ("Every case in the export is on 'All cases', fitted to one of your "
-            "categories or left blank with the reason why. 'Not fitted' is just "
-            "those cases, so they can be worked through on their own. Find any case "
-            "with the file, sheet and row number: open your export and go to that "
-            "row. Placeholder values are stripped from the category column - they "
-            "are counted on 'Values to fix' instead. No member number, name or case "
-            "text is reproduced here.")
+    note = ("Every case in the export is on 'All cases'. Most carry a value from your "
+            "category list and are fitted to it. A case whose value is not on the list "
+            "gets a driver family read off its own text instead - coarser than a "
+            "category, so it is never written into the category column - and those "
+            "cases are also on 'Placed by text' with the term that matched, to be "
+            "checked. 'Cannot be placed' is what is left: neither the category cell "
+            "nor the case text says anything usable. Find any case with the file, "
+            "sheet and row number: open your export and go to that row. Placeholder "
+            "values are stripped from the category column - they are counted on "
+            "'Values to fix' instead. No member number, name or case text is "
+            "reproduced here.")
     summary = [
         ["Cases in the export", w["total_cases"]],
         ["Categories supplied", w["kb_size"]],
@@ -564,8 +586,12 @@ def fit_sheets(w, meta=None):
         ["Share fitted", "%s%%" % _r(w["pct_fitted"], 1)],
     ] + [["   " + k, v] for k, v in w["fits"]] + [
         ["", ""],
-        ["Not fitted", w["not_fitted"]],
-        ["Share not fitted", "%s%%" % _r(w["pct_not_fitted"], 1)],
+        ["Placed in a driver family from the case text", w["placed_by_text"]],
+        ["Share placed by text", "%s%%" % _r(w["pct_placed_by_text"], 1)],
+    ] + [["   " + k, v] for k, v in w["reads"]] + [
+        ["", ""],
+        ["Cannot be placed", w["not_placed"]],
+        ["Share not placed", "%s%%" % _r(w["pct_not_placed"], 1)],
     ] + [["   " + k, v] for k, v in w["reasons"]] + [
         ["", ""],
         ["Source file(s)", meta.get("files", "")],
@@ -579,8 +605,10 @@ def fit_sheets(w, meta=None):
          "widths": [46, 74], "filter": False},
         {"name": "All cases", "header": w["columns"], "rows": w["rows"],
          "widths": _auto_widths(w["columns"], w["rows"]), "filter": True},
-        {"name": "Not fitted", "header": w["nofit_columns"], "rows": w["nofit"],
-         "widths": _auto_widths(w["nofit_columns"], w["nofit"]), "filter": True},
+        {"name": "Placed by text", "header": w["text_columns"], "rows": w["by_text"],
+         "widths": _auto_widths(w["text_columns"], w["by_text"]), "filter": True},
+        {"name": "Cannot be placed", "header": w["none_columns"], "rows": w["no_place"],
+         "widths": _auto_widths(w["none_columns"], w["no_place"]), "filter": True},
         {"name": "Values to fix", "header": vhdr, "rows": w["values"],
          "widths": _auto_widths(vhdr, w["values"]), "filter": True},
     ]

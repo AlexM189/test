@@ -838,18 +838,24 @@ def build(res, meta):
     # ---------------- 1. volume
     A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>')
     INF = res.get("inference") or {}
-    if INF.get("from_subject") or INF.get("unresolved"):
-        A('<div class="callout info"><div class="t">Cases bucketed from the subject line</div>'
-          '<b>%d of %d cases (%.1f%%)</b> had no usable Category value — blank, or a label that '
-          'matched no bucket rule — so their bucket was inferred from the subject line instead. '
-          '%s A further <b>%d case(s) (%.1f%%)</b> could not be placed from either field and stay '
+    if INF.get("from_text") or INF.get("unresolved"):
+        A('<div class="callout info"><div class="t">Cases bucketed from the case text</div>'
+          '<b>%s of %s cases (%.1f%%)</b> had no usable Category value — blank, or a label that '
+          'matched no bucket rule — so their bucket was read off the case text instead: the '
+          'subject first (%s case[s]), then the description (%s case[s]). This gives a driver '
+          'family, never a category — the text is not specific enough to name one. '
+          '%s A further <b>%s case(s) (%.1f%%)</b> could not be placed from either field and stay '
           'in Other / Unmapped. Every inferred assignment, and the keyword that triggered it, is '
           'listed in Appendix A.</div>'
-          % (INF.get("from_subject", 0), INF.get("total", 0), INF.get("pct_from_subject", 0.0),
-             ("They landed in: " + "; ".join("%s (%d)" % (ESC(b["label"]), b["count"])
+          % ("{:,}".format(INF.get("from_text", 0)), "{:,}".format(INF.get("total", 0)),
+             INF.get("pct_from_text", 0.0),
+             "{:,}".format(INF.get("from_subject", 0)),
+             "{:,}".format(INF.get("from_description", 0)),
+             ("They landed in: " + "; ".join("%s (%s)" % (ESC(b["label"]),
+                                                          "{:,}".format(b["count"]))
                                              for b in INF.get("by_bucket", [])) + ".")
              if INF.get("by_bucket") else "",
-             INF.get("unresolved", 0), INF.get("pct_unresolved", 0.0)))
+             "{:,}".format(INF.get("unresolved", 0)), INF.get("pct_unresolved", 0.0)))
     A('<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its '
       'Category field — and that primary label is mapped to a reporting bucket. Shares therefore '
       'sum to 100%. The full label-to-bucket mapping is in the appendix; secondary topic tags are '
@@ -921,19 +927,22 @@ def build(res, meta):
                  % (Q["junk_distinct"], Q["unknown_distinct"]))][:5]) + "</div>")
         FIT = res.get("fit") or {}
         if FIT.get("total_cases"):
-            A('<div class="callout"><div class="t">Every case, fitted to one of your '
-              'categories</div><b>%s of %s cases (%.1f%%)</b> carry a value that is on the '
-              '%d-category list; <b>%s (%.1f%%)</b> could not be fitted. '
-              '<b>category-fit.xlsx</b>, alongside this report, has the case-by-case '
-              'assignment: <i>All cases</i> gives every case its fitted category and how it '
-              'was matched, <i>Not fitted</i> is just the cases that need a decision with the '
-              'reason for each, and <i>Values to fix</i> counts the values standing in the '
-              'way. Placeholder values are stripped from the category column — they are not '
-              'categories. It carries no member number, name or case text: the row number '
-              'points at the line in the export you already have.</div>'
+            A('<div class="callout"><div class="t">Where every case ended up</div>'
+              '<b>%s of %s cases (%.1f%%)</b> carry a value that is on the %d-category list '
+              'and are fitted to it. A further <b>%s (%.1f%%)</b> carry no value from the '
+              'list but say enough in their own text to place in a driver family — coarser '
+              'than a category, so it is never written into the category column. <b>%s '
+              '(%.1f%%)</b> cannot be placed at all. <b>category-fit.xlsx</b>, alongside this '
+              'report, has the case-by-case placement: <i>All cases</i>, <i>Placed by text</i> '
+              'with the term that matched so each one can be checked, <i>Cannot be placed</i> '
+              'with the reason for each, and <i>Values to fix</i>. Placeholder values are '
+              'stripped from the category column — they are not categories. It carries no '
+              'member number, name or case text: the row number points at the line in the '
+              'export you already have.</div>'
               % ("{:,}".format(FIT["fitted"]), "{:,}".format(FIT["total_cases"]),
                  FIT["pct_fitted"], FIT.get("kb_size", 0),
-                 "{:,}".format(FIT["not_fitted"]), FIT["pct_not_fitted"]))
+                 "{:,}".format(FIT["placed_by_text"]), FIT["pct_placed_by_text"],
+                 "{:,}".format(FIT["not_placed"]), FIT["pct_not_placed"]))
 
         if Q.get("junk_labels") or Q.get("unknown_labels"):
             A("<h4>Where these values come from</h4>")
@@ -1196,15 +1205,18 @@ def build(res, meta):
                 % (ESC(i["label"]), ESC(i["bucket"]), i["count"]) for i in MAP["items"])
       + "</tbody></table></div>")
     if INF.get("keywords"):
-        A("<h3>Subject-line inference (cases with no usable category)</h3>")
-        A("<p>Where the Category field was blank or unrecognised, the subject line was matched "
-          "against the same ordered rules. The keyword below is the exact text that triggered "
-          "each assignment — the subject itself is never shown, since it can carry identifying "
-          "detail.</p>")
-        A('<div class="scroll"><table><thead><tr><th>Matched keyword in subject</th>'
+        A("<h3>Text inference (cases with no usable category)</h3>")
+        A("<p>Where the Category field was blank or unrecognised, the subject line and then "
+          "the description were matched against the same ordered rules. The keyword below is "
+          "the exact text that triggered each assignment — the subject and description "
+          "themselves are never shown, since they can carry identifying detail. These "
+          "assignments are a driver family, never a category: the case-by-case list, with the "
+          "term that matched each one, is on the <i>Placed by text</i> sheet of the category "
+          "fit workbook.</p>")
+        A('<div class="scroll"><table><thead><tr><th>Matched keyword in the case text</th>'
           '<th>Assigned bucket</th><th class="n">Cases</th></tr></thead><tbody>'
-          + "".join('<tr><td class="mono">%s</td><td>%s</td><td class="n">%d</td></tr>'
-                    % (ESC(k["keyword"]), ESC(k["bucket"]), k["count"])
+          + "".join('<tr><td class="mono">%s</td><td>%s</td><td class="n">%s</td></tr>'
+                    % (ESC(k["keyword"]), ESC(k["bucket"]), "{:,}".format(k["count"]))
                     for k in INF["keywords"]) + "</tbody></table></div>")
     A("</section>")
 

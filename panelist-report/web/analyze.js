@@ -262,10 +262,15 @@ export function makeEngine(RULES) {
       r.bucket = b0;
       r.bucket_source = s0;
       r.inferred_keyword = "";
-      if (r.bucket === UNMAPPED) {
-        const [b, kw] = bucketFromSubject(r.subject);
-        if (b) { r.bucket = b; r.bucket_source = "subject"; r.inferred_keyword = kw; }
-        else r.bucket_source = "none";
+      if (r.bucket === UNMAPPED) r.bucket_source = "none";
+      // Anything the category field could not place gets a pass over its own text: the
+      // subject first, then the description, because a case with no usable category
+      // very often has no usable subject either. A driver family is all this can
+      // honestly produce - it is never specific enough to name a category.
+      for (const field of ["subject", "description"]) {
+        if (r.bucket !== UNMAPPED) break;
+        const [b, kw] = bucketFromSubject(r[field]);
+        if (b) { r.bucket = b; r.bucket_source = field; r.inferred_keyword = kw; }
       }
       r.tag_count = r.tags_clean.length;
       const hay = (r.tags_clean.join(" | ") + " | " + (r.subject || "")).toLowerCase();
@@ -537,51 +542,68 @@ export function makeEngine(RULES) {
 
   function inferenceAudit(recs) {
     const n = recs.length;
-    let fromKb = 0, fromRule = 0, fromSub = 0, none = 0;
+    let fromKb = 0, fromRule = 0, fromSub = 0, fromDesc = 0, none = 0;
     const kw = new Map(), byB = new Map();
     for (const r of recs) {
       if (r.bucket_source === "kb") fromKb++;
       else if (r.bucket_source === "rule") fromRule++;
-      else if (r.bucket_source === "subject") {
-        fromSub++;
+      else if (r.bucket_source === "subject" || r.bucket_source === "description") {
+        if (r.bucket_source === "subject") fromSub++; else fromDesc++;
         const k = r.bucket + "\u0000" + r.inferred_keyword;
         kw.set(k, (kw.get(k) || 0) + 1);
         byB.set(r.bucket, (byB.get(r.bucket) || 0) + 1);
       } else none++;
     }
+    const fromText = fromSub + fromDesc;
     const keywords = [...kw.entries()].map(([k, count]) => {
       const [bucket, keyword] = k.split("\u0000");
       return { bucket, keyword, count };
     }).sort((a, b) => b.count - a.count || a.bucket.localeCompare(b.bucket) ||
       a.keyword.localeCompare(b.keyword)).slice(0, 40);
     const by_bucket = [...byB.entries()].sort((a, b) => b[1] - a[1])
-      .map(([label, count]) => ({ label, count, pct: pct(count, fromSub) }));
+      .map(([label, count]) => ({ label, count, pct: pct(count, fromText) }));
     return { total: n, from_category: fromKb + fromRule, from_kb: fromKb, from_rule: fromRule,
              pct_from_kb: pct(fromKb, n), pct_from_rule: pct(fromRule, n),
-             from_subject: fromSub, unresolved: none,
-             pct_from_subject: pct(fromSub, n), pct_unresolved: pct(none, n),
-             keywords, by_bucket };
+             from_subject: fromSub, from_description: fromDesc, from_text: fromText,
+             unresolved: none,
+             pct_from_subject: pct(fromText, n), pct_from_text: pct(fromText, n),
+             pct_unresolved: pct(none, n), keywords, by_bucket };
   }
 
   /* Category values the KB does not contain, plus labels that carry no meaning
      at all. This is the cleanup list, sized. */
-  /* Every case, fitted to one of the supplied categories or marked with the reason it
-     could not be. This is the one place the tool emits case-level records, because an
-     assignment you cannot trace back to a row is not checkable. It carries the file,
-     sheet and row number to find the case in the export the user already has - never a
-     member number, a name or any free text. Placeholder values are stripped from the
-     category column: they are not categories and have no business being shown as
-     though they were. */
+  const PLACED_SUBJ = "Family read from the subject";
+  const PLACED_DESC = "Family read from the description";
+  const NOPLACE = "Nothing in the case text points at a family either";
+
+  /* Every case placed as precisely as the data allows, or marked with the reason it
+     could not be placed at all.
+
+     Three tiers, and the distinction between them is the whole point. A case is fitted
+     to one of the supplied categories, or - failing that - to a driver family read off
+     its own text, which is coarser and says so; or it is left for a human. A family is
+     never written into the category column, because a family is not a category and
+     presenting one as the other is how a report starts lying.
+
+     This is the one place the tool emits case-level records, because a placement you
+     cannot trace back to a row is not checkable. It carries the file, sheet and row
+     number to find the case in the export the user already has - never a member number,
+     a name or any free text. Placeholder values are stripped from the category column:
+     they are not categories and have no business being shown as though they were. */
   function categoryFit(recs) {
     const hasId = recs.some(r => (r.case_id ?? "") !== "");
     const head = ["Source file", "Sheet", "Row in file"];
     if (hasId) head.push("Case number");
     head.push("Date", "Case origin", "Category values");
-    const cols = head.concat(["Fitted category", "Driver family", "How it was fitted",
-                              "Why not fitted"]);
-    const nofitCols = head.concat(["Why not fitted", "Suggested family (from subject)"]);
+    const cols = head.concat(["Fitted category", "Driver family", "How it was placed",
+                              "Matched on", "Why no category"]);
+    const textCols = head.concat(["Driver family", "Read from", "Matched on",
+                                  "Why no category"]);
+    const noneCols = head.concat(["Why it could not be placed"]);
 
-    const rows = [], nofit = [], fits = new Map(), reasons = new Map(), bad = new Map();
+    const rows = [], byText = [], noPlace = [];
+    const fits = new Map(), reads = new Map(), reasons = new Map(), bad = new Map();
+    const bump = (m, k) => m.set(k, (m.get(k) || 0) + 1);
     for (const r of recs) {
       const base = [String(r._source_file ?? ""), String(r._source_sheet ?? ""),
                     +(r._source_row || 0)];
@@ -590,36 +612,49 @@ export function makeEngine(RULES) {
       // never the placeholder itself
       base.push(r._date ? r._date.toISOString().slice(0, 10) : "",
                 String(r.case_origin ?? ""), r.tags_clean.join(", "));
-      rows.push(base.concat([r.kb_category, r.kb_category ? r.bucket : "",
-                             r.kb_fit, r.kb_reason]));
+
       if (r.kb_category) {
-        fits.set(r.kb_fit, (fits.get(r.kb_fit) || 0) + 1);
+        bump(fits, r.kb_fit);
+        rows.push(base.concat([r.kb_category, r.bucket, r.kb_fit, "", ""]));
         continue;
       }
-      reasons.set(r.kb_reason, (reasons.get(r.kb_reason) || 0) + 1);
-      nofit.push(base.concat([r.kb_reason, suggestFamily(r.subject, r.description)]));
-      // every value standing between this case and a category, counted once per case
-      const toks = (r.tags_clean.length ? r.tags_clean : r.tags).length
-        ? (r.tags_clean.length ? r.tags_clean : r.tags) : [""];
-      for (const t of toks) {
+      // no category on the list: count what stood in the way, whichever tier follows
+      const toks = (r.tags_clean.length ? r.tags_clean : r.tags);
+      for (const t of (toks.length ? toks : [""])) {
         const k = t || "(blank cell)";
         const e = bad.get(k);
         if (e) e[2]++;
         else bad.set(k, [k, (k !== "(blank cell)" && !isJunkLabel(k))
           ? "not on the list" : "not a category value", 1, +(r._source_row || 0)]);
       }
+
+      const srcf = r.bucket_source;
+      if (srcf === "subject" || srcf === "description") {
+        const how = srcf === "subject" ? PLACED_SUBJ : PLACED_DESC;
+        bump(reads, how);
+        rows.push(base.concat(["", r.bucket, how, r.inferred_keyword, r.kb_reason]));
+        byText.push(base.concat([r.bucket, srcf === "subject" ? "Subject" : "Description",
+                                 r.inferred_keyword, r.kb_reason]));
+      } else {
+        bump(reasons, r.kb_reason);
+        rows.push(base.concat(["", "", "", "", r.kb_reason]));
+        noPlace.push(base.concat([r.kb_reason + "; " + NOPLACE.toLowerCase()]));
+      }
     }
     const values = [...bad.values()].sort((a, b) => b[2] - a[2] ||
       (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
-    const fitted = rows.length - nofit.length;
+    const fitted = rows.length - byText.length - noPlace.length;
     const pick = (m, ks) => ks.filter(k => m.get(k)).map(k => [k, m.get(k)]);
-    return { columns: cols, rows, nofit_columns: nofitCols, nofit, values,
+    return { columns: cols, rows, text_columns: textCols, by_text: byText,
+             none_columns: noneCols, no_place: noPlace, values,
              fits: pick(fits, [FIT_EXACT, FIT_LATER, FIT_LOOSE]),
+             reads: pick(reads, [PLACED_SUBJ, PLACED_DESC]),
              reasons: pick(reasons, [NOFIT_EMPTY, NOFIT_JUNK, NOFIT_UNK]),
-             total_cases: recs.length, fitted, not_fitted: nofit.length,
-             has_case_id: hasId, kb_size: CATEGORY_MAP.size,
+             total_cases: recs.length, fitted, placed_by_text: byText.length,
+             not_placed: noPlace.length, has_case_id: hasId, kb_size: CATEGORY_MAP.size,
              pct_fitted: pct(fitted, recs.length),
-             pct_not_fitted: pct(nofit.length, recs.length) };
+             pct_placed_by_text: pct(byText.length, recs.length),
+             pct_not_placed: pct(noPlace.length, recs.length) };
   }
 
   function autoWidths(header, rows, cap) {
@@ -635,12 +670,15 @@ export function makeEngine(RULES) {
      same workbook. */
   function fitSheets(w, meta) {
     meta = meta || {};
-    const note = "Every case in the export is on 'All cases', fitted to one of your " +
-      "categories or left blank with the reason why. 'Not fitted' is just those cases, " +
-      "so they can be worked through on their own. Find any case with the file, sheet " +
-      "and row number: open your export and go to that row. Placeholder values are " +
-      "stripped from the category column - they are counted on 'Values to fix' " +
-      "instead. No member number, name or case text is reproduced here.";
+    const note = "Every case in the export is on 'All cases'. Most carry a value from " +
+      "your category list and are fitted to it. A case whose value is not on the list " +
+      "gets a driver family read off its own text instead - coarser than a category, so " +
+      "it is never written into the category column - and those cases are also on " +
+      "'Placed by text' with the term that matched, to be checked. 'Cannot be placed' is " +
+      "what is left: neither the category cell nor the case text says anything usable. " +
+      "Find any case with the file, sheet and row number: open your export and go to that " +
+      "row. Placeholder values are stripped from the category column - they are counted " +
+      "on 'Values to fix' instead. No member number, name or case text is reproduced here.";
     const f1v = n => (Math.round(n * 10) / 10).toFixed(1);
     const summary = [
       ["Cases in the export", w.total_cases],
@@ -650,8 +688,12 @@ export function makeEngine(RULES) {
       ["Share fitted", f1v(w.pct_fitted) + "%"],
     ].concat(w.fits.map(x => ["   " + x[0], x[1]])).concat([
       ["", ""],
-      ["Not fitted", w.not_fitted],
-      ["Share not fitted", f1v(w.pct_not_fitted) + "%"],
+      ["Placed in a driver family from the case text", w.placed_by_text],
+      ["Share placed by text", f1v(w.pct_placed_by_text) + "%"],
+    ]).concat(w.reads.map(x => ["   " + x[0], x[1]])).concat([
+      ["", ""],
+      ["Cannot be placed", w.not_placed],
+      ["Share not placed", f1v(w.pct_not_placed) + "%"],
     ]).concat(w.reasons.map(x => ["   " + x[0], x[1]])).concat([
       ["", ""],
       ["Source file(s)", meta.files || ""],
@@ -666,8 +708,10 @@ export function makeEngine(RULES) {
         widths: [46, 74], filter: false },
       { name: "All cases", header: w.columns, rows: w.rows,
         widths: autoWidths(w.columns, w.rows), filter: true },
-      { name: "Not fitted", header: w.nofit_columns, rows: w.nofit,
-        widths: autoWidths(w.nofit_columns, w.nofit), filter: true },
+      { name: "Placed by text", header: w.text_columns, rows: w.by_text,
+        widths: autoWidths(w.text_columns, w.by_text), filter: true },
+      { name: "Cannot be placed", header: w.none_columns, rows: w.no_place,
+        widths: autoWidths(w.none_columns, w.no_place), filter: true },
       { name: "Values to fix", header: vhdr, rows: w.values,
         widths: autoWidths(vhdr, w.values), filter: true },
     ];

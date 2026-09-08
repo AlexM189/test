@@ -764,16 +764,19 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
     // 1. volume
     A('<section class="card"><h2><span class="secnum">1</span>Ticket volume &amp; category breakdown</h2>');
     const INF = res.inference || {};
-    if (INF.from_subject || INF.unresolved) {
-      A('<div class="callout info"><div class="t">Cases bucketed from the subject line</div>' +
-        `<b>${INF.from_subject} of ${INF.total} cases (${f1(INF.pct_from_subject)}%)</b> had no ` +
-        "usable Category value — blank, or a label that matched no bucket rule — so their bucket " +
-        "was inferred from the subject line instead. " +
+    if (INF.from_text || INF.unresolved) {
+      A('<div class="callout info"><div class="t">Cases bucketed from the case text</div>' +
+        `<b>${th(INF.from_text)} of ${th(INF.total)} cases (${f1(INF.pct_from_text)}%)</b> had ` +
+        "no usable Category value — blank, or a label that matched no bucket rule — so their " +
+        "bucket was read off the case text instead: the subject first " +
+        `(${th(INF.from_subject)} case[s]), then the description ` +
+        `(${th(INF.from_description)} case[s]). This gives a driver family, never a category — ` +
+        "the text is not specific enough to name one. " +
         ((INF.by_bucket || []).length ? "They landed in: " +
-          INF.by_bucket.map(b => `${ESC(b.label)} (${b.count})`).join("; ") + ". " : "") +
-        `A further <b>${INF.unresolved} case(s) (${f1(INF.pct_unresolved)}%)</b> could not be ` +
-        "placed from either field and stay in Other / Unmapped. Every inferred assignment, and " +
-        "the keyword that triggered it, is listed in Appendix A.</div>");
+          INF.by_bucket.map(b => `${ESC(b.label)} (${th(b.count)})`).join("; ") + ". " : "") +
+        `A further <b>${th(INF.unresolved)} case(s) (${f1(INF.pct_unresolved)}%)</b> could not ` +
+        "be placed from either field and stay in Other / Unmapped. Every inferred assignment, " +
+        "and the keyword that triggered it, is listed in Appendix A.</div>");
     }
     A("<p>Every case is assigned to exactly one <b>primary category</b> — the first label in its " +
       "Category field — and that primary label is mapped to a reporting bucket. Shares therefore " +
@@ -836,17 +839,19 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         `<div class="v num">${v}</div><div class="d">${d}</div></div>`).join("") + "</div>");
       const FIT = res.fit || {};
       if (FIT.total_cases) {
-        A('<div class="callout"><div class="t">Every case, fitted to one of your ' +
-          `categories</div><b>${th(FIT.fitted)} of ${th(FIT.total_cases)} cases ` +
-          `(${f1(FIT.pct_fitted)}%)</b> carry a value that is on the ${FIT.kb_size || 0}-` +
-          `category list; <b>${th(FIT.not_fitted)} (${f1(FIT.pct_not_fitted)}%)</b> could ` +
-          'not be fitted. The <b>category fit (.xlsx)</b> you can download from the builder ' +
-          'has the case-by-case assignment: <i>All cases</i> gives every case its fitted ' +
-          'category and how it was matched, <i>Not fitted</i> is just the cases that need a ' +
-          'decision with the reason for each, and <i>Values to fix</i> counts the values ' +
-          'standing in the way. Placeholder values are stripped from the category column — ' +
-          'they are not categories. It carries no member number, name or case text: the row ' +
-          'number points at the line in the export you already have.</div>');
+        A('<div class="callout"><div class="t">Where every case ended up</div>' +
+          `<b>${th(FIT.fitted)} of ${th(FIT.total_cases)} cases (${f1(FIT.pct_fitted)}%)</b> ` +
+          `carry a value that is on the ${FIT.kb_size || 0}-category list and are fitted to ` +
+          `it. A further <b>${th(FIT.placed_by_text)} (${f1(FIT.pct_placed_by_text)}%)</b> ` +
+          'carry no value from the list but say enough in their own text to place in a ' +
+          'driver family — coarser than a category, so it is never written into the category ' +
+          `column. <b>${th(FIT.not_placed)} (${f1(FIT.pct_not_placed)}%)</b> cannot be placed ` +
+          'at all. The <b>category fit (.xlsx)</b> you can download from the builder has the ' +
+          'case-by-case placement: <i>All cases</i>, <i>Placed by text</i> with the term that ' +
+          'matched so each one can be checked, <i>Cannot be placed</i> with the reason for ' +
+          'each, and <i>Values to fix</i>. Placeholder values are stripped from the category ' +
+          'column — they are not categories. It carries no member number, name or case text: ' +
+          'the row number points at the line in the export you already have.</div>');
       }
       if ((Q.junk_labels || []).length || (Q.unknown_labels || []).length) {
         A("<h4>Where these values come from</h4>");
@@ -1097,14 +1102,17 @@ export function makeRenderer(RULES, CSS, RUNTIME_JS) {
         `<tr><td class="mono">${ESC(i.label)}</td><td>${ESC(i.bucket)}</td>` +
         `<td class="n">${i.count}</td></tr>`).join("") + "</tbody></table></div>");
     if ((INF.keywords || []).length) {
-      A("<h3>Subject-line inference (cases with no usable category)</h3>");
-      A("<p>Where the Category field was blank or unrecognised, the subject line was matched " +
-        "against the same ordered rules. The keyword below is the exact text that triggered each " +
-        "assignment — the subject itself is never shown, since it can carry identifying detail.</p>");
-      A('<div class="scroll"><table><thead><tr><th>Matched keyword in subject</th>' +
+      A("<h3>Text inference (cases with no usable category)</h3>");
+      A("<p>Where the Category field was blank or unrecognised, the subject line and then the " +
+        "description were matched against the same ordered rules. The keyword below is the " +
+        "exact text that triggered each assignment — the subject and description themselves " +
+        "are never shown, since they can carry identifying detail. These assignments are a " +
+        "driver family, never a category: the case-by-case list, with the term that matched " +
+        "each one, is on the <i>Placed by text</i> sheet of the category fit workbook.</p>");
+      A('<div class="scroll"><table><thead><tr><th>Matched keyword in the case text</th>' +
         '<th>Assigned bucket</th><th class="n">Cases</th></tr></thead><tbody>' +
         INF.keywords.map(k => `<tr><td class="mono">${ESC(k.keyword)}</td>` +
-          `<td>${ESC(k.bucket)}</td><td class="n">${k.count}</td></tr>`).join("") +
+          `<td>${ESC(k.bucket)}</td><td class="n">${th(k.count)}</td></tr>`).join("") +
         "</tbody></table></div>");
     }
     A("</section>");

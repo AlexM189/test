@@ -121,9 +121,9 @@ async function run() {
     $("pptBtn").classList.remove("hidden");
     const xb = $("xlsxBtn");
     xb.classList.remove("hidden");
-    xb.querySelector(".n").textContent = res.fit.not_fitted
-      ? res.fit.not_fitted.toLocaleString("en-US") + " not fitted"
-      : "all fitted";
+    xb.querySelector(".n").textContent = res.fit.not_placed
+      ? res.fit.not_placed.toLocaleString("en-US") + " unplaced"
+      : "all placed";
 
     const skipped = prov.filter(p => p.status !== "loaded").length;
     setStatus(recs.length.toLocaleString("en-US") + " case(s) analysed from " +
@@ -169,8 +169,9 @@ async function downloadFit() {
     saveBlob(bytes,
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       "category-fit-" + new Date().toISOString().slice(0, 10) + ".xlsx");
-    setStatus(fit.fitted.toLocaleString("en-US") + " case(s) fitted to a category, " +
-      fit.not_fitted.toLocaleString("en-US") + " not fitted.", "done");
+    const n = x => x.toLocaleString("en-US");
+    setStatus(n(fit.fitted) + " fitted to a category, " + n(fit.placed_by_text) +
+      " placed by text, " + n(fit.not_placed) + " left for a human.", "done");
   } catch (e) {
     showError("Could not build the category fit", e && e.message ? e.message : String(e));
   }

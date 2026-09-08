@@ -55,7 +55,9 @@ def main(argv):
     print("  forecast     : %s" % res["forecast"]["method"])
     print("  fitted       : %d of %d case(s) to a supplied category (%.1f%%)"
           % (fit["fitted"], fit["total_cases"], fit["pct_fitted"]))
-    print("  not fitted   : %d case(s) (%.1f%%)" % (fit["not_fitted"], fit["pct_not_fitted"]))
+    print("  by text      : %d case(s) placed in a family from their own text (%.1f%%)"
+          % (fit["placed_by_text"], fit["pct_placed_by_text"]))
+    print("  not placed   : %d case(s) (%.1f%%)" % (fit["not_placed"], fit["pct_not_placed"]))
     print("\nWrote %s (%.1f KB)" % (out, os.path.getsize(out) / 1024))
     print("Wrote %s (%.1f KB)" % (fit_path, os.path.getsize(fit_path) / 1024))
 

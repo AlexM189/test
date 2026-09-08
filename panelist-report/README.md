@@ -119,20 +119,21 @@ PowerPoint, and which python-pptx is too lenient to catch.
 
 ## Category fit
 
-Every case is fitted to one of the supplied categories, or marked with the reason
-it could not be. `analyze.category_fit` writes four sheets (`xlsx.py` in the CLI,
-`web/xlsx.js` in the builder — the same sheet spec, so the two workbooks are
-content-identical):
+Every case is placed as precisely as the data allows, in three tiers.
+`analyze.category_fit` writes five sheets (`xlsx.py` in the CLI, `web/xlsx.js` in
+the builder — the same sheet spec, so the two workbooks are content-identical):
 
 | Sheet | What it holds |
 |---|---|
-| Summary | How many cases fitted, by which route, and how many did not, by reason |
-| All cases | Every case: source file, sheet, **row number in the file**, date, origin, its category values, the category it was fitted to, the driver family, and how it was matched |
-| Not fitted | Only the cases needing a decision, each with its reason and a suggested family read off its own text |
+| Summary | The three tiers with their counts, split by how each was reached |
+| All cases | Every case: source file, sheet, **row number in the file**, date, origin, its category values, the fitted category, the driver family, how it was placed and the term that matched |
+| Placed by text | Only the cases with no category on the list that a family could still be read for — with the field it was read from and the term that matched, so each one can be checked |
+| Cannot be placed | What is left, each with its reason |
 | Values to fix | Every value standing between a case and a category, with case counts |
 
-`fit_category` tries each value in the cell in order and returns a knowledge-base
-category or nothing — never a driver family, never a guess:
+**Tier 1 — fitted to a supplied category.** `fit_category` tries each value in the
+cell in order and returns a knowledge-base category or nothing — never a driver
+family, never a guess:
 
 1. **Exact match on the primary value** — the first value is a real category.
 2. **Exact match on a later value in the same cell** — the primary is not on the
@@ -143,21 +144,27 @@ category or nothing — never a driver family, never a guess:
    Built only because the 442 names collide under that key exactly zero times; a
    collision would make it a guess.
 
-Otherwise the case is not fitted, with one of three reasons: the cell is empty, it
-holds only placeholder values, or no value in it is on the list. The category
-column shows the values with placeholders removed — `1` is not a category and is
-not displayed as one; it is counted on *Values to fix* instead.
+**Tier 2 — placed in a driver family from the case text.** With no category on the
+list, the subject and then the description are matched against the ordered
+`subject_rules`. This yields a family, which is coarser than a category and is
+never written into the category column — presenting one as the other is how a
+report starts lying. The matched term travels with the row so the placement can be
+audited; the text itself never does.
 
-The same order decides the primary category everywhere else in the report, so a
-case that fits by a later value is counted under that category's family rather
-than falling into *Other / Unmapped*.
+**Tier 3 — cannot be placed.** One of three reasons: the cell is empty, it holds
+only placeholder values, or nothing in it is on the list — and nothing in the case
+text points at a family either.
+
+The category column shows the values with placeholders removed — `1` is not a
+category and is not displayed as one; it is counted on *Values to fix* instead.
+The same order decides the bucket everywhere else in the report, so the workbook
+and the report always agree on where a case landed.
 
 This is the only case-level output. It carries no member number, name or case
 text: the file/sheet/row pointer is what makes a case findable, in the export the
-user already has. The suggested family on *Not fitted* is read from the subject
-and then the description but only ever emits a family name, never the text.
+user already has.
 
-## Category deep dives## Category deep dives
+## Category deep dives## Category deep dives## Category deep dives
 
 `rules.json` carries a `deep_dives` list. Each entry names a family of drivers and a
 set of **facets** — a fixed vocabulary of labelled regular expressions matched against
