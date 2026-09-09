@@ -35,3 +35,10 @@ The data file (`reservations.json`) is written atomically so concurrent reads ar
 
 Edit the `DEFAULT_DATA` dictionary at the top of `app.py` to match your floor plan.  
 Delete `data/reservations.json` to reset all reservations.
+
+## Sales CRM
+
+This repository also contains a standalone **[Sales CRM](crm/)** — a single HTML
+file (`crm/index.html`) with pipeline, deals, contacts, companies, activities and
+reports. It has no server and no dependencies: open the file in a browser. See
+[`crm/README.md`](crm/README.md).

@@ -1,0 +1,2213 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Northwind Sales CRM</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#f5f7fb; --surface:#ffffff; --surface-2:#f1f4f9; --surface-3:#e8edf5;
+  --border:#e2e8f0; --border-strong:#cbd5e1;
+  --text:#1e293b; --text-muted:#64748b; --text-faint:#94a3b8;
+  --primary:#2a78d6; --primary-hover:#256abf; --primary-light:#eaf2fd; --on-primary:#ffffff;
+  --good:#0f7a52; --good-bg:#dcfce7;
+  --warn:#a35c00; --warn-bg:#fef3c7;
+  --bad:#b3261e; --bad-bg:#fee2e2;
+  --info-bg:#e0edfb;
+  --shadow:0 1px 2px rgba(15,23,42,.06),0 1px 3px rgba(15,23,42,.08);
+  --shadow-lg:0 10px 30px rgba(15,23,42,.14);
+  --radius:10px; --radius-sm:6px;
+  /* chart tokens — validated (see crm/README.md) */
+  --chart-surface:#ffffff;
+  --series-1:#2a78d6;
+  --ord-1:#86b6ef; --ord-2:#3987e5; --ord-3:#256abf; --ord-4:#184f95; --ord-5:#0d366b;
+  --grid:#eef2f7; --axis:#dbe3ec;
+}
+
+html[data-theme="dark"]{
+  --bg:#0f172a; --surface:#1a2436; --surface-2:#223049; --surface-3:#2b3a55;
+  --border:#334155; --border-strong:#43536b;
+  --text:#e9eef6; --text-muted:#9fb0c6; --text-faint:#7c8ca4;
+  --primary:#3987e5; --primary-hover:#5598e7; --primary-light:#16263f; --on-primary:#08121f;
+  --good:#4ade80; --good-bg:#0d3d29;
+  --warn:#fbbf24; --warn-bg:#402c05;
+  --bad:#f87171; --bad-bg:#43120f;
+  --info-bg:#152a44;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  --shadow-lg:0 10px 30px rgba(0,0,0,.55);
+  --chart-surface:#1a2436;
+  --series-1:#3987e5;
+  --ord-1:#cde2fb; --ord-2:#9ec5f4; --ord-3:#6da7ec; --ord-4:#3987e5; --ord-5:#184f95;
+  --grid:#25324a; --axis:#334155;
+  color-scheme:dark;
+}
+
+body{
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg); color:var(--text);
+  font-size:14px; line-height:1.5;
+  -webkit-font-smoothing:antialiased;
+}
+
+button,input,select,textarea{font:inherit;color:inherit}
+a{color:var(--primary);text-decoration:none}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+
+/* ── Shell ─────────────────────────────────────────────── */
+.app{display:grid;grid-template-columns:232px 1fr;min-height:100vh}
+
+.sidebar{
+  background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+}
+.brand{display:flex;align-items:center;gap:10px;padding:18px 18px 16px;border-bottom:1px solid var(--border)}
+.brand-mark{
+  width:32px;height:32px;border-radius:8px;flex:none;
+  background:linear-gradient(135deg,var(--primary),#184f95);
+  color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px;letter-spacing:-.5px;
+}
+.brand-name{font-weight:700;font-size:15px;letter-spacing:-.01em;line-height:1.2}
+.brand-sub{font-size:11px;color:var(--text-muted)}
+
+.nav{padding:12px 10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex:1}
+.nav-label{font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text-faint);padding:12px 10px 6px}
+.nav a{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);
+  color:var(--text-muted);font-weight:500;transition:background .15s,color .15s;
+}
+.nav a:hover{background:var(--surface-2);color:var(--text)}
+.nav a.active{background:var(--primary-light);color:var(--primary);font-weight:600}
+.nav .ico{width:18px;text-align:center;font-size:15px;flex:none}
+.nav .count{margin-left:auto;font-size:11px;color:var(--text-faint);font-variant-numeric:tabular-nums}
+
+.sidebar-foot{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center}
+
+/* ── Topbar ────────────────────────────────────────────── */
+.main{display:flex;flex-direction:column;min-width:0}
+.topbar{
+  display:flex;align-items:center;gap:14px;padding:12px 24px;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:40;
+}
+.search-wrap{position:relative;flex:1;max-width:420px}
+.search-wrap .mag{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--text-faint);pointer-events:none}
+#globalSearch{
+  width:100%;padding:8px 12px 8px 32px;border:1px solid var(--border);
+  background:var(--surface-2);border-radius:var(--radius-sm);
+}
+#globalSearch:focus{outline:2px solid var(--primary);outline-offset:-1px;background:var(--surface)}
+.search-results{
+  position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-lg);
+  max-height:340px;overflow-y:auto;z-index:50;padding:6px;
+}
+.sr-item{display:flex;gap:10px;align-items:center;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer}
+.sr-item:hover,.sr-item.sel{background:var(--surface-2)}
+.sr-kind{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-faint);margin-left:auto}
+.sr-empty{padding:14px;color:var(--text-muted);text-align:center}
+
+/* ── Buttons ───────────────────────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:var(--radius-sm);
+  border:1px solid var(--border-strong);background:var(--surface);color:var(--text);
+  font-weight:600;font-size:13px;cursor:pointer;transition:background .15s,border-color .15s;white-space:nowrap;
+}
+.btn:hover{background:var(--surface-2)}
+.btn-primary{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.btn-primary:hover{background:var(--primary-hover);border-color:var(--primary-hover)}
+.btn-danger{color:var(--bad);border-color:var(--border-strong)}
+.btn-danger:hover{background:var(--bad-bg)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{padding:7px 9px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+/* ── Page ──────────────────────────────────────────────── */
+.page{padding:22px 24px 48px;max-width:1400px;width:100%}
+.page-head{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;flex-wrap:wrap}
+.page-title{font-size:22px;font-weight:700;letter-spacing:-.02em}
+.page-sub{color:var(--text-muted);font-size:13px;margin-top:2px}
+.page-actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow)}
+.card-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border)}
+.card-title{font-weight:650;font-size:14px}
+.card-sub{font-size:12px;color:var(--text-muted)}
+.card-body{padding:16px}
+.card-actions{margin-left:auto;display:flex;gap:6px}
+
+/* ── Stat tiles ────────────────────────────────────────── */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:18px}
+.tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow)}
+.tile-label{font-size:12px;color:var(--text-muted);font-weight:600;letter-spacing:.01em}
+.tile-value{font-size:27px;font-weight:700;letter-spacing:-.025em;margin-top:6px;font-variant-numeric:tabular-nums}
+.tile-meta{font-size:12px;color:var(--text-muted);margin-top:4px;display:flex;align-items:center;gap:5px}
+.delta-up{color:var(--good);font-weight:600}
+.delta-down{color:var(--bad);font-weight:600}
+
+/* ── Tables ────────────────────────────────────────────── */
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{
+  text-align:left;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;
+  color:var(--text-muted);padding:10px 14px;border-bottom:1px solid var(--border);white-space:nowrap;
+  background:var(--surface);position:sticky;top:0;
+}
+th.sortable{cursor:pointer;user-select:none}
+th.sortable:hover{color:var(--text)}
+th .arrow{opacity:.45;font-size:9px}
+td{padding:11px 14px;border-bottom:1px solid var(--border);vertical-align:middle}
+tbody tr{cursor:pointer;transition:background .12s}
+tbody tr:hover{background:var(--surface-2)}
+tbody tr:last-child td{border-bottom:none}
+.num{text-align:right;font-variant-numeric:tabular-nums}
+.cell-strong{font-weight:600}
+.cell-sub{font-size:12px;color:var(--text-muted)}
+
+.empty-state{padding:48px 20px;text-align:center;color:var(--text-muted)}
+.empty-state .big{font-size:32px;margin-bottom:8px;opacity:.5}
+.empty-state .title{font-weight:600;color:var(--text);margin-bottom:4px}
+
+/* ── Badges & avatars ──────────────────────────────────── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;
+  font-size:11.5px;font-weight:650;background:var(--surface-3);color:var(--text-muted);white-space:nowrap;
+}
+.badge.good{background:var(--good-bg);color:var(--good)}
+.badge.warn{background:var(--warn-bg);color:var(--warn)}
+.badge.bad{background:var(--bad-bg);color:var(--bad)}
+.badge.info{background:var(--info-bg);color:var(--primary)}
+.badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
+
+.avatar{
+  width:28px;height:28px;border-radius:50%;flex:none;display:grid;place-items:center;
+  font-size:11px;font-weight:700;background:var(--surface-3);color:var(--text-muted);
+}
+.avatar.lg{width:44px;height:44px;font-size:15px}
+.with-avatar{display:flex;align-items:center;gap:10px;min-width:0}
+
+/* ── Filters ───────────────────────────────────────────── */
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters input,.filters select{
+  padding:7px 11px;border:1px solid var(--border);background:var(--surface);
+  border-radius:var(--radius-sm);font-size:13px;
+}
+.filters input:focus,.filters select:focus{outline:2px solid var(--primary);outline-offset:-1px}
+.filter-chip{
+  display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;
+  border:1px solid var(--border);background:var(--surface);cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-muted);
+}
+.filter-chip.active{background:var(--primary-light);border-color:var(--primary);color:var(--primary)}
+.spacer{flex:1}
+
+/* ── Kanban ────────────────────────────────────────────── */
+.kanban{display:flex;gap:12px;overflow-x:auto;padding-bottom:12px;align-items:flex-start}
+.kcol{
+  flex:0 0 268px;background:var(--surface-2);border:1px solid var(--border);
+  border-radius:var(--radius);display:flex;flex-direction:column;max-height:calc(100vh - 230px);
+}
+.kcol.drag-over{border-color:var(--primary);background:var(--primary-light)}
+.kcol-head{padding:11px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.kcol-bar{width:3px;height:16px;border-radius:2px;flex:none}
+.kcol-name{font-weight:650;font-size:13px}
+.kcol-count{font-size:11px;color:var(--text-muted);background:var(--surface);padding:1px 7px;border-radius:999px;font-weight:600}
+.kcol-sum{margin-left:auto;font-size:12px;font-weight:650;color:var(--text-muted);font-variant-numeric:tabular-nums}
+.kcol-body{padding:9px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;flex:1;min-height:70px}
+.kcard{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:11px 12px;cursor:grab;box-shadow:var(--shadow);transition:box-shadow .15s,transform .1s;
+}
+.kcard:hover{box-shadow:var(--shadow-lg)}
+.kcard:active{cursor:grabbing}
+.kcard.dragging{opacity:.4}
+.kcard-title{font-weight:650;font-size:13px;margin-bottom:3px;line-height:1.35}
+.kcard-co{font-size:12px;color:var(--text-muted);margin-bottom:9px}
+.kcard-foot{display:flex;align-items:center;gap:8px}
+.kcard-val{font-weight:700;font-size:13px;font-variant-numeric:tabular-nums}
+.kcard-date{font-size:11.5px;color:var(--text-muted);margin-left:auto}
+.kcard-date.overdue{color:var(--bad);font-weight:650}
+.kcol-empty{padding:18px 10px;text-align:center;color:var(--text-faint);font-size:12px}
+
+/* ── Modal & drawer ────────────────────────────────────── */
+.overlay{
+  position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(2px);
+  display:grid;place-items:center;z-index:200;padding:20px;
+}
+.modal{
+  background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-lg);
+  width:100%;max-width:560px;max-height:88vh;display:flex;flex-direction:column;
+}
+.modal.wide{max-width:720px}
+.modal-head{display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid var(--border)}
+.modal-title{font-weight:700;font-size:16px}
+.modal-body{padding:20px;overflow-y:auto}
+.modal-foot{display:flex;gap:8px;padding:14px 20px;border-top:1px solid var(--border)}
+.modal-foot .spacer{flex:1}
+.close-x{margin-left:auto;background:none;border:none;font-size:20px;color:var(--text-muted);cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px}
+.close-x:hover{background:var(--surface-2);color:var(--text)}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.field{display:flex;flex-direction:column;gap:5px}
+.field.full{grid-column:1/-1}
+.field label{font-size:12px;font-weight:650;color:var(--text-muted)}
+.field input,.field select,.field textarea{
+  padding:8px 11px;border:1px solid var(--border);background:var(--surface);
+  border-radius:var(--radius-sm);width:100%;
+}
+.field input:focus,.field select:focus,.field textarea:focus{outline:2px solid var(--primary);outline-offset:-1px}
+.field textarea{resize:vertical;min-height:72px}
+.field .hint{font-size:11.5px;color:var(--text-faint)}
+.field .err{font-size:11.5px;color:var(--bad);font-weight:600}
+.field input.invalid,.field select.invalid{border-color:var(--bad)}
+
+/* record detail */
+.rec-head{display:flex;gap:14px;align-items:flex-start;padding:18px 20px;border-bottom:1px solid var(--border)}
+.rec-title{font-size:17px;font-weight:700;letter-spacing:-.01em}
+.rec-sub{font-size:13px;color:var(--text-muted);margin-top:2px}
+.dl{display:grid;grid-template-columns:118px 1fr;gap:9px 14px;font-size:13px}
+.dl dt{color:var(--text-muted);font-weight:600}
+.dl dd{font-weight:500;word-break:break-word}
+.section-title{font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text-faint);margin:20px 0 9px}
+.mini-list{display:flex;flex-direction:column;gap:7px}
+.mini-row{
+  display:flex;align-items:center;gap:10px;padding:9px 11px;background:var(--surface-2);
+  border-radius:var(--radius-sm);font-size:13px;cursor:pointer;border:1px solid transparent;
+}
+.mini-row:hover{border-color:var(--border-strong)}
+.mini-row .m-val{margin-left:auto;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mini-empty{font-size:12.5px;color:var(--text-faint);padding:9px 2px}
+
+/* stage progress */
+.stage-track{display:flex;gap:3px;margin-top:14px}
+.stage-step{
+  flex:1;padding:6px 4px;text-align:center;font-size:11px;font-weight:650;
+  background:var(--surface-2);color:var(--text-faint);border-radius:3px;
+}
+.stage-step.done{background:var(--primary-light);color:var(--primary)}
+.stage-step.current{background:var(--primary);color:var(--on-primary)}
+
+/* activities */
+.act-row{display:flex;gap:12px;align-items:flex-start;padding:12px 14px;border-bottom:1px solid var(--border)}
+.act-row:last-child{border-bottom:none}
+.act-check{
+  width:19px;height:19px;border:1.5px solid var(--border-strong);border-radius:5px;background:var(--surface);
+  cursor:pointer;flex:none;margin-top:1px;display:grid;place-items:center;color:transparent;font-size:12px;font-weight:800;
+}
+.act-check:hover{border-color:var(--primary)}
+.act-check.done{background:var(--primary);border-color:var(--primary);color:var(--on-primary)}
+.act-main{min-width:0;flex:1}
+.act-subject{font-weight:600;font-size:13px}
+.act-row.is-done .act-subject{text-decoration:line-through;color:var(--text-faint)}
+.act-meta{font-size:12px;color:var(--text-muted);margin-top:2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.act-due.overdue{color:var(--bad);font-weight:650}
+.act-due.today{color:var(--warn);font-weight:650}
+
+/* charts */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+.viz{width:100%;display:block;overflow:visible;font-family:inherit}
+.viz text{font-family:inherit}
+.viz .lbl{font-size:11.5px;fill:var(--text-muted)}
+.viz .val{font-size:11.5px;fill:var(--text);font-weight:650;font-variant-numeric:tabular-nums}
+.viz .grid-line{stroke:var(--grid);stroke-width:1}
+.viz .axis-line{stroke:var(--axis);stroke-width:1}
+.viz .bar{transition:opacity .12s}
+.viz .bar-hit{fill:transparent;cursor:pointer}
+.viz g.mark:hover .bar{opacity:.78}
+.chart-note{font-size:11.5px;color:var(--text-faint);margin-top:10px}
+
+/* horizontal bars */
+.hbars{display:flex;flex-direction:column;gap:10px}
+.hb-row{display:grid;grid-template-columns:106px 1fr 74px;align-items:center;gap:12px}
+.hb-label{font-size:12.5px;color:var(--text-muted);font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hb-track{position:relative;display:flex;align-items:center;gap:9px;min-width:0}
+.hb-bar{height:14px;border-radius:0 4px 4px 0;transition:opacity .12s}
+.hb-row:hover .hb-bar{opacity:.8}
+.hb-value{font-size:12px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hb-meta{font-size:12px;color:var(--text-muted);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+/* vertical bars */
+.vbars{display:flex;gap:10px}
+.vb-axis{width:46px;flex:none;height:186px;box-sizing:border-box;padding:18px 0 22px;
+  display:flex;flex-direction:column;justify-content:space-between;
+  font-size:11px;color:var(--text-faint);text-align:right;font-variant-numeric:tabular-nums}
+.vb-plot{flex:1;min-width:0;height:186px;box-sizing:border-box;padding:18px 0 22px;position:relative}
+.vb-grid{position:absolute;top:18px;left:0;right:0;bottom:22px;display:flex;flex-direction:column;justify-content:space-between}
+.vb-grid i{display:block;height:1px;background:var(--grid)}
+.vb-grid i.base{background:var(--axis)}
+.vb-cols{position:relative;height:100%;display:flex;gap:8px;align-items:flex-end}
+.vb-col{flex:1;min-width:0;height:100%;position:relative}
+.vb-slot{height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center}
+.vb-bar{flex:none;width:100%;max-width:44px;background:var(--series-1);border-radius:4px 4px 0 0;transition:opacity .12s}
+.vb-col:hover .vb-bar{opacity:.8}
+.vb-value{flex:none;font-size:11px;font-weight:650;color:var(--text);margin-bottom:4px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.vb-tick{position:absolute;top:100%;left:0;right:0;padding-top:6px;text-align:center;font-size:11px;color:var(--text-muted);white-space:nowrap}
+
+/* table view under a chart */
+.chart-table{margin-top:14px;border-top:1px solid var(--border);padding-top:9px}
+.chart-table summary{font-size:12px;color:var(--text-muted);cursor:pointer;font-weight:600;list-style:none}
+.chart-table summary::-webkit-details-marker{display:none}
+.chart-table summary::before{content:"▸  "}
+.chart-table[open] summary::before{content:"▾  "}
+.chart-table table{margin-top:8px}
+.chart-table th{position:static;padding:6px 8px}
+.chart-table td{padding:6px 8px}
+.chart-table tbody tr{cursor:default}
+.chart-table tbody tr:hover{background:transparent}
+
+.tooltip{
+  position:fixed;z-index:300;pointer-events:none;background:var(--surface);
+  border:1px solid var(--border-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-lg);
+  padding:8px 11px;font-size:12px;max-width:230px;opacity:0;transition:opacity .1s;
+}
+.tooltip.show{opacity:1}
+.tt-title{font-weight:700;margin-bottom:3px}
+.tt-row{display:flex;gap:12px;color:var(--text-muted)}
+.tt-row b{margin-left:auto;color:var(--text);font-variant-numeric:tabular-nums}
+
+.toast-wrap{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:400;display:flex;flex-direction:column;gap:8px;align-items:center}
+.toast{
+  background:var(--text);color:var(--surface);padding:10px 16px;border-radius:999px;
+  font-size:13px;font-weight:600;box-shadow:var(--shadow-lg);animation:pop .2s ease;
+}
+@keyframes pop{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+@media (max-width:900px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .sidebar{position:static;height:auto;flex-direction:row;align-items:center;overflow-x:auto;min-width:0}
+  .brand{border-bottom:none;border-right:1px solid var(--border);flex:none}
+  .nav{flex-direction:row;padding:8px;gap:4px;overflow:auto;min-width:0}
+  .nav a{white-space:nowrap}
+  .topbar{padding:10px 14px;flex-wrap:wrap;gap:8px}
+  .search-wrap{order:2;flex:1 1 100%;max-width:none}
+  .topbar .spacer{display:none}
+  .page{padding:18px 14px 40px}
+  .nav-label,.nav .count{display:none}
+  .sidebar-foot{border-top:none;border-left:1px solid var(--border);flex:none}
+  .chart-grid{grid-template-columns:minmax(0,1fr)}
+  .form-grid{grid-template-columns:1fr}
+  .dl{grid-template-columns:100px 1fr}
+  .card,.tile,.card-body,.mini-row,.mini-row>div{min-width:0}
+  .tiles{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+  .hb-row{grid-template-columns:84px minmax(0,1fr) 56px;gap:8px}
+  .hb-label,.hb-meta,.hb-value{font-size:11px}
+  .page-title{font-size:19px}
+}
+@media print{.sidebar,.topbar,.page-actions,.filters{display:none}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark" id="brandMark">NW</div>
+      <div>
+        <div class="brand-name" id="brandName">Northwind</div>
+        <div class="brand-sub">Sales CRM</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <div class="nav-label">Sell</div>
+      <a href="#/dashboard" data-route="dashboard"><span class="ico">◆</span>Dashboard</a>
+      <a href="#/pipeline"  data-route="pipeline"><span class="ico">▤</span>Pipeline<span class="count" data-count="openDeals"></span></a>
+      <a href="#/deals"     data-route="deals"><span class="ico">◇</span>Deals<span class="count" data-count="deals"></span></a>
+      <a href="#/activities" data-route="activities"><span class="ico">✓</span>Activities<span class="count" data-count="openTasks"></span></a>
+      <div class="nav-label">Records</div>
+      <a href="#/contacts"  data-route="contacts"><span class="ico">☺</span>Contacts<span class="count" data-count="contacts"></span></a>
+      <a href="#/companies" data-route="companies"><span class="ico">▣</span>Companies<span class="count" data-count="companies"></span></a>
+      <div class="nav-label">Manage</div>
+      <a href="#/reports"   data-route="reports"><span class="ico">▦</span>Reports</a>
+      <a href="#/settings"  data-route="settings"><span class="ico">⚙</span>Settings</a>
+    </nav>
+
+    <div class="sidebar-foot">
+      <div class="avatar" id="meAvatar">—</div>
+      <div style="min-width:0">
+        <div style="font-size:12.5px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="meName">—</div>
+        <div style="font-size:11px;color:var(--text-muted)">Sales rep</div>
+      </div>
+      <button class="btn btn-icon btn-sm" id="themeBtn" style="margin-left:auto" title="Toggle light / dark theme" aria-label="Toggle theme">◐</button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="topbar">
+      <div class="search-wrap">
+        <span class="mag" aria-hidden="true">⌕</span>
+        <label class="sr-only" for="globalSearch">Search deals, contacts and companies</label>
+        <input id="globalSearch" type="search" placeholder="Search deals, contacts, companies…" autocomplete="off">
+        <div class="search-results" id="searchResults" hidden></div>
+      </div>
+      <div class="spacer"></div>
+      <button class="btn" id="newActivityBtn">＋ Activity</button>
+      <button class="btn btn-primary" id="newDealBtn">＋ New deal</button>
+    </header>
+
+    <main class="page" id="page" tabindex="-1"></main>
+  </div>
+</div>
+
+<div id="modalRoot"></div>
+<div class="tooltip" id="tooltip" role="status" aria-live="polite"></div>
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+"use strict";
+/* ═══════════════════════════════════════════════════════════════
+   Northwind Sales CRM — single-file, no dependencies.
+   State lives in localStorage under STORE_KEY.
+   ═══════════════════════════════════════════════════════════════ */
+
+const STORE_KEY  = "northwind.crm.v1";
+const THEME_KEY  = "northwind.crm.theme";
+
+const STAGES = [
+  { id:"lead",        name:"Lead in",     prob:10 },
+  { id:"qualified",   name:"Qualified",   prob:30 },
+  { id:"proposal",    name:"Proposal",    prob:55 },
+  { id:"negotiation", name:"Negotiation", prob:75 },
+  { id:"won",         name:"Won",         prob:100 },
+  { id:"lost",        name:"Lost",        prob:0 },
+];
+const OPEN_STAGES   = STAGES.filter(s => s.id !== "won" && s.id !== "lost");
+const CLOSED_STAGES = ["won","lost"];
+const stageById = id => STAGES.find(s => s.id === id) || STAGES[0];
+const stageIndex = id => STAGES.findIndex(s => s.id === id);
+
+const SOURCES  = ["Inbound","Outbound","Referral","Partner","Trade show","Website","Campaign"];
+const ACT_TYPES = ["Call","Email","Meeting","Demo","Task"];
+const INDUSTRIES = ["Manufacturing","Retail","Logistics","Software","Healthcare","Construction","Hospitality","Energy","Finance","Education"];
+
+const CURRENCIES = {
+  EUR:{ symbol:"€", locale:"de-DE" },
+  USD:{ symbol:"$", locale:"en-US" },
+  GBP:{ symbol:"£", locale:"en-GB" },
+  RON:{ symbol:"lei", locale:"ro-RO" },
+};
+
+/* ── tiny helpers ──────────────────────────────────────── */
+const $  = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+
+function esc(v){
+  return String(v ?? "").replace(/[&<>"']/g, c =>
+    ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+const todayISO = () => new Date().toISOString().slice(0, 10);
+function addDays(iso, n){
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function monthKey(iso){ return (iso || "").slice(0, 7); }
+function monthLabel(key){
+  if (!key) return "";
+  const [y, m] = key.split("-");
+  return new Date(Number(y), Number(m) - 1, 1)
+    .toLocaleDateString("en-GB", { month:"short" }) + " " + y.slice(2);
+}
+function fmtDate(iso){
+  if (!iso) return "—";
+  return new Date(iso + "T00:00:00")
+    .toLocaleDateString("en-GB", { day:"2-digit", month:"short", year:"numeric" });
+}
+function relDate(iso){
+  if (!iso) return "no date";
+  const days = Math.round((new Date(iso + "T00:00:00") - new Date(todayISO() + "T00:00:00")) / 86400000);
+  if (days === 0)  return "today";
+  if (days === 1)  return "tomorrow";
+  if (days === -1) return "yesterday";
+  if (days < 0)    return Math.abs(days) + "d overdue";
+  if (days < 31)   return "in " + days + "d";
+  return fmtDate(iso);
+}
+function money(n){
+  const cur = CURRENCIES[state.settings.currency] || CURRENCIES.EUR;
+  const abs = Math.abs(Number(n) || 0);
+  const opts = { style:"currency", currency:state.settings.currency, maximumFractionDigits:0 };
+  try { return new Intl.NumberFormat(cur.locale, opts).format(Math.round(Number(n) || 0)); }
+  catch { return cur.symbol + Math.round(abs).toLocaleString(); }
+}
+function moneyShort(n){
+  const cur = CURRENCIES[state.settings.currency] || CURRENCIES.EUR;
+  const v = Number(n) || 0, a = Math.abs(v);
+  const unit = a >= 1e6 ? [1e6, "M"] : a >= 1e3 ? [1e3, "k"] : [1, ""];
+  const num = (v / unit[0]).toFixed(a >= 1e6 || (a >= 1e3 && a < 1e4) ? 1 : 0).replace(/\.0$/, "");
+  return cur.symbol + num + unit[1];
+}
+function initials(name){
+  return String(name || "?").trim().split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+}
+function pct(part, whole){ return whole > 0 ? Math.round((part / whole) * 100) : 0; }
+
+function toast(msg){
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  $("#toastWrap").appendChild(el);
+  setTimeout(() => el.remove(), 2600);
+}
+
+/* ── state & persistence ───────────────────────────────── */
+let state = emptyState();
+
+function emptyState(){
+  return {
+    settings:{ orgName:"Northwind", currency:"EUR", me:"Alex Murariu", target:250000 },
+    owners:[],
+    companies:[],
+    contacts:[],
+    deals:[],
+    activities:[],
+  };
+}
+
+function load(){
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw);
+    state = Object.assign(emptyState(), parsed);
+    state.settings = Object.assign(emptyState().settings, parsed.settings || {});
+    return true;
+  } catch (err){
+    console.warn("CRM: could not read saved data —", err);
+    return false;
+  }
+}
+
+function save(){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  catch (err){ toast("Could not save — storage is full or blocked"); console.warn(err); }
+}
+
+/* ── lookups ───────────────────────────────────────────── */
+const companyById = id => state.companies.find(c => c.id === id);
+const contactById = id => state.contacts.find(c => c.id === id);
+const dealById    = id => state.deals.find(d => d.id === id);
+const companyName = id => (companyById(id) || {}).name || "—";
+const contactName = id => { const c = contactById(id); return c ? c.firstName + " " + c.lastName : "—"; };
+
+const openDeals   = () => state.deals.filter(d => !CLOSED_STAGES.includes(d.stage));
+const wonDeals    = () => state.deals.filter(d => d.stage === "won");
+const lostDeals   = () => state.deals.filter(d => d.stage === "lost");
+const openTasks   = () => state.activities.filter(a => !a.done);
+const sum         = (arr, fn) => arr.reduce((t, x) => t + (Number(fn(x)) || 0), 0);
+const weighted    = d => (Number(d.value) || 0) * (stageById(d.stage).prob / 100);
+
+function dealsForCompany(id){ return state.deals.filter(d => d.companyId === id); }
+function contactsForCompany(id){ return state.contacts.filter(c => c.companyId === id); }
+function activitiesForDeal(id){ return state.activities.filter(a => a.dealId === id); }
+
+/* ── demo data ─────────────────────────────────────────── */
+function seedDemo(){
+  const S = emptyState();
+  S.settings = { orgName:"Northwind", currency:"EUR", me:"Alex Murariu", target:250000 };
+  S.owners = ["Alex Murariu","Dana Petrescu","Marco Ricci","Sofia Lindqvist"];
+
+  const co = (name, industry, city, country, size) =>
+    ({ id:uid(), name, industry, city, country, size, website:"www." + name.toLowerCase().replace(/[^a-z]/g, "") + ".com",
+       phone:"+40 21 " + (300 + Math.floor(Math.random() * 699)) + " " + (100 + Math.floor(Math.random() * 899)),
+       owner:S.owners[Math.floor(Math.random() * S.owners.length)], notes:"", createdAt:todayISO() });
+
+  S.companies = [
+    co("Vertex Manufacturing","Manufacturing","Cluj-Napoca","Romania","250-1000"),
+    co("Baltica Retail Group","Retail","Gdansk","Poland","1000+"),
+    co("Helios Logistics","Logistics","Rotterdam","Netherlands","250-1000"),
+    co("Andersen Foods","Retail","Copenhagen","Denmark","50-250"),
+    co("Rivera Hospitality","Hospitality","Barcelona","Spain","50-250"),
+    co("Kappa Energy","Energy","Vienna","Austria","1000+"),
+    co("Northlake Health","Healthcare","Dublin","Ireland","250-1000"),
+    co("Orion Construction","Construction","Bucharest","Romania","50-250"),
+    co("Lumen Software","Software","Berlin","Germany","10-50"),
+    co("Trasimeno Finance","Finance","Milan","Italy","250-1000"),
+  ];
+
+  const ct = (first, last, title, coName, email) => {
+    const c = S.companies.find(x => x.name === coName);
+    return { id:uid(), firstName:first, lastName:last, title, companyId:c ? c.id : null,
+             email, phone:"+40 7" + (20 + Math.floor(Math.random() * 70)) + " " + (100 + Math.floor(Math.random() * 899)) + " " + (100 + Math.floor(Math.random() * 899)),
+             owner:c ? c.owner : S.owners[0], notes:"", createdAt:todayISO() };
+  };
+
+  S.contacts = [
+    ct("Radu","Ionescu","Head of Operations","Vertex Manufacturing","r.ionescu@vertexmfg.com"),
+    ct("Elena","Marin","Procurement Manager","Vertex Manufacturing","e.marin@vertexmfg.com"),
+    ct("Piotr","Kowalski","Chief Buyer","Baltica Retail Group","p.kowalski@baltica.pl"),
+    ct("Anna","Nowak","Store Systems Lead","Baltica Retail Group","a.nowak@baltica.pl"),
+    ct("Jeroen","Bakker","Logistics Director","Helios Logistics","j.bakker@helioslog.nl"),
+    ct("Mette","Sorensen","Category Manager","Andersen Foods","m.sorensen@andersenfoods.dk"),
+    ct("Pau","Serra","GM","Rivera Hospitality","p.serra@riverahotels.es"),
+    ct("Lukas","Berger","Head of Procurement","Kappa Energy","l.berger@kappaenergy.at"),
+    ct("Niamh","Doyle","Facilities Lead","Northlake Health","n.doyle@northlake.ie"),
+    ct("Mihai","Dobre","Site Manager","Orion Construction","m.dobre@orionconstruct.ro"),
+    ct("Katrin","Vogel","COO","Lumen Software","k.vogel@lumensw.de"),
+    ct("Giulia","Ferrari","Head of Vendor Mgmt","Trasimeno Finance","g.ferrari@trasimeno.it"),
+  ];
+
+  const dl = (title, coName, contactEmail, value, stage, closeIn, source) => {
+    const c = S.companies.find(x => x.name === coName);
+    const p = S.contacts.find(x => x.email === contactEmail);
+    return { id:uid(), title, companyId:c ? c.id : null, contactId:p ? p.id : null,
+             value, stage, closeDate:addDays(todayISO(), closeIn), source,
+             owner:c ? c.owner : S.owners[0], notes:"", lostReason:"",
+             createdAt:addDays(todayISO(), -Math.floor(Math.random() * 90) - 10) };
+  };
+
+  S.deals = [
+    dl("Vertex — line automation retrofit","Vertex Manufacturing","r.ionescu@vertexmfg.com",84000,"negotiation",12,"Referral"),
+    dl("Vertex — annual spare parts","Vertex Manufacturing","e.marin@vertexmfg.com",23500,"proposal",26,"Inbound"),
+    dl("Baltica — 40-store POS rollout","Baltica Retail Group","p.kowalski@baltica.pl",156000,"proposal",34,"Trade show"),
+    dl("Baltica — pilot store refit","Baltica Retail Group","a.nowak@baltica.pl",28000,"qualified",48,"Outbound"),
+    dl("Helios — fleet telematics","Helios Logistics","j.bakker@helioslog.nl",67500,"negotiation",7,"Partner"),
+    dl("Andersen — cold chain sensors","Andersen Foods","m.sorensen@andersenfoods.dk",19800,"lead",61,"Website"),
+    dl("Rivera — 3-hotel PMS upgrade","Rivera Hospitality","p.serra@riverahotels.es",45000,"qualified",40,"Campaign"),
+    dl("Kappa — metering framework","Kappa Energy","l.berger@kappaenergy.at",212000,"proposal",55,"Outbound"),
+    dl("Northlake — ward equipment","Northlake Health","n.doyle@northlake.ie",38600,"lead",70,"Inbound"),
+    dl("Orion — site safety kit","Orion Construction","m.dobre@orionconstruct.ro",14200,"qualified",22,"Referral"),
+    dl("Lumen — office fit-out","Lumen Software","k.vogel@lumensw.de",9800,"lead",44,"Website"),
+    dl("Trasimeno — branch hardware","Trasimeno Finance","g.ferrari@trasimeno.it",92000,"negotiation",19,"Partner"),
+    dl("Vertex — safety audit package","Vertex Manufacturing","r.ionescu@vertexmfg.com",31000,"won",-8,"Referral"),
+    dl("Helios — warehouse scanners","Helios Logistics","j.bakker@helioslog.nl",47200,"won",-21,"Outbound"),
+    dl("Baltica — signage refresh","Baltica Retail Group","a.nowak@baltica.pl",26400,"won",-40,"Inbound"),
+    dl("Rivera — kitchen equipment","Rivera Hospitality","p.serra@riverahotels.es",52000,"won",-63,"Campaign"),
+    dl("Kappa — legacy meter swap","Kappa Energy","l.berger@kappaenergy.at",78000,"won",-95,"Outbound"),
+    dl("Andersen — packaging line","Andersen Foods","m.sorensen@andersenfoods.dk",64000,"won",-126,"Trade show"),
+    dl("Northlake — reception refit","Northlake Health","n.doyle@northlake.ie",21500,"lost",-15,"Website"),
+    dl("Orion — crane hire contract","Orion Construction","m.dobre@orionconstruct.ro",58000,"lost",-52,"Outbound"),
+    dl("Lumen — support retainer","Lumen Software","k.vogel@lumensw.de",12400,"lost",-77,"Inbound"),
+  ];
+  S.deals.forEach((d, i) => { d.owner = S.owners[i % S.owners.length]; });
+  S.deals.filter(d => d.stage === "lost")
+         .forEach(d => { d.lostReason = ["Price","Competitor","No budget","No decision"][Math.floor(Math.random() * 4)]; });
+
+  const ac = (type, subject, dealTitle, dueIn, done) => {
+    const d = S.deals.find(x => x.title === dealTitle);
+    return { id:uid(), type, subject, dealId:d ? d.id : null, contactId:d ? d.contactId : null,
+             companyId:d ? d.companyId : null, due:addDays(todayISO(), dueIn), done,
+             owner:d ? d.owner : S.owners[0], notes:"", createdAt:todayISO() };
+  };
+
+  S.activities = [
+    ac("Call","Chase signed order form","Helios — fleet telematics",-2,false),
+    ac("Email","Send revised pricing sheet","Baltica — 40-store POS rollout",-1,false),
+    ac("Meeting","On-site walkthrough","Vertex — line automation retrofit",0,false),
+    ac("Demo","Product demo for procurement","Kappa — metering framework",1,false),
+    ac("Call","Qualify budget & timeline","Rivera — 3-hotel PMS upgrade",2,false),
+    ac("Task","Draft statement of work","Trasimeno — branch hardware",3,false),
+    ac("Email","Follow up after trade show","Andersen — cold chain sensors",5,false),
+    ac("Meeting","Quarterly review","Baltica — pilot store refit",9,false),
+    ac("Call","Intro call","Northlake — ward equipment",12,false),
+    ac("Email","Share case study","Lumen — office fit-out",14,false),
+    ac("Call","Discovery call","Vertex — annual spare parts",-9,true),
+    ac("Meeting","Kickoff after signature","Helios — warehouse scanners",-18,true),
+    ac("Email","Send contract","Vertex — safety audit package",-11,true),
+  ];
+
+  state = S;
+  save();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Charts — plain HTML/CSS marks, no chart library.
+   Colours come from the validated tokens declared in :root
+   (single-hue blue for one series; ordinal blue ramp for the
+   ordered pipeline stages). See crm/README.md.
+   ═══════════════════════════════════════════════════════════════ */
+
+function tipAttrs(title, rows){
+  const r = rows.map(([k, v]) => k + "|" + v).join(";;");
+  return `data-tip="${esc(title)}" data-tip-rows="${esc(r)}"`;
+}
+
+/* Horizontal bars — ordered categories (ordinal ramp) or one series. */
+function hBars(rows, opts = {}){
+  const { ordinal = false, valueFmt = money, note = "", tableCols = ["Stage","Deals","Value"] } = opts;
+  const max = Math.max(1, ...rows.map(r => r.value));
+  const bars = rows.map((r, i) => {
+    const w = Math.max(r.value > 0 ? 1.5 : 0, (r.value / max) * 100);
+    const color = ordinal ? `var(--ord-${Math.min(5, i + 1)})` : "var(--series-1)";
+    return `
+      <div class="hb-row" ${tipAttrs(r.label, r.tip || [["Value", valueFmt(r.value)]])}>
+        <div class="hb-label">${esc(r.label)}</div>
+        <div class="hb-track">
+          <div class="hb-bar" style="width:${w}%;background:${color}"></div>
+          <span class="hb-value">${esc(valueFmt(r.value))}</span>
+        </div>
+        <div class="hb-meta">${esc(r.meta || "")}</div>
+      </div>`;
+  }).join("");
+
+  const table = `
+    <details class="chart-table">
+      <summary>View as table</summary>
+      <table><thead><tr>${tableCols.map(c => `<th>${esc(c)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(r.meta || "")}</td><td class="num">${esc(valueFmt(r.value))}</td></tr>`).join("")}</tbody></table>
+    </details>`;
+
+  return `<div class="hbars">${bars}</div>${note ? `<p class="chart-note">${esc(note)}</p>` : ""}${table}`;
+}
+
+/* Vertical bars — one measure over time, one series, one axis. */
+function vBars(rows, opts = {}){
+  const { valueFmt = moneyShort, note = "", highlightLast = true } = opts;
+  const max = Math.max(1, ...rows.map(r => r.value));
+  const nice = niceCeil(max);
+  const bars = rows.map((r, i) => {
+    const h = (r.value / nice) * 100;
+    const isMax  = r.value === max && max > 0;
+    const isLast = highlightLast && i === rows.length - 1;
+    const label  = (isMax || isLast) && r.value > 0 ? `<span class="vb-value">${esc(valueFmt(r.value))}</span>` : "";
+    return `
+      <div class="vb-col" ${tipAttrs(r.label, r.tip || [["Value", money(r.value)]])}>
+        <div class="vb-slot">
+          ${label}
+          <div class="vb-bar" style="height:${Math.max(r.value > 0 ? 2 : 0, h)}%"></div>
+        </div>
+        <div class="vb-tick">${esc(r.short || r.label)}</div>
+      </div>`;
+  }).join("");
+
+  const table = `
+    <details class="chart-table">
+      <summary>View as table</summary>
+      <table><thead><tr><th>Period</th><th>Value</th></tr></thead>
+      <tbody>${rows.map(r => `<tr><td>${esc(r.label)}</td><td class="num">${esc(money(r.value))}</td></tr>`).join("")}</tbody></table>
+    </details>`;
+
+  return `
+    <div class="vbars">
+      <div class="vb-axis"><span>${esc(valueFmt(nice))}</span><span>${esc(valueFmt(nice / 2))}</span><span>0</span></div>
+      <div class="vb-plot">
+        <div class="vb-grid"><i></i><i></i><i class="base"></i></div>
+        <div class="vb-cols">${bars}</div>
+      </div>
+    </div>
+    ${note ? `<p class="chart-note">${esc(note)}</p>` : ""}${table}`;
+}
+
+function niceCeil(n){
+  if (n <= 0) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(n)));
+  return Math.ceil(n / (mag / 2)) * (mag / 2);
+}
+
+/* hover tooltip, delegated so re-rendered views keep working */
+function bindTooltips(){
+  const tip = $("#tooltip");
+  document.addEventListener("mouseover", e => {
+    const host = e.target.closest("[data-tip]");
+    if (!host) return;
+    const rows = (host.dataset.tipRows || "").split(";;").filter(Boolean)
+      .map(s => s.split("|"));
+    tip.innerHTML = `<div class="tt-title">${esc(host.dataset.tip)}</div>` +
+      rows.map(([k, v]) => `<div class="tt-row">${esc(k)}<b>${esc(v)}</b></div>`).join("");
+    tip.classList.add("show");
+  });
+  document.addEventListener("mousemove", e => {
+    if (!tip.classList.contains("show")) return;
+    const pad = 14, r = tip.getBoundingClientRect();
+    let x = e.clientX + pad, y = e.clientY + pad;
+    if (x + r.width  > innerWidth  - 8) x = e.clientX - r.width  - pad;
+    if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad;
+    tip.style.left = x + "px";
+    tip.style.top  = y + "px";
+  });
+  document.addEventListener("mouseout", e => {
+    if (e.target.closest("[data-tip]")) tip.classList.remove("show");
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Router
+   ═══════════════════════════════════════════════════════════════ */
+const views = {};
+let currentRoute = "dashboard";
+
+function go(route){ location.hash = "#/" + route; }
+
+function router(){
+  const route = (location.hash.replace(/^#\/?/, "") || "dashboard").split("/")[0];
+  currentRoute = views[route] ? route : "dashboard";
+  render();
+}
+
+function render(){
+  $$("#nav a").forEach(a => a.classList.toggle("active", a.dataset.route === currentRoute));
+  $("#page").innerHTML = views[currentRoute]();
+  $("#page").scrollTop = 0;
+  refreshChrome();
+}
+
+function refreshChrome(){
+  const counts = {
+    openDeals: openDeals().length,
+    deals: state.deals.length,
+    contacts: state.contacts.length,
+    companies: state.companies.length,
+    openTasks: openTasks().length,
+  };
+  $$("[data-count]").forEach(el => {
+    const v = counts[el.dataset.count];
+    el.textContent = v ? v : "";
+  });
+  $("#brandName").textContent = state.settings.orgName || "Northwind";
+  $("#brandMark").textContent = initials(state.settings.orgName || "NW");
+  $("#meName").textContent   = state.settings.me || "—";
+  $("#meAvatar").textContent = initials(state.settings.me || "?");
+  document.title = (state.settings.orgName || "Northwind") + " Sales CRM";
+}
+
+/* shared bits ------------------------------------------------- */
+function pageHead(title, sub, actions = ""){
+  return `<div class="page-head">
+    <div><h1 class="page-title">${esc(title)}</h1><p class="page-sub">${esc(sub)}</p></div>
+    <div class="page-actions">${actions}</div>
+  </div>`;
+}
+function emptyBox(icon, title, msg, action = ""){
+  return `<div class="empty-state"><div class="big">${icon}</div>
+    <div class="title">${esc(title)}</div><div>${esc(msg)}</div>
+    ${action ? `<div style="margin-top:14px">${action}</div>` : ""}</div>`;
+}
+function stageBadge(id){
+  const s = stageById(id);
+  const cls = id === "won" ? "good" : id === "lost" ? "bad" : id === "negotiation" ? "warn" : "info";
+  return `<span class="badge ${cls}"><span class="dot"></span>${esc(s.name)}</span>`;
+}
+function dueClass(iso, done){
+  if (done || !iso) return "";
+  if (iso <  todayISO()) return "overdue";
+  if (iso === todayISO()) return "today";
+  return "";
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard
+   ═══════════════════════════════════════════════════════════════ */
+views.dashboard = () => {
+  const open = openDeals(), won = wonDeals(), lost = lostDeals();
+  const pipeline = sum(open, d => d.value);
+  const forecast = sum(open, weighted);
+  const thisMonth = monthKey(todayISO());
+  const wonThisMonth = won.filter(d => monthKey(d.closeDate) === thisMonth);
+  const wonValue = sum(wonThisMonth, d => d.value);
+  const target = Number(state.settings.target) || 0;
+  const winRate = pct(won.length, won.length + lost.length);
+  const avgDeal = won.length ? sum(won, d => d.value) / won.length : 0;
+
+  /* pipeline by stage — ordered categories, ordinal ramp */
+  const stageRows = OPEN_STAGES.map(s => {
+    const ds = open.filter(d => d.stage === s.id);
+    const v  = sum(ds, d => d.value);
+    return { label:s.name, value:v, meta:ds.length + (ds.length === 1 ? " deal" : " deals"),
+             tip:[["Deals", String(ds.length)], ["Value", money(v)], ["Weighted", money(v * s.prob / 100)]] };
+  });
+
+  /* won revenue, last 6 months — one measure, one series, one axis */
+  const months = [];
+  for (let i = 5; i >= 0; i--){
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    months.push(d.toISOString().slice(0, 7));
+  }
+  const monthRows = months.map(k => {
+    const ds = won.filter(d => monthKey(d.closeDate) === k);
+    const v  = sum(ds, d => d.value);
+    return { label:monthLabel(k), short:monthLabel(k).split(" ")[0], value:v,
+             tip:[["Deals won", String(ds.length)], ["Revenue", money(v)]] };
+  });
+
+  const closingSoon = open
+    .filter(d => d.closeDate)
+    .sort((a, b) => a.closeDate.localeCompare(b.closeDate))
+    .slice(0, 6);
+
+  const attention = state.activities
+    .filter(a => !a.done && a.due <= todayISO())
+    .sort((a, b) => a.due.localeCompare(b.due))
+    .slice(0, 6);
+
+  return pageHead(
+    "Dashboard",
+    `${open.length} open ${open.length === 1 ? "deal" : "deals"} · ${money(pipeline)} in play`,
+    `<button class="btn" data-act="print">Print</button>
+     <button class="btn btn-primary" data-act="new-deal">＋ New deal</button>`
+  ) + `
+  <div class="tiles">
+    <div class="tile">
+      <div class="tile-label">Open pipeline</div>
+      <div class="tile-value">${esc(money(pipeline))}</div>
+      <div class="tile-meta">${open.length} open ${open.length === 1 ? "deal" : "deals"}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">Weighted forecast</div>
+      <div class="tile-value">${esc(money(forecast))}</div>
+      <div class="tile-meta">value × stage probability</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">Won this month</div>
+      <div class="tile-value">${esc(money(wonValue))}</div>
+      <div class="tile-meta">${target
+        ? `<span class="${wonValue >= target ? "delta-up" : "delta-down"}">${pct(wonValue, target)}%</span> of ${esc(money(target))} target`
+        : `${wonThisMonth.length} closed won`}</div>
+    </div>
+    <div class="tile">
+      <div class="tile-label">Win rate</div>
+      <div class="tile-value">${winRate}%</div>
+      <div class="tile-meta">${won.length} won · ${lost.length} lost · avg ${esc(money(avgDeal))}</div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <section class="card">
+      <div class="card-head">
+        <div><div class="card-title">Open pipeline by stage</div>
+        <div class="card-sub">Where the ${esc(money(pipeline))} currently sits</div></div>
+        <div class="card-actions"><button class="btn btn-sm" data-act="goto" data-route="pipeline">Open board</button></div>
+      </div>
+      <div class="card-body">
+        ${pipeline > 0
+          ? hBars(stageRows, { ordinal:true, note:"Bar length is deal value; the deepening blue tracks stage order." })
+          : emptyBox("◇", "Nothing in the pipeline", "Add a deal to start tracking value by stage.")}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div><div class="card-title">Closed-won revenue</div>
+        <div class="card-sub">Last 6 months</div></div>
+      </div>
+      <div class="card-body">
+        ${vBars(monthRows, { note:"Deals are counted in the month of their close date." })}
+      </div>
+    </section>
+  </div>
+
+  <div class="chart-grid" style="margin-top:14px">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Closing soon</div>
+        <div class="card-actions"><button class="btn btn-sm" data-act="goto" data-route="deals">All deals</button></div></div>
+      <div class="card-body">
+        ${closingSoon.length ? `<div class="mini-list">` + closingSoon.map(d => `
+          <div class="mini-row" data-open-deal="${d.id}">
+            <div style="min-width:0">
+              <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(d.title)}</div>
+              <div class="cell-sub">${esc(companyName(d.companyId))} · <span class="${dueClass(d.closeDate) === "overdue" ? "act-due overdue" : ""}">${esc(relDate(d.closeDate))}</span></div>
+            </div>
+            <div class="m-val">${esc(money(d.value))}</div>
+          </div>`).join("") + `</div>`
+        : `<div class="mini-empty">No open deals with a close date.</div>`}
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Needs attention</div>
+        <div class="card-sub">Overdue &amp; due today</div>
+        <div class="card-actions"><button class="btn btn-sm" data-act="goto" data-route="activities">All activities</button></div></div>
+      <div class="card-body">
+        ${attention.length ? `<div class="mini-list">` + attention.map(a => `
+          <div class="mini-row" data-open-activity="${a.id}">
+            <span class="badge">${esc(a.type)}</span>
+            <div style="min-width:0">
+              <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.subject)}</div>
+              <div class="cell-sub">${esc(a.dealId ? (dealById(a.dealId) || {}).title || "—" : "No deal")}</div>
+            </div>
+            <div class="m-val act-due ${dueClass(a.due, a.done)}">${esc(relDate(a.due))}</div>
+          </div>`).join("") + `</div>`
+        : `<div class="mini-empty">Nothing overdue. Good place to be.</div>`}
+      </div>
+    </section>
+  </div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Pipeline board
+   ═══════════════════════════════════════════════════════════════ */
+const ui = {
+  deals:      { q:"", stage:"open", owner:"", sort:"closeDate", dir:1 },
+  contacts:   { q:"", sort:"lastName", dir:1 },
+  companies:  { q:"", sort:"name", dir:1 },
+  activities: { q:"", filter:"open" },
+  pipeline:   { owner:"" },
+};
+
+function ownerOptions(selected, allLabel = "All owners"){
+  const owners = ownerList();
+  return `<option value="">${esc(allLabel)}</option>` +
+    owners.map(o => `<option value="${esc(o)}"${o === selected ? " selected" : ""}>${esc(o)}</option>`).join("");
+}
+function ownerList(){
+  const set = new Set(state.owners || []);
+  state.deals.forEach(d => d.owner && set.add(d.owner));
+  state.companies.forEach(c => c.owner && set.add(c.owner));
+  if (state.settings.me) set.add(state.settings.me);
+  return Array.from(set).sort();
+}
+
+views.pipeline = () => {
+  const owner = ui.pipeline.owner;
+  const deals = openDeals().filter(d => !owner || d.owner === owner);
+  const total = sum(deals, d => d.value);
+
+  const cols = OPEN_STAGES.map((s, i) => {
+    const ds = deals.filter(d => d.stage === s.id)
+      .sort((a, b) => (a.closeDate || "9999").localeCompare(b.closeDate || "9999"));
+    const cards = ds.map(d => `
+      <article class="kcard" draggable="true" data-deal="${d.id}">
+        <div class="kcard-title">${esc(d.title)}</div>
+        <div class="kcard-co">${esc(companyName(d.companyId))}</div>
+        <div class="kcard-foot">
+          <span class="avatar" style="width:22px;height:22px;font-size:9px" title="${esc(d.owner || "Unassigned")}">${esc(initials(d.owner))}</span>
+          <span class="kcard-val">${esc(money(d.value))}</span>
+          <span class="kcard-date ${dueClass(d.closeDate)}">${esc(relDate(d.closeDate))}</span>
+        </div>
+      </article>`).join("");
+
+    return `
+      <section class="kcol" data-stage="${s.id}">
+        <header class="kcol-head">
+          <span class="kcol-bar" style="background:var(--ord-${i + 1})"></span>
+          <span class="kcol-name">${esc(s.name)}</span>
+          <span class="kcol-count">${ds.length}</span>
+          <span class="kcol-sum">${esc(moneyShort(sum(ds, d => d.value)))}</span>
+        </header>
+        <div class="kcol-body">${cards || `<div class="kcol-empty">Drop a deal here</div>`}</div>
+      </section>`;
+  }).join("");
+
+  return pageHead("Pipeline", `${deals.length} open ${deals.length === 1 ? "deal" : "deals"} · ${money(total)} · drag a card to change its stage`,
+    `<button class="btn btn-primary" data-act="new-deal">＋ New deal</button>`) + `
+    <div class="filters">
+      <select data-filter="pipeline.owner">${ownerOptions(owner)}</select>
+      <span class="badge info">Weighted ${esc(money(sum(deals, weighted)))}</span>
+    </div>
+    <div class="kanban">${cols}
+      <section class="kcol" data-stage="won" style="flex:0 0 200px">
+        <header class="kcol-head"><span class="kcol-bar" style="background:var(--good)"></span>
+          <span class="kcol-name">Won</span><span class="kcol-sum">${esc(moneyShort(sum(wonDeals(), d => d.value)))}</span></header>
+        <div class="kcol-body"><div class="kcol-empty">Drop here to mark won</div></div>
+      </section>
+      <section class="kcol" data-stage="lost" style="flex:0 0 200px">
+        <header class="kcol-head"><span class="kcol-bar" style="background:var(--bad)"></span>
+          <span class="kcol-name">Lost</span><span class="kcol-sum">${lostDeals().length}</span></header>
+        <div class="kcol-body"><div class="kcol-empty">Drop here to mark lost</div></div>
+      </section>
+    </div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Deals table
+   ═══════════════════════════════════════════════════════════════ */
+function sortBy(arr, key, dir, get){
+  return arr.slice().sort((a, b) => {
+    const x = get(a, key), y = get(b, key);
+    if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+    return String(x ?? "").localeCompare(String(y ?? ""), undefined, { numeric:true }) * dir;
+  });
+}
+function th(label, key, cfg, cls = ""){
+  const active = cfg.sort === key;
+  return `<th class="sortable ${cls}" data-sort="${key}">${esc(label)}
+    <span class="arrow">${active ? (cfg.dir === 1 ? "▲" : "▼") : "▲"}</span></th>`;
+}
+
+views.deals = () => {
+  const cfg = ui.deals;
+  const q = cfg.q.toLowerCase();
+  let rows = state.deals.filter(d => {
+    if (cfg.stage === "open"   && CLOSED_STAGES.includes(d.stage)) return false;
+    if (cfg.stage === "closed" && !CLOSED_STAGES.includes(d.stage)) return false;
+    if (["lead","qualified","proposal","negotiation","won","lost"].includes(cfg.stage) && d.stage !== cfg.stage) return false;
+    if (cfg.owner && d.owner !== cfg.owner) return false;
+    if (q && !(d.title + " " + companyName(d.companyId) + " " + (d.source || "")).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  rows = sortBy(rows, cfg.sort, cfg.dir, (d, k) =>
+    k === "value" ? Number(d.value) || 0 :
+    k === "company" ? companyName(d.companyId) :
+    k === "stage" ? stageIndex(d.stage) : d[k]);
+
+  const totalVal = sum(rows, d => d.value);
+
+  const body = rows.map(d => `
+    <tr data-open-deal="${d.id}">
+      <td class="cell-strong">${esc(d.title)}<div class="cell-sub">${esc(d.source || "—")}</div></td>
+      <td>${esc(companyName(d.companyId))}</td>
+      <td>${stageBadge(d.stage)}</td>
+      <td class="num cell-strong">${esc(money(d.value))}</td>
+      <td><span class="${dueClass(d.closeDate) === "overdue" && !CLOSED_STAGES.includes(d.stage) ? "act-due overdue" : ""}">${esc(fmtDate(d.closeDate))}</span></td>
+      <td><div class="with-avatar"><span class="avatar" style="width:24px;height:24px;font-size:10px">${esc(initials(d.owner))}</span>${esc(d.owner || "—")}</div></td>
+    </tr>`).join("");
+
+  return pageHead("Deals", `${rows.length} shown · ${money(totalVal)}`,
+    `<button class="btn" data-act="export" data-what="deals">Export CSV</button>
+     <button class="btn btn-primary" data-act="new-deal">＋ New deal</button>`) + `
+    <div class="filters">
+      <input type="search" placeholder="Filter deals…" data-filter="deals.q" value="${esc(cfg.q)}">
+      <select data-filter="deals.stage">
+        <option value="all"${cfg.stage === "all" ? " selected" : ""}>All stages</option>
+        <option value="open"${cfg.stage === "open" ? " selected" : ""}>Open only</option>
+        <option value="closed"${cfg.stage === "closed" ? " selected" : ""}>Closed only</option>
+        ${STAGES.map(s => `<option value="${s.id}"${cfg.stage === s.id ? " selected" : ""}>${esc(s.name)}</option>`).join("")}
+      </select>
+      <select data-filter="deals.owner">${ownerOptions(cfg.owner)}</select>
+    </div>
+    <div class="card"><div class="table-wrap">
+      <table><thead><tr>
+        ${th("Deal","title",cfg)}${th("Company","company",cfg)}${th("Stage","stage",cfg)}
+        ${th("Value","value",cfg,"num")}${th("Close date","closeDate",cfg)}${th("Owner","owner",cfg)}
+      </tr></thead><tbody>${body}</tbody></table>
+      ${rows.length ? "" : emptyBox("◇","No deals match","Try clearing the filters, or add your first deal.",
+        `<button class="btn btn-primary" data-act="new-deal">＋ New deal</button>`)}
+    </div></div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Contacts
+   ═══════════════════════════════════════════════════════════════ */
+views.contacts = () => {
+  const cfg = ui.contacts, q = cfg.q.toLowerCase();
+  let rows = state.contacts.filter(c =>
+    !q || (c.firstName + " " + c.lastName + " " + (c.email || "") + " " + (c.title || "") + " " + companyName(c.companyId)).toLowerCase().includes(q));
+  rows = sortBy(rows, cfg.sort, cfg.dir, (c, k) => k === "company" ? companyName(c.companyId) : c[k]);
+
+  const body = rows.map(c => `
+    <tr data-open-contact="${c.id}">
+      <td><div class="with-avatar"><span class="avatar">${esc(initials(c.firstName + " " + c.lastName))}</span>
+        <div><div class="cell-strong">${esc(c.firstName)} ${esc(c.lastName)}</div>
+        <div class="cell-sub">${esc(c.title || "—")}</div></div></div></td>
+      <td>${esc(companyName(c.companyId))}</td>
+      <td>${c.email ? `<a href="mailto:${esc(c.email)}" onclick="event.stopPropagation()">${esc(c.email)}</a>` : "—"}</td>
+      <td>${esc(c.phone || "—")}</td>
+      <td>${esc(c.owner || "—")}</td>
+    </tr>`).join("");
+
+  return pageHead("Contacts", `${state.contacts.length} people across ${state.companies.length} companies`,
+    `<button class="btn" data-act="export" data-what="contacts">Export CSV</button>
+     <button class="btn btn-primary" data-act="new-contact">＋ New contact</button>`) + `
+    <div class="filters">
+      <input type="search" placeholder="Filter contacts…" data-filter="contacts.q" value="${esc(cfg.q)}">
+    </div>
+    <div class="card"><div class="table-wrap">
+      <table><thead><tr>
+        ${th("Name","lastName",cfg)}${th("Company","company",cfg)}${th("Email","email",cfg)}
+        ${th("Phone","phone",cfg)}${th("Owner","owner",cfg)}
+      </tr></thead><tbody>${body}</tbody></table>
+      ${rows.length ? "" : emptyBox("☺","No contacts match","Add the people you sell to.",
+        `<button class="btn btn-primary" data-act="new-contact">＋ New contact</button>`)}
+    </div></div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Companies
+   ═══════════════════════════════════════════════════════════════ */
+views.companies = () => {
+  const cfg = ui.companies, q = cfg.q.toLowerCase();
+  let rows = state.companies.filter(c =>
+    !q || (c.name + " " + (c.industry || "") + " " + (c.city || "") + " " + (c.country || "")).toLowerCase().includes(q));
+  rows = sortBy(rows, cfg.sort, cfg.dir, (c, k) =>
+    k === "open"     ? sum(dealsForCompany(c.id).filter(d => !CLOSED_STAGES.includes(d.stage)), d => d.value) :
+    k === "deals"    ? dealsForCompany(c.id).length :
+    k === "contacts" ? contactsForCompany(c.id).length : c[k]);
+
+  const body = rows.map(c => {
+    const ds = dealsForCompany(c.id);
+    const openVal = sum(ds.filter(d => !CLOSED_STAGES.includes(d.stage)), d => d.value);
+    return `
+    <tr data-open-company="${c.id}">
+      <td><div class="with-avatar"><span class="avatar">${esc(initials(c.name))}</span>
+        <div><div class="cell-strong">${esc(c.name)}</div>
+        <div class="cell-sub">${esc([c.city, c.country].filter(Boolean).join(", ") || "—")}</div></div></div></td>
+      <td>${esc(c.industry || "—")}</td>
+      <td class="num">${contactsForCompany(c.id).length}</td>
+      <td class="num">${ds.length}</td>
+      <td class="num cell-strong">${esc(openVal ? money(openVal) : "—")}</td>
+      <td>${esc(c.owner || "—")}</td>
+    </tr>`;
+  }).join("");
+
+  return pageHead("Companies", `${state.companies.length} accounts`,
+    `<button class="btn" data-act="export" data-what="companies">Export CSV</button>
+     <button class="btn btn-primary" data-act="new-company">＋ New company</button>`) + `
+    <div class="filters">
+      <input type="search" placeholder="Filter companies…" data-filter="companies.q" value="${esc(cfg.q)}">
+    </div>
+    <div class="card"><div class="table-wrap">
+      <table><thead><tr>
+        ${th("Company","name",cfg)}${th("Industry","industry",cfg)}${th("Contacts","contacts",cfg,"num")}
+        ${th("Deals","deals",cfg,"num")}${th("Open value","open",cfg,"num")}${th("Owner","owner",cfg)}
+      </tr></thead><tbody>${body}</tbody></table>
+      ${rows.length ? "" : emptyBox("▣","No companies match","Accounts you sell to live here.",
+        `<button class="btn btn-primary" data-act="new-company">＋ New company</button>`)}
+    </div></div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Activities
+   ═══════════════════════════════════════════════════════════════ */
+views.activities = () => {
+  const cfg = ui.activities, q = cfg.q.toLowerCase(), today = todayISO();
+  const all = state.activities.slice().sort((a, b) => (a.due || "").localeCompare(b.due || ""));
+  const match = a => !q || (a.subject + " " + a.type + " " + (a.dealId ? (dealById(a.dealId) || {}).title || "" : "")).toLowerCase().includes(q);
+
+  const buckets = {
+    open:     all.filter(a => !a.done),
+    overdue:  all.filter(a => !a.done && a.due <  today),
+    today:    all.filter(a => !a.done && a.due === today),
+    upcoming: all.filter(a => !a.done && a.due >  today),
+    done:     all.filter(a =>  a.done).reverse(),
+    all,
+  };
+  const rows = buckets[cfg.filter].filter(match);
+
+  const chip = (id, label) =>
+    `<button class="filter-chip ${cfg.filter === id ? "active" : ""}" data-filter-set="activities.filter" data-value="${id}">
+      ${esc(label)} <span style="opacity:.7">${buckets[id].length}</span></button>`;
+
+  const list = rows.map(a => {
+    const deal = a.dealId ? dealById(a.dealId) : null;
+    return `
+    <div class="act-row ${a.done ? "is-done" : ""}" data-open-activity="${a.id}">
+      <button class="act-check ${a.done ? "done" : ""}" data-toggle-activity="${a.id}"
+        aria-label="${a.done ? "Mark as not done" : "Mark as done"}" title="${a.done ? "Mark as not done" : "Mark as done"}">✓</button>
+      <div class="act-main">
+        <div class="act-subject">${esc(a.subject)}</div>
+        <div class="act-meta">
+          <span class="badge">${esc(a.type)}</span>
+          ${deal ? `<span>${esc(deal.title)}</span>` : ""}
+          ${a.companyId ? `<span>· ${esc(companyName(a.companyId))}</span>` : ""}
+          <span class="act-due ${dueClass(a.due, a.done)}">${a.done ? "done" : esc(relDate(a.due))}</span>
+        </div>
+      </div>
+      <span class="avatar" style="width:24px;height:24px;font-size:10px" title="${esc(a.owner || "")}">${esc(initials(a.owner))}</span>
+    </div>`;
+  }).join("");
+
+  return pageHead("Activities", `${buckets.open.length} open · ${buckets.overdue.length} overdue`,
+    `<button class="btn btn-primary" data-act="new-activity">＋ New activity</button>`) + `
+    <div class="filters">
+      ${chip("open","Open")}${chip("overdue","Overdue")}${chip("today","Today")}
+      ${chip("upcoming","Upcoming")}${chip("done","Done")}${chip("all","All")}
+      <span class="spacer"></span>
+      <input type="search" placeholder="Filter activities…" data-filter="activities.q" value="${esc(cfg.q)}">
+    </div>
+    <div class="card">
+      ${rows.length ? list : emptyBox("✓","Nothing here","No activities in this view.",
+        `<button class="btn btn-primary" data-act="new-activity">＋ New activity</button>`)}
+    </div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Reports
+   ═══════════════════════════════════════════════════════════════ */
+views.reports = () => {
+  const won = wonDeals(), lost = lostDeals(), open = openDeals();
+  const closed = won.length + lost.length;
+
+  /* nominal categories → one series colour, length carries the value */
+  const bySource = SOURCES.map(s => {
+    const w = won.filter(d => d.source === s), l = lost.filter(d => d.source === s);
+    const o = open.filter(d => d.source === s);
+    return { label:s, value:sum(w, d => d.value), meta:w.length + "W / " + l.length + "L",
+             tip:[["Won", money(sum(w, d => d.value))], ["Deals won", String(w.length)],
+                  ["Lost", String(l.length)], ["Still open", String(o.length)]] };
+  }).filter(r => r.value > 0 || r.meta !== "0W / 0L").sort((a, b) => b.value - a.value);
+
+  const owners = ownerList().map(o => {
+    const w = won.filter(d => d.owner === o), l = lost.filter(d => d.owner === o), op = open.filter(d => d.owner === o);
+    return { owner:o, wonValue:sum(w, d => d.value), wonCount:w.length, lostCount:l.length,
+             pipeline:sum(op, d => d.value), rate:pct(w.length, w.length + l.length) };
+  }).filter(r => r.wonCount || r.lostCount || r.pipeline).sort((a, b) => b.wonValue - a.wonValue);
+
+  const reasons = {};
+  lost.forEach(d => { const r = d.lostReason || "Not recorded"; reasons[r] = (reasons[r] || 0) + 1; });
+  const lostRows = Object.entries(reasons)
+    .map(([label, n]) => ({ label, value:n, meta:pct(n, lost.length) + "%", tip:[["Deals lost", String(n)]] }))
+    .sort((a, b) => b.value - a.value);
+
+  /* Stage reach. Only open and won deals count: a lost deal records no exit
+     stage, so crediting it with every stage it sorts after would overstate reach. */
+  const tracked = state.deals.filter(d => d.stage !== "lost");
+  const funnel = OPEN_STAGES.map(s => {
+    const reached = tracked.filter(d => stageIndex(d.stage) >= stageIndex(s.id));
+    return { label:s.name, value:reached.length, meta:pct(reached.length, tracked.length) + "%",
+             tip:[["Deals reached", String(reached.length)], ["Of tracked deals", pct(reached.length, tracked.length) + "%"]] };
+  });
+
+  return pageHead("Reports", `${state.deals.length} deals · ${closed} closed · ${money(sum(won, d => d.value))} won all-time`,
+    `<button class="btn" data-act="print">Print</button>
+     <button class="btn" data-act="export" data-what="deals">Export CSV</button>`) + `
+  <div class="tiles">
+    <div class="tile"><div class="tile-label">Won all-time</div>
+      <div class="tile-value">${esc(money(sum(won, d => d.value)))}</div>
+      <div class="tile-meta">${won.length} deals</div></div>
+    <div class="tile"><div class="tile-label">Lost all-time</div>
+      <div class="tile-value">${esc(money(sum(lost, d => d.value)))}</div>
+      <div class="tile-meta">${lost.length} deals</div></div>
+    <div class="tile"><div class="tile-label">Average won deal</div>
+      <div class="tile-value">${esc(money(won.length ? sum(won, d => d.value) / won.length : 0))}</div>
+      <div class="tile-meta">across ${won.length} closed-won</div></div>
+    <div class="tile"><div class="tile-label">Open pipeline</div>
+      <div class="tile-value">${esc(money(sum(open, d => d.value)))}</div>
+      <div class="tile-meta">${open.length} deals · weighted ${esc(money(sum(open, weighted)))}</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <section class="card">
+      <div class="card-head"><div><div class="card-title">Won revenue by source</div>
+        <div class="card-sub">Which channels actually close</div></div></div>
+      <div class="card-body">${bySource.length
+        ? hBars(bySource, { note:"Bars are closed-won value; the W/L count sits on the right.", tableCols:["Source","Won / lost","Won value"] })
+        : `<div class="mini-empty">No closed deals yet.</div>`}</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div><div class="card-title">Why deals are lost</div>
+        <div class="card-sub">${lost.length} lost ${lost.length === 1 ? "deal" : "deals"}</div></div></div>
+      <div class="card-body">${lostRows.length
+        ? hBars(lostRows, { valueFmt:n => n + (n === 1 ? " deal" : " deals"), tableCols:["Reason","Share","Deals"] })
+        : `<div class="mini-empty">Nothing lost yet.</div>`}</div>
+    </section>
+  </div>
+
+  <div class="chart-grid" style="margin-top:14px">
+    <section class="card">
+      <div class="card-head"><div><div class="card-title">Stage reach</div>
+        <div class="card-sub">How far open &amp; won deals get</div></div></div>
+      <div class="card-body">${hBars(funnel, {
+        ordinal:true, valueFmt:n => n + (n === 1 ? " deal" : " deals"), tableCols:["Stage","Share","Deals"],
+        note:`Open and won deals only (${tracked.length} of ${state.deals.length}) — a lost deal does not record the stage it died in.` })}</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div><div class="card-title">Owner leaderboard</div>
+        <div class="card-sub">Closed-won value per rep</div></div></div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Owner</th><th class="num">Won</th><th class="num">Win rate</th><th class="num">Pipeline</th></tr></thead>
+        <tbody>${owners.length ? owners.map(o => `
+          <tr style="cursor:default">
+            <td><div class="with-avatar"><span class="avatar" style="width:24px;height:24px;font-size:10px">${esc(initials(o.owner))}</span>${esc(o.owner)}</div></td>
+            <td class="num cell-strong">${esc(money(o.wonValue))}<div class="cell-sub">${o.wonCount} ${o.wonCount === 1 ? "deal" : "deals"}</div></td>
+            <td class="num">${o.wonCount + o.lostCount ? o.rate + "%" : "—"}</td>
+            <td class="num">${esc(o.pipeline ? money(o.pipeline) : "—")}</td>
+          </tr>`).join("") : `<tr><td colspan="4" class="mini-empty">No owners yet.</td></tr>`}
+        </tbody></table>
+      </div>
+    </section>
+  </div>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Settings
+   ═══════════════════════════════════════════════════════════════ */
+views.settings = () => {
+  const s = state.settings;
+  return pageHead("Settings", "Org details, currency and your data") + `
+  <div class="chart-grid">
+    <section class="card">
+      <div class="card-head"><div class="card-title">Organisation</div></div>
+      <div class="card-body">
+        <div class="form-grid">
+          <div class="field full"><label for="setOrg">Company name</label>
+            <input id="setOrg" data-setting="orgName" value="${esc(s.orgName || "")}"></div>
+          <div class="field"><label for="setMe">Your name</label>
+            <input id="setMe" data-setting="me" value="${esc(s.me || "")}"></div>
+          <div class="field"><label for="setCur">Currency</label>
+            <select id="setCur" data-setting="currency">
+              ${Object.keys(CURRENCIES).map(c => `<option value="${c}"${s.currency === c ? " selected" : ""}>${c} ${CURRENCIES[c].symbol}</option>`).join("")}
+            </select></div>
+          <div class="field full"><label for="setTarget">Monthly revenue target</label>
+            <input id="setTarget" type="number" min="0" step="1000" data-setting="target" value="${esc(s.target || 0)}">
+            <span class="hint">Used for the “Won this month” tile on the dashboard.</span></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div class="card-title">Sales team</div>
+        <div class="card-actions"><button class="btn btn-sm" data-act="add-owner">＋ Add</button></div></div>
+      <div class="card-body">
+        <div class="mini-list">${(state.owners || []).length
+          ? state.owners.map(o => `<div class="mini-row" style="cursor:default">
+              <span class="avatar" style="width:24px;height:24px;font-size:10px">${esc(initials(o))}</span>${esc(o)}
+              <button class="btn btn-sm btn-danger" style="margin-left:auto" data-remove-owner="${esc(o)}">Remove</button>
+            </div>`).join("")
+          : `<div class="mini-empty">No reps yet — add the people who own deals.</div>`}</div>
+      </div>
+    </section>
+  </div>
+
+  <section class="card" style="margin-top:14px">
+    <div class="card-head"><div><div class="card-title">Data</div>
+      <div class="card-sub">Everything is stored in this browser only (localStorage) — export to keep a copy.</div></div></div>
+    <div class="card-body">
+      <div class="filters" style="margin:0">
+        <button class="btn" data-act="backup">⭳ Export backup (JSON)</button>
+        <button class="btn" data-act="restore">⭱ Import backup</button>
+        <button class="btn" data-act="export" data-what="deals">Deals CSV</button>
+        <button class="btn" data-act="export" data-what="contacts">Contacts CSV</button>
+        <button class="btn" data-act="export" data-what="companies">Companies CSV</button>
+        <span class="spacer"></span>
+        <button class="btn" data-act="seed">Reload demo data</button>
+        <button class="btn btn-danger" data-act="wipe">Delete everything</button>
+      </div>
+      <p class="chart-note">${state.deals.length} deals · ${state.contacts.length} contacts · ${state.companies.length} companies · ${state.activities.length} activities</p>
+    </div>
+  </section>`;
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   Modals
+   ═══════════════════════════════════════════════════════════════ */
+let onModalSubmit = null;
+let openRecord = null;   // {type,id} of the detail modal currently on screen
+
+function reopenRecord(){
+  if (!openRecord) return false;
+  const { type, id } = openRecord;
+  if (type === "deal")    dealDetail(id);
+  if (type === "contact") contactDetail(id);
+  if (type === "company") companyDetail(id);
+  return true;
+}
+
+function openModal(html, submitHandler){
+  onModalSubmit = submitHandler || null;
+  $("#modalRoot").innerHTML = `<div class="overlay" data-overlay>${html}</div>`;
+  const first = $("#modalRoot input, #modalRoot select, #modalRoot textarea");
+  if (first) first.focus();
+}
+function closeModal(){
+  $("#modalRoot").innerHTML = "";
+  onModalSubmit = null;
+  openRecord = null;
+}
+function modalShell(title, bodyHtml, footHtml, wide){
+  return `<div class="modal${wide ? " wide" : ""}" role="dialog" aria-modal="true" aria-label="${esc(title)}">
+    <div class="modal-head"><span class="modal-title">${esc(title)}</span>
+      <button class="close-x" data-act="close" aria-label="Close">×</button></div>
+    <div class="modal-body">${bodyHtml}</div>
+    <div class="modal-foot">${footHtml}</div>
+  </div>`;
+}
+function formVal(name){
+  const el = $(`#modalRoot [name="${name}"]`);
+  return el ? el.value.trim() : "";
+}
+function markInvalid(name, msg){
+  const el = $(`#modalRoot [name="${name}"]`);
+  if (!el) return;
+  el.classList.add("invalid");
+  const holder = el.closest(".field");
+  if (holder && !holder.querySelector(".err")){
+    const p = document.createElement("span");
+    p.className = "err";
+    p.textContent = msg;
+    holder.appendChild(p);
+  }
+  el.focus();
+}
+function clearInvalid(){
+  $$("#modalRoot .invalid").forEach(el => el.classList.remove("invalid"));
+  $$("#modalRoot .err").forEach(el => el.remove());
+}
+
+const selOptions = (items, valueKey, labelFn, selected, blank) =>
+  (blank ? `<option value="">${esc(blank)}</option>` : "") +
+  items.map(i => `<option value="${esc(i[valueKey])}"${i[valueKey] === selected ? " selected" : ""}>${esc(labelFn(i))}</option>`).join("");
+
+/* ── deal form ─────────────────────────────────────────── */
+function dealForm(deal){
+  openRecord = null;
+  const d = deal || { title:"", companyId:"", contactId:"", value:"", stage:"lead",
+                      closeDate:addDays(todayISO(), 30), source:"Inbound", owner:state.settings.me, notes:"", lostReason:"" };
+  const body = `<div class="form-grid">
+    <div class="field full"><label for="f-title">Deal name *</label>
+      <input id="f-title" name="title" value="${esc(d.title)}" placeholder="e.g. Vertex — line automation retrofit"></div>
+    <div class="field"><label for="f-company">Company</label>
+      <select id="f-company" name="companyId">${selOptions(state.companies, "id", c => c.name, d.companyId, "— none —")}</select></div>
+    <div class="field"><label for="f-contact">Primary contact</label>
+      <select id="f-contact" name="contactId">${selOptions(state.contacts, "id", c => c.firstName + " " + c.lastName + " · " + companyName(c.companyId), d.contactId, "— none —")}</select></div>
+    <div class="field"><label for="f-value">Value *</label>
+      <input id="f-value" name="value" type="number" min="0" step="100" value="${esc(d.value)}" placeholder="0"></div>
+    <div class="field"><label for="f-stage">Stage</label>
+      <select id="f-stage" name="stage">${STAGES.map(s => `<option value="${s.id}"${s.id === d.stage ? " selected" : ""}>${esc(s.name)} · ${s.prob}%</option>`).join("")}</select></div>
+    <div class="field"><label for="f-close">Expected close</label>
+      <input id="f-close" name="closeDate" type="date" value="${esc(d.closeDate || "")}"></div>
+    <div class="field"><label for="f-source">Source</label>
+      <select id="f-source" name="source">${SOURCES.map(s => `<option${s === d.source ? " selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+    <div class="field full"><label for="f-owner">Owner</label>
+      <select id="f-owner" name="owner">${ownerList().map(o => `<option${o === d.owner ? " selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+    <div class="field full"><label for="f-notes">Notes</label>
+      <textarea id="f-notes" name="notes" placeholder="Context, next steps, blockers…">${esc(d.notes || "")}</textarea></div>
+  </div>`;
+
+  openModal(modalShell(deal ? "Edit deal" : "New deal", body,
+    `${deal ? `<button class="btn btn-danger" data-act="delete-deal" data-id="${deal.id}">Delete</button>` : ""}
+     <span class="spacer"></span>
+     <button class="btn" data-act="close">Cancel</button>
+     <button class="btn btn-primary" data-act="submit">${deal ? "Save changes" : "Create deal"}</button>`, true),
+    () => {
+      clearInvalid();
+      const title = formVal("title");
+      const value = Number(formVal("value"));
+      if (!title){ markInvalid("title", "Give the deal a name"); return; }
+      if (!(value >= 0) || formVal("value") === ""){ markInvalid("value", "Enter a number"); return; }
+      const patch = {
+        title, value,
+        companyId: formVal("companyId") || null,
+        contactId: formVal("contactId") || null,
+        stage: formVal("stage"),
+        closeDate: formVal("closeDate"),
+        source: formVal("source"),
+        owner: formVal("owner"),
+        notes: $(`#modalRoot [name="notes"]`).value,
+      };
+      if (deal) Object.assign(deal, patch);
+      else state.deals.push(Object.assign({ id:uid(), createdAt:todayISO(), lostReason:"" }, patch));
+      save(); closeModal(); render();
+      toast(deal ? "Deal updated" : "Deal created");
+    });
+}
+
+/* ── contact form ──────────────────────────────────────── */
+function contactForm(contact){
+  openRecord = null;
+  const c = contact || { firstName:"", lastName:"", title:"", companyId:"", email:"", phone:"", owner:state.settings.me, notes:"" };
+  const body = `<div class="form-grid">
+    <div class="field"><label for="f-first">First name *</label><input id="f-first" name="firstName" value="${esc(c.firstName)}"></div>
+    <div class="field"><label for="f-last">Last name *</label><input id="f-last" name="lastName" value="${esc(c.lastName)}"></div>
+    <div class="field"><label for="f-jt">Job title</label><input id="f-jt" name="title" value="${esc(c.title || "")}"></div>
+    <div class="field"><label for="f-co">Company</label>
+      <select id="f-co" name="companyId">${selOptions(state.companies, "id", x => x.name, c.companyId, "— none —")}</select></div>
+    <div class="field"><label for="f-email">Email</label><input id="f-email" name="email" type="email" value="${esc(c.email || "")}"></div>
+    <div class="field"><label for="f-phone">Phone</label><input id="f-phone" name="phone" value="${esc(c.phone || "")}"></div>
+    <div class="field full"><label for="f-cowner">Owner</label>
+      <select id="f-cowner" name="owner">${ownerList().map(o => `<option${o === c.owner ? " selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+    <div class="field full"><label for="f-cnotes">Notes</label><textarea id="f-cnotes" name="notes">${esc(c.notes || "")}</textarea></div>
+  </div>`;
+
+  openModal(modalShell(contact ? "Edit contact" : "New contact", body,
+    `${contact ? `<button class="btn btn-danger" data-act="delete-contact" data-id="${contact.id}">Delete</button>` : ""}
+     <span class="spacer"></span>
+     <button class="btn" data-act="close">Cancel</button>
+     <button class="btn btn-primary" data-act="submit">${contact ? "Save changes" : "Create contact"}</button>`),
+    () => {
+      clearInvalid();
+      if (!formVal("firstName")){ markInvalid("firstName", "Required"); return; }
+      if (!formVal("lastName")){ markInvalid("lastName", "Required"); return; }
+      const email = formVal("email");
+      if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)){ markInvalid("email", "That does not look like an email"); return; }
+      const patch = {
+        firstName:formVal("firstName"), lastName:formVal("lastName"), title:formVal("title"),
+        companyId:formVal("companyId") || null, email, phone:formVal("phone"),
+        owner:formVal("owner"), notes:$(`#modalRoot [name="notes"]`).value,
+      };
+      if (contact) Object.assign(contact, patch);
+      else state.contacts.push(Object.assign({ id:uid(), createdAt:todayISO() }, patch));
+      save(); closeModal(); render();
+      toast(contact ? "Contact updated" : "Contact created");
+    });
+}
+
+/* ── company form ──────────────────────────────────────── */
+function companyForm(company){
+  openRecord = null;
+  const c = company || { name:"", industry:"", website:"", phone:"", city:"", country:"", size:"", owner:state.settings.me, notes:"" };
+  const body = `<div class="form-grid">
+    <div class="field full"><label for="f-name">Company name *</label><input id="f-name" name="name" value="${esc(c.name)}"></div>
+    <div class="field"><label for="f-ind">Industry</label>
+      <select id="f-ind" name="industry"><option value="">— none —</option>
+        ${INDUSTRIES.map(i => `<option${i === c.industry ? " selected" : ""}>${esc(i)}</option>`).join("")}</select></div>
+    <div class="field"><label for="f-size">Headcount</label>
+      <select id="f-size" name="size"><option value="">— none —</option>
+        ${["1-10","10-50","50-250","250-1000","1000+"].map(s => `<option${s === c.size ? " selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+    <div class="field"><label for="f-city">City</label><input id="f-city" name="city" value="${esc(c.city || "")}"></div>
+    <div class="field"><label for="f-country">Country</label><input id="f-country" name="country" value="${esc(c.country || "")}"></div>
+    <div class="field"><label for="f-web">Website</label><input id="f-web" name="website" value="${esc(c.website || "")}"></div>
+    <div class="field"><label for="f-cophone">Phone</label><input id="f-cophone" name="phone" value="${esc(c.phone || "")}"></div>
+    <div class="field full"><label for="f-coowner">Owner</label>
+      <select id="f-coowner" name="owner">${ownerList().map(o => `<option${o === c.owner ? " selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+    <div class="field full"><label for="f-conotes">Notes</label><textarea id="f-conotes" name="notes">${esc(c.notes || "")}</textarea></div>
+  </div>`;
+
+  openModal(modalShell(company ? "Edit company" : "New company", body,
+    `${company ? `<button class="btn btn-danger" data-act="delete-company" data-id="${company.id}">Delete</button>` : ""}
+     <span class="spacer"></span>
+     <button class="btn" data-act="close">Cancel</button>
+     <button class="btn btn-primary" data-act="submit">${company ? "Save changes" : "Create company"}</button>`),
+    () => {
+      clearInvalid();
+      if (!formVal("name")){ markInvalid("name", "Required"); return; }
+      const patch = {
+        name:formVal("name"), industry:formVal("industry"), size:formVal("size"),
+        city:formVal("city"), country:formVal("country"), website:formVal("website"),
+        phone:formVal("phone"), owner:formVal("owner"), notes:$(`#modalRoot [name="notes"]`).value,
+      };
+      if (company) Object.assign(company, patch);
+      else state.companies.push(Object.assign({ id:uid(), createdAt:todayISO() }, patch));
+      save(); closeModal(); render();
+      toast(company ? "Company updated" : "Company created");
+    });
+}
+
+/* ── activity form ─────────────────────────────────────── */
+function activityForm(activity, presetDealId){
+  openRecord = null;
+  const a = activity || { type:"Call", subject:"", dealId:presetDealId || "", contactId:"", companyId:"",
+                          due:todayISO(), done:false, owner:state.settings.me, notes:"" };
+  const body = `<div class="form-grid">
+    <div class="field"><label for="f-type">Type</label>
+      <select id="f-type" name="type">${ACT_TYPES.map(t => `<option${t === a.type ? " selected" : ""}>${esc(t)}</option>`).join("")}</select></div>
+    <div class="field"><label for="f-due">Due</label><input id="f-due" name="due" type="date" value="${esc(a.due || todayISO())}"></div>
+    <div class="field full"><label for="f-subj">Subject *</label>
+      <input id="f-subj" name="subject" value="${esc(a.subject)}" placeholder="e.g. Chase signed order form"></div>
+    <div class="field full"><label for="f-adeal">Related deal</label>
+      <select id="f-adeal" name="dealId">${selOptions(state.deals, "id", d => d.title, a.dealId, "— none —")}</select></div>
+    <div class="field full"><label for="f-aowner">Owner</label>
+      <select id="f-aowner" name="owner">${ownerList().map(o => `<option${o === a.owner ? " selected" : ""}>${esc(o)}</option>`).join("")}</select></div>
+    <div class="field full"><label for="f-anotes">Notes</label><textarea id="f-anotes" name="notes">${esc(a.notes || "")}</textarea></div>
+  </div>`;
+
+  openModal(modalShell(activity ? "Edit activity" : "New activity", body,
+    `${activity ? `<button class="btn btn-danger" data-act="delete-activity" data-id="${activity.id}">Delete</button>` : ""}
+     <span class="spacer"></span>
+     <button class="btn" data-act="close">Cancel</button>
+     <button class="btn btn-primary" data-act="submit">${activity ? "Save changes" : "Create activity"}</button>`),
+    () => {
+      clearInvalid();
+      if (!formVal("subject")){ markInvalid("subject", "Say what needs doing"); return; }
+      const deal = formVal("dealId") ? dealById(formVal("dealId")) : null;
+      const patch = {
+        type:formVal("type"), subject:formVal("subject"), due:formVal("due") || todayISO(),
+        dealId:deal ? deal.id : null, contactId:deal ? deal.contactId : null,
+        companyId:deal ? deal.companyId : null, owner:formVal("owner"),
+        notes:$(`#modalRoot [name="notes"]`).value,
+      };
+      if (activity) Object.assign(activity, patch);
+      else state.activities.push(Object.assign({ id:uid(), done:false, createdAt:todayISO() }, patch));
+      save(); closeModal(); render();
+      toast(activity ? "Activity updated" : "Activity created");
+    });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Record detail views
+   ═══════════════════════════════════════════════════════════════ */
+function dealDetail(id){
+  const d = dealById(id);
+  if (!d) return;
+  openRecord = { type:"deal", id };
+  const idx = stageIndex(d.stage);
+  const acts = activitiesForDeal(d.id).sort((a, b) => (a.due || "").localeCompare(b.due || ""));
+  const track = OPEN_STAGES.concat([stageById("won")]).map((s, i) => {
+    const si = stageIndex(s.id);
+    const cls = d.stage === "lost" ? "" : si === idx ? "current" : si < idx ? "done" : "";
+    return `<div class="stage-step ${cls}">${esc(s.name)}</div>`;
+  }).join("");
+
+  const body = `
+    <dl class="dl">
+      <dt>Company</dt><dd>${d.companyId ? `<a href="#" data-open-company="${d.companyId}">${esc(companyName(d.companyId))}</a>` : "—"}</dd>
+      <dt>Contact</dt><dd>${d.contactId ? `<a href="#" data-open-contact="${d.contactId}">${esc(contactName(d.contactId))}</a>` : "—"}</dd>
+      <dt>Value</dt><dd>${esc(money(d.value))} <span class="cell-sub">· weighted ${esc(money(weighted(d)))}</span></dd>
+      <dt>Stage</dt><dd>${stageBadge(d.stage)} <span class="cell-sub">${stageById(d.stage).prob}% probability</span></dd>
+      <dt>Expected close</dt><dd>${esc(fmtDate(d.closeDate))} <span class="cell-sub">· ${esc(relDate(d.closeDate))}</span></dd>
+      <dt>Source</dt><dd>${esc(d.source || "—")}</dd>
+      <dt>Owner</dt><dd>${esc(d.owner || "—")}</dd>
+      <dt>Created</dt><dd>${esc(fmtDate(d.createdAt))}</dd>
+      ${d.stage === "lost" ? `<dt>Lost reason</dt><dd>${esc(d.lostReason || "Not recorded")}</dd>` : ""}
+    </dl>
+    ${d.stage === "lost" ? "" : `<div class="stage-track">${track}</div>`}
+    ${d.notes ? `<div class="section-title">Notes</div><div style="white-space:pre-wrap;font-size:13px">${esc(d.notes)}</div>` : ""}
+    <div class="section-title">Activities (${acts.length})</div>
+    <div class="mini-list">${acts.length ? acts.map(a => `
+      <div class="mini-row" data-open-activity="${a.id}">
+        <button class="act-check ${a.done ? "done" : ""}" data-toggle-activity="${a.id}" aria-label="Toggle done">✓</button>
+        <div style="min-width:0"><div style="font-weight:600">${esc(a.subject)}</div>
+          <div class="cell-sub">${esc(a.type)}</div></div>
+        <div class="m-val act-due ${dueClass(a.due, a.done)}">${a.done ? "done" : esc(relDate(a.due))}</div>
+      </div>`).join("") : `<div class="mini-empty">No activities logged.</div>`}
+    </div>
+    <div style="margin-top:10px"><button class="btn btn-sm" data-act="new-activity" data-deal="${d.id}">＋ Add activity</button></div>`;
+
+  const closed = CLOSED_STAGES.includes(d.stage);
+  openModal(modalShell(d.title, body,
+    `<button class="btn" data-act="edit-deal" data-id="${d.id}">Edit</button>
+     <span class="spacer"></span>
+     ${closed ? `<button class="btn" data-act="reopen-deal" data-id="${d.id}">Reopen</button>`
+              : `<button class="btn btn-danger" data-act="lose-deal" data-id="${d.id}">Mark lost</button>
+                 <button class="btn btn-primary" data-act="win-deal" data-id="${d.id}">Mark won</button>`}`, true));
+}
+
+function contactDetail(id){
+  const c = contactById(id);
+  if (!c) return;
+  openRecord = { type:"contact", id };
+  const deals = state.deals.filter(d => d.contactId === c.id);
+  const body = `
+    <div class="rec-head" style="padding:0 0 16px;border:none">
+      <span class="avatar lg">${esc(initials(c.firstName + " " + c.lastName))}</span>
+      <div><div class="rec-title">${esc(c.firstName)} ${esc(c.lastName)}</div>
+        <div class="rec-sub">${esc(c.title || "—")}${c.companyId ? " · " + esc(companyName(c.companyId)) : ""}</div></div>
+    </div>
+    <dl class="dl">
+      <dt>Email</dt><dd>${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : "—"}</dd>
+      <dt>Phone</dt><dd>${esc(c.phone || "—")}</dd>
+      <dt>Company</dt><dd>${c.companyId ? `<a href="#" data-open-company="${c.companyId}">${esc(companyName(c.companyId))}</a>` : "—"}</dd>
+      <dt>Owner</dt><dd>${esc(c.owner || "—")}</dd>
+    </dl>
+    ${c.notes ? `<div class="section-title">Notes</div><div style="white-space:pre-wrap;font-size:13px">${esc(c.notes)}</div>` : ""}
+    <div class="section-title">Deals (${deals.length})</div>
+    <div class="mini-list">${deals.length ? deals.map(d => `
+      <div class="mini-row" data-open-deal="${d.id}">${stageBadge(d.stage)}
+        <div style="min-width:0;font-weight:600">${esc(d.title)}</div>
+        <div class="m-val">${esc(money(d.value))}</div></div>`).join("")
+      : `<div class="mini-empty">No deals for this contact yet.</div>`}</div>`;
+
+  openModal(modalShell("Contact", body,
+    `<button class="btn" data-act="edit-contact" data-id="${c.id}">Edit</button>
+     <span class="spacer"></span>
+     <button class="btn" data-act="close">Close</button>`));
+}
+
+function companyDetail(id){
+  const co = companyById(id);
+  if (!co) return;
+  openRecord = { type:"company", id };
+  const deals = dealsForCompany(co.id);
+  const people = contactsForCompany(co.id);
+  const openVal = sum(deals.filter(d => !CLOSED_STAGES.includes(d.stage)), d => d.value);
+  const wonVal  = sum(deals.filter(d => d.stage === "won"), d => d.value);
+  const body = `
+    <div class="rec-head" style="padding:0 0 16px;border:none">
+      <span class="avatar lg">${esc(initials(co.name))}</span>
+      <div><div class="rec-title">${esc(co.name)}</div>
+        <div class="rec-sub">${esc([co.industry, co.city, co.country].filter(Boolean).join(" · ") || "—")}</div></div>
+    </div>
+    <div class="tiles" style="margin-bottom:4px;grid-template-columns:1fr 1fr">
+      <div class="tile" style="padding:12px 14px"><div class="tile-label">Open pipeline</div>
+        <div class="tile-value" style="font-size:20px">${esc(money(openVal))}</div></div>
+      <div class="tile" style="padding:12px 14px"><div class="tile-label">Won all-time</div>
+        <div class="tile-value" style="font-size:20px">${esc(money(wonVal))}</div></div>
+    </div>
+    <dl class="dl" style="margin-top:16px">
+      <dt>Website</dt><dd>${co.website ? `<a href="https://${esc(co.website.replace(/^https?:\/\//, ""))}" target="_blank" rel="noopener">${esc(co.website)}</a>` : "—"}</dd>
+      <dt>Phone</dt><dd>${esc(co.phone || "—")}</dd>
+      <dt>Headcount</dt><dd>${esc(co.size || "—")}</dd>
+      <dt>Owner</dt><dd>${esc(co.owner || "—")}</dd>
+    </dl>
+    ${co.notes ? `<div class="section-title">Notes</div><div style="white-space:pre-wrap;font-size:13px">${esc(co.notes)}</div>` : ""}
+    <div class="section-title">Contacts (${people.length})</div>
+    <div class="mini-list">${people.length ? people.map(p => `
+      <div class="mini-row" data-open-contact="${p.id}">
+        <span class="avatar" style="width:24px;height:24px;font-size:10px">${esc(initials(p.firstName + " " + p.lastName))}</span>
+        <div style="min-width:0"><div style="font-weight:600">${esc(p.firstName)} ${esc(p.lastName)}</div>
+          <div class="cell-sub">${esc(p.title || "—")}</div></div></div>`).join("")
+      : `<div class="mini-empty">No contacts yet.</div>`}</div>
+    <div class="section-title">Deals (${deals.length})</div>
+    <div class="mini-list">${deals.length ? deals.map(d => `
+      <div class="mini-row" data-open-deal="${d.id}">${stageBadge(d.stage)}
+        <div style="min-width:0;font-weight:600">${esc(d.title)}</div>
+        <div class="m-val">${esc(money(d.value))}</div></div>`).join("")
+      : `<div class="mini-empty">No deals yet.</div>`}</div>`;
+
+  openModal(modalShell("Company", body,
+    `<button class="btn" data-act="edit-company" data-id="${co.id}">Edit</button>
+     <span class="spacer"></span>
+     <button class="btn" data-act="new-deal" data-company="${co.id}">＋ Deal</button>
+     <button class="btn" data-act="close">Close</button>`, true));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Import / export
+   ═══════════════════════════════════════════════════════════════ */
+function download(filename, text, type = "text/plain"){
+  const blob = new Blob([text], { type: type + ";charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+function toCSV(rows, cols){
+  const cell = v => {
+    const s = String(v ?? "");
+    return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+  };
+  return [cols.map(c => cell(c.label)).join(",")]
+    .concat(rows.map(r => cols.map(c => cell(c.get(r))).join(",")))
+    .join("\r\n");
+}
+function exportCSV(what){
+  const stamp = todayISO();
+  if (what === "deals"){
+    download(`deals-${stamp}.csv`, toCSV(state.deals, [
+      { label:"Deal", get:d => d.title },
+      { label:"Company", get:d => companyName(d.companyId) },
+      { label:"Contact", get:d => d.contactId ? contactName(d.contactId) : "" },
+      { label:"Stage", get:d => stageById(d.stage).name },
+      { label:"Value", get:d => d.value },
+      { label:"Currency", get:() => state.settings.currency },
+      { label:"Close date", get:d => d.closeDate },
+      { label:"Source", get:d => d.source },
+      { label:"Owner", get:d => d.owner },
+      { label:"Lost reason", get:d => d.lostReason || "" },
+    ]), "text/csv");
+  } else if (what === "contacts"){
+    download(`contacts-${stamp}.csv`, toCSV(state.contacts, [
+      { label:"First name", get:c => c.firstName },
+      { label:"Last name", get:c => c.lastName },
+      { label:"Job title", get:c => c.title },
+      { label:"Company", get:c => companyName(c.companyId) },
+      { label:"Email", get:c => c.email },
+      { label:"Phone", get:c => c.phone },
+      { label:"Owner", get:c => c.owner },
+    ]), "text/csv");
+  } else {
+    download(`companies-${stamp}.csv`, toCSV(state.companies, [
+      { label:"Company", get:c => c.name },
+      { label:"Industry", get:c => c.industry },
+      { label:"City", get:c => c.city },
+      { label:"Country", get:c => c.country },
+      { label:"Headcount", get:c => c.size },
+      { label:"Website", get:c => c.website },
+      { label:"Phone", get:c => c.phone },
+      { label:"Open deals", get:c => dealsForCompany(c.id).filter(d => !CLOSED_STAGES.includes(d.stage)).length },
+      { label:"Owner", get:c => c.owner },
+    ]), "text/csv");
+  }
+  toast("CSV exported");
+}
+function backup(){
+  download(`crm-backup-${todayISO()}.json`, JSON.stringify(state, null, 2), "application/json");
+  toast("Backup downloaded");
+}
+function restore(){
+  const input = document.createElement("input");
+  input.type = "file";
+  input.accept = "application/json,.json";
+  input.onchange = () => {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(String(reader.result));
+        if (!parsed || !Array.isArray(parsed.deals)) throw new Error("not a CRM backup");
+        state = Object.assign(emptyState(), parsed);
+        state.settings = Object.assign(emptyState().settings, parsed.settings || {});
+        save(); render();
+        toast("Backup restored");
+      } catch (err){
+        toast("That file is not a CRM backup");
+        console.warn(err);
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Events
+   ═══════════════════════════════════════════════════════════════ */
+function setStage(deal, stage){
+  if (!deal || deal.stage === stage) return;
+  deal.stage = stage;
+  if (stage === "won" || stage === "lost"){
+    if (!deal.closeDate || deal.closeDate > todayISO()) deal.closeDate = todayISO();
+    if (stage === "lost" && !deal.lostReason) deal.lostReason = "Not recorded";
+  }
+  save();
+}
+
+document.addEventListener("click", e => {
+  /* overlay backdrop closes the modal */
+  if (e.target.matches("[data-overlay]")){ closeModal(); return; }
+
+  const toggle = e.target.closest("[data-toggle-activity]");
+  if (toggle){
+    e.stopPropagation();
+    const a = state.activities.find(x => x.id === toggle.dataset.toggleActivity);
+    if (a){
+      a.done = !a.done; save();
+      const rec = openRecord;
+      render();
+      if (rec){ openRecord = rec; reopenRecord(); }
+      else if ($("#modalRoot").innerHTML) closeModal();
+    }
+    return;
+  }
+
+  const btn = e.target.closest("[data-act]");
+  if (btn){
+    const id = btn.dataset.id;
+    switch (btn.dataset.act){
+      case "close":  closeModal(); return;
+      case "submit": if (onModalSubmit) onModalSubmit(); return;
+      case "goto":   go(btn.dataset.route); return;
+      case "print":  window.print(); return;
+      case "new-deal":
+        closeModal();
+        dealForm(null);
+        if (btn.dataset.company) $(`#modalRoot [name="companyId"]`).value = btn.dataset.company;
+        return;
+      case "new-contact":  contactForm(null); return;
+      case "new-company":  companyForm(null); return;
+      case "new-activity": { const d = btn.dataset.deal; closeModal(); activityForm(null, d); return; }
+      case "edit-deal":    { const d = dealById(id); closeModal(); dealForm(d); return; }
+      case "edit-contact": { const c = contactById(id); closeModal(); contactForm(c); return; }
+      case "edit-company": { const c = companyById(id); closeModal(); companyForm(c); return; }
+      case "win-deal":     setStage(dealById(id), "won");  closeModal(); render(); toast("Deal won 🎉"); return;
+      case "lose-deal":    setStage(dealById(id), "lost"); closeModal(); render(); toast("Deal marked lost"); return;
+      case "reopen-deal":  setStage(dealById(id), "negotiation"); closeModal(); render(); toast("Deal reopened"); return;
+      case "delete-deal":
+        if (!confirm("Delete this deal? Its activities stay, unlinked.")) return;
+        state.deals = state.deals.filter(d => d.id !== id);
+        state.activities.forEach(a => { if (a.dealId === id) a.dealId = null; });
+        save(); closeModal(); render(); toast("Deal deleted"); return;
+      case "delete-contact":
+        if (!confirm("Delete this contact?")) return;
+        state.contacts = state.contacts.filter(c => c.id !== id);
+        state.deals.forEach(d => { if (d.contactId === id) d.contactId = null; });
+        save(); closeModal(); render(); toast("Contact deleted"); return;
+      case "delete-company": {
+        const n = dealsForCompany(id).length + contactsForCompany(id).length;
+        if (!confirm(n ? `Delete this company? ${n} linked record(s) will be unlinked.` : "Delete this company?")) return;
+        state.companies = state.companies.filter(c => c.id !== id);
+        state.deals.forEach(d => { if (d.companyId === id) d.companyId = null; });
+        state.contacts.forEach(c => { if (c.companyId === id) c.companyId = null; });
+        save(); closeModal(); render(); toast("Company deleted"); return;
+      }
+      case "delete-activity":
+        if (!confirm("Delete this activity?")) return;
+        state.activities = state.activities.filter(a => a.id !== id);
+        save(); closeModal(); render(); toast("Activity deleted"); return;
+      case "export":  exportCSV(btn.dataset.what); return;
+      case "backup":  backup();  return;
+      case "restore": restore(); return;
+      case "add-owner": {
+        const name = prompt("Name of the sales rep");
+        if (name && name.trim()){
+          state.owners = Array.from(new Set((state.owners || []).concat(name.trim())));
+          save(); render();
+        }
+        return;
+      }
+      case "seed":
+        if (!confirm("Replace everything with the demo data set?")) return;
+        seedDemo(); render(); toast("Demo data loaded"); return;
+      case "wipe":
+        if (!confirm("Delete every record in this browser? This cannot be undone.")) return;
+        state = emptyState(); save(); render(); toast("All data deleted"); return;
+    }
+  }
+
+  const rmOwner = e.target.closest("[data-remove-owner]");
+  if (rmOwner){
+    state.owners = (state.owners || []).filter(o => o !== rmOwner.dataset.removeOwner);
+    save(); render();
+    return;
+  }
+
+  /* record openers */
+  const openDeal = e.target.closest("[data-open-deal]");
+  if (openDeal){ e.preventDefault(); dealDetail(openDeal.dataset.openDeal); return; }
+  const openContact = e.target.closest("[data-open-contact]");
+  if (openContact){ e.preventDefault(); contactDetail(openContact.dataset.openContact); return; }
+  const openCompany = e.target.closest("[data-open-company]");
+  if (openCompany){ e.preventDefault(); companyDetail(openCompany.dataset.openCompany); return; }
+  const openAct = e.target.closest("[data-open-activity]");
+  if (openAct){
+    e.preventDefault();
+    const a = state.activities.find(x => x.id === openAct.dataset.openActivity);
+    closeModal();
+    if (a) activityForm(a);
+    return;
+  }
+
+  /* sortable table headers */
+  const sortTh = e.target.closest("th[data-sort]");
+  if (sortTh){
+    const cfg = ui[currentRoute];
+    if (cfg){
+      const key = sortTh.dataset.sort;
+      if (cfg.sort === key) cfg.dir = -cfg.dir;
+      else { cfg.sort = key; cfg.dir = 1; }
+      render();
+    }
+    return;
+  }
+
+  /* filter chips */
+  const chip = e.target.closest("[data-filter-set]");
+  if (chip){
+    const [view, key] = chip.dataset.filterSet.split(".");
+    ui[view][key] = chip.dataset.value;
+    render();
+    return;
+  }
+
+  if (!e.target.closest(".search-wrap")) hideSearch();
+});
+
+/* filter inputs & settings, debounced for text */
+let filterTimer = null;
+document.addEventListener("input", e => {
+  const f = e.target.closest("[data-filter]");
+  if (f){
+    const [view, key] = f.dataset.filter.split(".");
+    ui[view][key] = f.value;
+    clearTimeout(filterTimer);
+    const isText = f.type === "search" || f.type === "text";
+    filterTimer = setTimeout(() => {
+      render();
+      if (isText){
+        const again = $(`[data-filter="${f.dataset.filter}"]`);
+        if (again){ again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      }
+    }, isText ? 220 : 0);
+    return;
+  }
+  const s = e.target.closest("[data-setting]");
+  if (s){
+    const key = s.dataset.setting;
+    state.settings[key] = key === "target" ? Number(s.value) || 0 : s.value;
+    save();
+    refreshChrome();
+    return;
+  }
+});
+document.addEventListener("change", e => {
+  const s = e.target.closest("[data-setting]");
+  if (s && s.tagName === "SELECT"){ state.settings[s.dataset.setting] = s.value; save(); render(); }
+});
+
+/* ── drag & drop on the pipeline board ─────────────────── */
+let draggedId = null;
+document.addEventListener("dragstart", e => {
+  const card = e.target.closest(".kcard");
+  if (!card) return;
+  draggedId = card.dataset.deal;
+  card.classList.add("dragging");
+  e.dataTransfer.effectAllowed = "move";
+  try { e.dataTransfer.setData("text/plain", draggedId); } catch {}
+});
+document.addEventListener("dragend", () => {
+  draggedId = null;
+  $$(".dragging").forEach(el => el.classList.remove("dragging"));
+  $$(".drag-over").forEach(el => el.classList.remove("drag-over"));
+});
+document.addEventListener("dragover", e => {
+  const col = e.target.closest(".kcol");
+  if (!col || !draggedId) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = "move";
+  $$(".drag-over").forEach(el => el.classList.remove("drag-over"));
+  col.classList.add("drag-over");
+});
+document.addEventListener("drop", e => {
+  const col = e.target.closest(".kcol");
+  if (!col || !draggedId) return;
+  e.preventDefault();
+  const deal = dealById(draggedId);
+  const stage = col.dataset.stage;
+  draggedId = null;
+  if (deal && deal.stage !== stage){
+    setStage(deal, stage);
+    render();
+    toast(`${deal.title} → ${stageById(stage).name}`);
+  } else {
+    $$(".drag-over").forEach(el => el.classList.remove("drag-over"));
+  }
+});
+
+/* ── global search ─────────────────────────────────────── */
+function hideSearch(){ $("#searchResults").hidden = true; }
+
+function runSearch(q){
+  const box = $("#searchResults");
+  const term = q.trim().toLowerCase();
+  if (term.length < 1){ hideSearch(); return; }
+
+  const hits = [];
+  state.deals.forEach(d => {
+    if ((d.title + " " + companyName(d.companyId)).toLowerCase().includes(term))
+      hits.push({ kind:"Deal", label:d.title, sub:companyName(d.companyId) + " · " + money(d.value), attr:`data-open-deal="${d.id}"` });
+  });
+  state.contacts.forEach(c => {
+    if ((c.firstName + " " + c.lastName + " " + (c.email || "")).toLowerCase().includes(term))
+      hits.push({ kind:"Contact", label:c.firstName + " " + c.lastName, sub:c.title || companyName(c.companyId), attr:`data-open-contact="${c.id}"` });
+  });
+  state.companies.forEach(c => {
+    if (c.name.toLowerCase().includes(term))
+      hits.push({ kind:"Company", label:c.name, sub:[c.industry, c.city].filter(Boolean).join(" · "), attr:`data-open-company="${c.id}"` });
+  });
+
+  box.innerHTML = hits.length
+    ? hits.slice(0, 12).map(h => `<div class="sr-item" ${h.attr}>
+        <div style="min-width:0"><div style="font-weight:600">${esc(h.label)}</div>
+        <div class="cell-sub">${esc(h.sub || "")}</div></div>
+        <span class="sr-kind">${esc(h.kind)}</span></div>`).join("")
+    : `<div class="sr-empty">Nothing matches “${esc(q)}”.</div>`;
+  box.hidden = false;
+}
+
+$("#globalSearch").addEventListener("input", e => runSearch(e.target.value));
+$("#globalSearch").addEventListener("focus", e => { if (e.target.value) runSearch(e.target.value); });
+$("#searchResults").addEventListener("click", () => {
+  hideSearch();
+  $("#globalSearch").value = "";
+});
+
+/* ── keyboard ──────────────────────────────────────────── */
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape"){
+    if ($("#modalRoot").innerHTML) closeModal();
+    else { hideSearch(); $("#globalSearch").blur(); }
+    return;
+  }
+  if (e.key === "Enter" && $("#modalRoot").innerHTML && onModalSubmit){
+    if (e.target.tagName === "TEXTAREA") return;
+    if (e.target.closest("#modalRoot")){ e.preventDefault(); onModalSubmit(); }
+    return;
+  }
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName);
+  if (typing || $("#modalRoot").innerHTML) return;
+  if (e.key === "/"){ e.preventDefault(); $("#globalSearch").focus(); }
+  if (e.key.toLowerCase() === "n"){ e.preventDefault(); dealForm(null); }
+});
+
+/* ── theme ─────────────────────────────────────────────── */
+function applyTheme(theme){
+  document.documentElement.dataset.theme = theme;
+  try { localStorage.setItem(THEME_KEY, theme); } catch {}
+  $("#themeBtn").textContent = theme === "dark" ? "☀" : "◐";
+}
+$("#themeBtn").addEventListener("click", () => {
+  applyTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark");
+});
+$("#newDealBtn").addEventListener("click", () => dealForm(null));
+$("#newActivityBtn").addEventListener("click", () => activityForm(null));
+
+/* ── boot ──────────────────────────────────────────────── */
+(function init(){
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch {}
+  applyTheme(saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));
+
+  if (!load()) seedDemo();
+  bindTooltips();
+  addEventListener("hashchange", router);
+  router();
+})();
+</script>
+</body>
+</html>
