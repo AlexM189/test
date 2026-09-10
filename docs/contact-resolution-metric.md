@@ -133,13 +133,60 @@ to call back", "follow-up scheduled" — those describe work still owed to the m
 
 ## Output
 
-Two KPI tiles (actual vs. target, on/below target), a mix bar, and a per-case table:
-case number, number of contacts, initial contact, outcome, resolution timestamp,
-calendar days and **the phrase that matched**. Clicking a case opens the full note
-timeline with each row labelled (initial contact / resolution / placeholder / follow-up
-with no outcome stated) so a number can always be traced back to the words that
-produced it. `↻` marks a case that received further notes *after* its resolution row.
-**Export CSV** writes the summary plus one line per case.
+Two KPI tiles (actual vs. target, on/below target, with the target marked on the bar),
+a bucket chart, an exceptions panel, and a per-case table: case number, number of
+contacts, initial contact, outcome, resolution timestamp, calendar days and **the
+phrase that matched**. Clicking a case opens the full note timeline with each row
+labelled (initial contact / resolution / placeholder / follow-up with no outcome
+stated) so a number can always be traced back to the words that produced it. `↻` marks
+a case that received further notes *after* its resolution row. **Export CSV** writes
+the summary plus one line per case.
+
+### Where the cases fall (chart)
+
+One bar per bucket — first contact, resolved within the window, resolved late, never
+resolved — in severity order, with the case count and share of the population labelled
+at each bar's tip and a hover/focus readout explaining what the bucket means for the
+targets. Colour is severity (green → blue → amber → red) and is never the only channel:
+each bar carries its name and value, and the case table repeats every number. The two
+palettes (light and dark) each pass the CVD-separation, contrast and lightness checks
+on their own surface.
+
+### Needs manual review (exceptions)
+
+Standing question for a team leader: *which cases do I go and check in the CRM?* The
+panel lists every case that falls outside the KPI definition or whose classification is
+doubtful, with the case number (click to copy) and the **exact timeframe** — initial
+contact, resolution (or "not resolved" plus the last note), the calendar days the
+metric counted, and the true elapsed time (`13d 19h 44m`), which is deliberately shown
+next to the calendar-day figure because the two differ.
+
+A case is flagged when it:
+
+| Flag | Why it matters |
+|---|---|
+| Resolved after the window | Misses the 90% sub-target — the breach itself |
+| Never resolved | No resolution language in any row; a breach (or excluded) |
+| Notes continue after the resolution row | The case came back; the metric timed the first closure |
+| Initial contact on the export's first day | The case may have started before the window, so its "initial contact" may be wrong |
+| Manually re-bucketed | Someone overrode the automatic verdict — shown with their reason |
+
+### Overriding a classification
+
+Phrase matching will misjudge some cases, so the verdict is editable. Opening a case
+shows an override bar: choose **the automatic verdict**, *resolved at first contact*,
+*resolved at contact #N* (each option shows that row's timestamp and the calendar days
+it would produce), or *never resolved*, add a reason, and apply.
+
+- Overrides drive the KPIs, the chart and the exceptions panel immediately.
+- The automatic verdict is never discarded: the case keeps it, and the CSV exports
+  `Classified by`, `Automatic outcome`, `Automatic calendar days`, `Override reason`
+  and `Override set at` beside the final numbers — so a reader of the export can always
+  see what was changed by hand and why.
+- Overridden cases are marked ✎, filterable with their own chip, and a banner reports
+  how many are in force with a one-click **Clear all**.
+- Overrides are keyed by case number and stored in the browser, so they survive
+  re-loading the same export next month.
 
 ## Worked example — August 2026 sample (15 notes, 5 cases)
 
@@ -164,8 +211,12 @@ full month's export before reading anything into the percentages.
   to the list rather than hand-correcting the output.
 - Case 11997868 shows the pattern to watch: it was closed on 27 Aug and picked up again
   on 31 Aug. The metric times resolution to the *first* resolving row, per the spec, and
-  flags the case with `↻`. If a re-open after closure should re-start the clock, that is
-  a rule change, not a bug fix.
+  flags the case with `↻` and in the exceptions panel. If a re-open after closure should
+  re-start the clock, that is a rule change, not a bug fix — until then, the override bar
+  is the escape hatch for individual cases.
+- Overrides live in the browser that made them. They are not shared between people, so a
+  published number should come from one person's run (or from the exported CSV, which
+  carries every override and its reason).
 - Cases whose initial contact falls outside the export's window are analysed on the rows
   present, so a case that started in July will look like it began on its first August
   note. Export a window wide enough to carry each case's opening note.

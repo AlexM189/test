@@ -118,6 +118,75 @@ tbody tr:last-child td{border-bottom:none}
   font-size:13px;margin:16px 0 0;
 }
 .filebar .meta{color:var(--text-muted);font-size:12px}
+.filebar strong{overflow-wrap:anywhere;min-width:0}
+
+/* ── Bucket chart ──────────────────────────────────────── */
+/* Four states, coloured by severity. Every bar is directly labelled and the
+   case table below repeats every value, so colour is never the only channel.
+   Both palettes pass the CVD/contrast checks on their own surface. */
+.chart{
+  --c-first:#0ca30c; --c-ontime:#2a78d6; --c-late:#e08a00; --c-none:#d03b3b;
+  margin:2px 0 18px;
+}
+@media (prefers-color-scheme:dark){
+  html:not([data-theme="light"]) .chart{ --c-first:#0ca30c; --c-ontime:#3987e5; --c-late:#c98500; --c-none:#e34948; }
+}
+html[data-theme="dark"] .chart{ --c-first:#0ca30c; --c-ontime:#3987e5; --c-late:#c98500; --c-none:#e34948; }
+.ch-row{
+  display:grid;grid-template-columns:minmax(96px,182px) 1fr;
+  align-items:center;gap:12px;padding:5px 4px;border-radius:var(--radius-sm);outline:none;
+}
+.ch-row:hover,.ch-row:focus-visible{background:var(--surface-2)}
+.ch-row:focus-visible{outline:2px solid var(--primary);outline-offset:-2px}
+.ch-lbl{font-size:12.5px;color:var(--text-muted);font-weight:600;line-height:1.25}
+.ch-track{height:20px;display:flex;align-items:center;gap:10px;min-width:0}
+.ch-bar{height:20px;border-radius:0 4px 4px 0;transition:width .25s ease,filter .12s;flex:0 0 auto}
+.ch-row:hover .ch-bar{filter:brightness(1.08)}
+.ch-bar.zero{width:2px!important;background:var(--border-strong)!important;border-radius:1px}
+.ch-val{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap;flex:0 0 auto}
+.ch-val .ch-pct{color:var(--text-muted);font-weight:500;margin-left:6px}
+.ch-cap{font-size:12px;color:var(--text-muted);margin-top:8px}
+.ch-tip{
+  position:fixed;z-index:60;pointer-events:none;opacity:0;transition:opacity .12s;
+  background:var(--surface);border:1px solid var(--border-strong);border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-lg);padding:9px 11px;max-width:280px;
+}
+.ch-tip.show{opacity:1}
+.ch-tip .t-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums}
+.ch-tip .t-key{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--text-muted);margin-top:2px}
+.ch-tip .t-key i{width:14px;height:3px;border-radius:2px;flex:none}
+.ch-tip .t-note{font-size:11.5px;color:var(--text-muted);margin-top:6px;border-top:1px solid var(--border);padding-top:6px}
+
+/* ── Overrides ─────────────────────────────────────────── */
+.ov-banner{
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  padding:9px 13px;border:1px solid var(--border-strong);background:var(--surface-2);
+  border-radius:var(--radius-sm);font-size:12.5px;margin-bottom:14px;
+}
+.ov-banner .grow{flex:1 1 auto}
+.ov-mark{color:var(--primary);font-weight:700;margin-left:5px}
+.ov-bar{
+  display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;
+  padding:10px 12px;margin:0 0 12px;background:var(--surface);
+  border:1px solid var(--border);border-radius:var(--radius-sm);
+}
+.ov-bar .field{gap:4px}
+.ov-bar label{font-size:11px}
+.ov-bar select{min-width:230px;max-width:100%}
+.ov-bar input{min-width:180px}
+.ov-state{font-size:11.5px;color:var(--text-muted);flex:1 1 160px;padding-bottom:9px}
+
+/* ── Exceptions ────────────────────────────────────────── */
+.exc-why{font-size:12px;color:var(--text-muted)}
+.exc-why strong{color:var(--text);font-weight:650}
+.exc-frame{font-variant-numeric:tabular-nums;white-space:nowrap}
+.exc-frame .exact{display:block;font-size:11.5px;color:var(--text-muted)}
+.case-id{
+  font-weight:700;font-variant-numeric:tabular-nums;cursor:copy;
+  border-bottom:1px dashed var(--border-strong);
+}
+.case-id:hover{color:var(--primary);border-bottom-color:var(--primary)}
+.exc-none{padding:22px;text-align:center;color:var(--text-muted);font-size:13px}
 
 /* ── Results ───────────────────────────────────────────── */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px}
@@ -262,6 +331,16 @@ details.rules-box .rules{margin-top:10px}
     </details>
   </div>
 
+  <div class="card" id="excCard" style="display:none">
+    <div class="card-head">
+      <div>
+        <div class="card-title">Needs manual review</div>
+        <div class="card-sub" id="excSub">Cases that miss the KPI definition, or whose classification is worth a second pair of eyes — with the exact timeframe so they can be checked in the CRM.</div>
+      </div>
+    </div>
+    <div id="exceptions"></div>
+  </div>
+
   <div class="card" id="kwCard" style="display:none">
     <div class="card-head">
       <div>
@@ -294,6 +373,7 @@ details.rules-box .rules{margin-top:10px}
   <div class="foot">Everything stays in this browser. Saved settings live in this browser's local storage; case notes are never written anywhere.</div>
 </div>
 
+<div class="ch-tip" id="chTip" role="status" aria-live="polite"></div>
 <div class="toast" id="toast"></div>
 
 <script>
@@ -463,6 +543,39 @@ function crrCalendarDays(from,to){
   return Math.round((b-a)/86400000);
 }
 
+/* A manual override replaces the automatic verdict for one case. Shape:
+     { bucket:'first'|'resolved'|'unresolved', seq:<contact # for 'resolved'>,
+       reason:'…', at:'<ISO stamp>' }
+   The automatic verdict is kept on the case as `auto`, so the export can show
+   both and nothing about the override is hidden. */
+function crrApplyOverride(c, ov, withinDays){
+  if(!ov || !ov.bucket || ov.bucket==='auto') return;
+  c.auto = { status:c.status, resolvedOn:c.resolvedOn, resolutionSeq:c.resolutionSeq,
+             days:c.days, withinTarget:c.withinTarget, matchedPhrase:c.matchedPhrase };
+  const first=c.contacts[0];
+  if(ov.bucket==='first'){
+    c.status='first-contact'; c.resolvedOn=first.createdOn; c.resolutionSeq=1;
+    c.days=0; c.withinTarget=true; c.matchedPhrase='(manual: closed on the first contact)';
+  } else if(ov.bucket==='unresolved'){
+    c.status='unresolved'; c.resolvedOn=null; c.resolutionSeq=null;
+    c.days=null; c.withinTarget=false; c.matchedPhrase=null;
+  } else if(ov.bucket==='resolved'){
+    const seq=Math.min(Math.max(parseInt(ov.seq)||2,1),c.contacts.length);
+    const hit=c.contacts[seq-1];
+    if(seq===1){
+      c.status='first-contact'; c.resolvedOn=first.createdOn; c.resolutionSeq=1;
+      c.days=0; c.withinTarget=true;
+    } else {
+      c.status='resolved-later'; c.resolvedOn=hit.createdOn; c.resolutionSeq=seq;
+      c.days=crrCalendarDays(first.createdOn,hit.createdOn);
+      c.withinTarget=c.days<=withinDays;
+    }
+    c.matchedPhrase=`(manual: resolved at contact #${seq})`;
+    c.reopenedAfterResolution=seq<c.contacts.length;
+  } else return;
+  c.overridden=true; c.override=ov;
+}
+
 /* rows: [{caseNumber, createdOn:Date, description, agent, origin}] */
 function crrAnalyze(rows, opts){
   opts = opts || {};
@@ -470,6 +583,7 @@ function crrAnalyze(rows, opts){
   const placeholderList = opts.placeholder || CRR_DEFAULT_PLACEHOLDER;
   const unresolvedMode  = opts.unresolvedMode || 'breach';
   const withinDays      = opts.withinDays==null ? 2 : opts.withinDays;
+  const overrides       = opts.overrides || {};
 
   const groups=new Map();
   for(const r of rows){
@@ -520,6 +634,7 @@ function crrAnalyze(rows, opts){
         c.lastPhrase=contacts[contacts.length-1].placeholderPhrase;
       }
     }
+    crrApplyOverride(c, overrides[caseNumber], withinDays);
     cases.push(c);
   }
   cases.sort((a,b)=>a.firstContactOn-b.firstContactOn);
@@ -537,6 +652,7 @@ function crrAnalyze(rows, opts){
   return {
     cases, unresolvedMode, withinDays, excluded,
     summary:{
+      overridden: cases.filter(c=>c.overridden).length,
       totalRows: rows.length,
       totalCases: cases.length,
       population: population.length,
@@ -614,6 +730,18 @@ function saveOptions(){
 
 let state={ rows:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, hasOrigin:false, filter:'all', open:new Set() };
 
+/* ── manual overrides ──────────────────────────────────────
+   Keyed by case number so they survive a re-export of the same period.
+   The automatic verdict is never thrown away — both go into the CSV. */
+const LS_OV='crr.overrides';
+function overrides(){ try{ return JSON.parse(lsGet(LS_OV)||'{}')||{}; }catch(e){ return {}; } }
+function setOverride(caseNumber,ov){
+  const all=overrides();
+  if(ov) all[caseNumber]=ov; else delete all[caseNumber];
+  lsSet(LS_OV,JSON.stringify(all));
+}
+function clearOverrides(){ lsDel(LS_OV); }
+
 /* ── column detection ──────────────────────────────────── */
 const normHdr=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
 function findCol(headers,candidates){
@@ -665,6 +793,7 @@ function setRows(rows,fileName,sheetName,skipped,hasOrigin){
   $('opts').style.display='flex';
   $('kwCard').style.display='';
   $('resultCard').style.display='';
+  $('excCard').style.display='';
   run();
 }
 
@@ -687,7 +816,8 @@ function run(){
   }
   state.skippedCases=skippedCases;
   state.result=crrAnalyze(rows,{ resolution:p.resolution, placeholder:p.placeholder,
-                                 unresolvedMode:o.unresolvedMode, withinDays:o.withinDays });
+                                 unresolvedMode:o.unresolvedMode, withinDays:o.withinDays,
+                                 overrides:overrides() });
 
   const s=state.result.summary;
   $('filebar').style.display='';
@@ -698,14 +828,77 @@ function run(){
   render();
 }
 
+/* ── buckets ───────────────────────────────────────────── */
+const BUCKETS=[
+  { k:'first',  color:'var(--c-first)',  meets:true,  label:c=>'Resolved at first contact', note:()=>'Counts toward the 80% first-contact target.' },
+  { k:'ontime', color:'var(--c-ontime)', meets:true,  label:(w)=>'Resolved ≤ '+w+' days',   note:(w)=>'Re-opened, but closed inside the '+w+'-day window — counts toward the 90% sub-target.' },
+  { k:'late',   color:'var(--c-late)',   meets:false, label:(w)=>'Resolved > '+w+' days',   note:(w)=>'Re-opened and closed after '+w+' calendar days — misses the sub-target.' },
+  { k:'none',   color:'var(--c-none)',   meets:false, label:()=>'Never resolved',           note:()=>'No row ever shows resolution language.' }
+];
+const bucketOf=c=> c.status==='first-contact' ? 'first'
+                 : c.status==='unresolved'    ? 'none'
+                 : c.withinTarget             ? 'ontime' : 'late';
+
+function bucketCounts(cases){
+  const n={first:0,ontime:0,late:0,none:0};
+  cases.forEach(c=>n[bucketOf(c)]++);
+  return n;
+}
+
+/* exact elapsed time, for a team leader checking the case by hand */
+function exactSpan(a,b){
+  if(!a||!b) return '—';
+  let ms=b-a; if(ms<0) ms=0;
+  const d=Math.floor(ms/86400000), h=Math.floor(ms%86400000/3600000), m=Math.floor(ms%3600000/60000);
+  return (d?d+'d ':'')+(d||h?h+'h ':'')+m+'m';
+}
+
+function renderChart(counts,total,w){
+  const max=Math.max(1,...Object.values(counts));
+  const rows=BUCKETS.map(b=>{
+    const n=counts[b.k], p=total?(n/total*100):0;
+    const lbl=b.label(w);
+    /* bars are scaled against the largest bucket and capped at 78% of the
+       track, so the value always has room to sit at the bar's tip */
+    const width=n?Math.max(1.5,n/max*78):0;
+    return `<div class="ch-row" tabindex="0" role="img" data-bucket="${b.k}"
+        aria-label="${esc(lbl)}: ${n} case${n===1?'':'s'}, ${p.toFixed(1)} percent of ${total}">
+      <div class="ch-lbl">${esc(lbl)}</div>
+      <div class="ch-track">
+        <div class="ch-bar${n?'':' zero'}" style="width:${width}%;background:${b.color}"></div>
+        <div class="ch-val">${n}<span class="ch-pct">· ${p.toFixed(1)}%</span></div>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="chart" id="chart">${rows}
+    <div class="ch-cap">${total} case${total===1?'':'s'} in the population — the top two buckets meet a target, the bottom two miss it. Bar length is the case count; every value is labelled and repeated in the table below.</div>
+  </div>`;
+}
+
+function chartTooltip(bucketKey,counts,total,w){
+  const b=BUCKETS.find(x=>x.k===bucketKey); if(!b) return null;
+  const n=counts[bucketKey], p=total?(n/total*100):0;
+  const tip=$('chTip');
+  tip.textContent='';
+  const val=document.createElement('div'); val.className='t-val';
+  val.textContent=`${n} case${n===1?'':'s'} · ${p.toFixed(1)}%`;
+  const key=document.createElement('div'); key.className='t-key';
+  const swatch=document.createElement('i'); swatch.style.background=b.color;
+  key.appendChild(swatch); key.appendChild(document.createTextNode(b.label(w)));
+  const note=document.createElement('div'); note.className='t-note'; note.textContent=b.note(w);
+  tip.appendChild(val); tip.appendChild(key); tip.appendChild(note);
+  return tip;
+}
+
 function render(){
   const r=state.result; if(!r) return;
-  const s=r.summary;
+  const s=r.summary, w=r.withinDays;
   const fcPass=s.firstContactPct!=null&&s.firstContactPct>=s.firstContactTarget;
   const w2Pass=s.withinTargetPct!=null&&s.withinTargetPct>=s.withinTargetTarget;
 
   $('resultSub').textContent=`${s.population} case${s.population===1?'':'s'} in the population`
-    +(s.unresolvedExcluded?` · ${s.unresolvedExcluded} never-resolved case(s) excluded`:'');
+    +(s.unresolvedExcluded?` · ${s.unresolvedExcluded} never-resolved case(s) excluded`:'')
+    +(s.overridden?` · ${s.overridden} manual override${s.overridden===1?'':'s'} applied`:'');
 
   const kpi=(cls,lbl,val,tag,sub,value,target)=>`
     <div class="kpi ${cls}">
@@ -715,40 +908,31 @@ function render(){
       <div class="k-bar"><i style="width:${value==null?0:Math.min(100,value).toFixed(1)}%"></i><u style="left:${target}%" title="target ${target}%"></u></div>
     </div>`;
 
-  const tot=s.population||1;
-  const seg=(n,c,t)=>n?`<span style="width:${(n/tot*100).toFixed(2)}%;background:${c}" title="${t}: ${n}"></span>`:'';
-  const counts={
-    all:r.cases.length,
-    first:r.cases.filter(c=>c.status==='first-contact').length,
-    ontime:r.cases.filter(c=>c.status==='resolved-later'&&c.withinTarget).length,
-    late:r.cases.filter(c=>c.status==='resolved-later'&&!c.withinTarget).length,
-    none:r.cases.filter(c=>c.status==='unresolved').length
-  };
+  const counts=bucketCounts(r.cases);
+  counts.over=r.cases.filter(c=>c.overridden).length;
+  counts.all=r.cases.length;
   const chip=(k,l)=>`<button class="chip${state.filter===k?' on':''}" data-filter="${k}">${l} (${counts[k]})</button>`;
 
-  const shown=r.cases.filter(c=>({
-    first : c.status==='first-contact',
-    ontime: c.status==='resolved-later'&&c.withinTarget,
-    late  : c.status==='resolved-later'&&!c.withinTarget,
-    none  : c.status==='unresolved',
-    all   : true
-  })[state.filter]);
+  const shown=r.cases.filter(c=>state.filter==='all'?true
+                              :state.filter==='over'?c.overridden
+                              :bucketOf(c)===state.filter);
 
-  const badge=c=> c.status==='first-contact' ? '<span class="badge good">First contact</span>'
-                : c.status==='unresolved'    ? '<span class="badge bad">Never resolved</span>'
-                : c.withinTarget             ? `<span class="badge info">≤ ${r.withinDays} days</span>`
-                                             : `<span class="badge warn">&gt; ${r.withinDays} days</span>`;
+  const badge=c=>({ first :'<span class="badge good">First contact</span>',
+                    ontime:`<span class="badge info">≤ ${w} days</span>`,
+                    late  :`<span class="badge warn">&gt; ${w} days</span>`,
+                    none  :'<span class="badge bad">Never resolved</span>' })[bucketOf(c)];
 
   const body=shown.map(c=>{
     const open=state.open.has(c.caseNumber);
-    const tl=!open?'':`<tr class="tl"><td colspan="7"><div style="padding:12px 4px">`+
-      c.contacts.map(x=>`<div class="tl-item ${x.resolutionPhrase?'res':x.placeholderPhrase?'ph':''}">
+    const tl=!open?'':`<tr class="tl" id="tl-${esc(c.caseNumber)}"><td colspan="7"><div style="padding:12px 4px">`
+      +overrideBar(c,w)
+      +c.contacts.map(x=>`<div class="tl-item ${x.resolutionPhrase?'res':x.placeholderPhrase?'ph':''}">
         <div class="tl-hdr"><strong>#${x.seq}</strong> · ${fmtDT(x.createdOn)}${x.agent?' · '+esc(x.agent):''} · ${x.label}`
         +(x.resolutionPhrase?` → matched “${esc(x.resolutionPhrase)}”`:x.placeholderPhrase?` → matched “${esc(x.placeholderPhrase)}”`:'')
         +`</div><div class="tl-txt">${esc(x.description.trim())||'<em>(empty note)</em>'}</div></div>`).join('')
       +`</div></td></tr>`;
-    return `<tr class="case-row" data-case="${esc(c.caseNumber)}">
-      <td><span class="caret">${open?'▼':'▶'}</span><strong>${esc(c.caseNumber)}</strong>${c.reopenedAfterResolution?' <span title="Further notes were added after the resolution row">↻</span>':''}</td>
+    return `<tr class="case-row" data-case="${esc(c.caseNumber)}" id="row-${esc(c.caseNumber)}">
+      <td><span class="caret">${open?'▼':'▶'}</span><strong>${esc(c.caseNumber)}</strong>${c.reopenedAfterResolution?' <span title="Further notes were added after the resolution row">↻</span>':''}${c.overridden?' <span class="ov-mark" title="Manually re-bucketed">✎</span>':''}</td>
       <td class="num">${c.rows}</td>
       <td>${fmtDT(c.firstContactOn)}</td>
       <td>${badge(c)}</td>
@@ -758,28 +942,25 @@ function render(){
     </tr>${tl}`;
   }).join('');
 
+  const banner=!s.overridden?'':`<div class="ov-banner">
+      <span class="grow"><strong>✎ ${s.overridden} case${s.overridden===1?' is':'s are'} manually re-bucketed.</strong>
+      The percentages above include the overrides; the CSV keeps the automatic verdict beside each one.</span>
+      <button class="btn btn-sm" id="ovShow">Show only these</button>
+      <button class="btn btn-sm" id="ovClearAll">Clear all overrides</button>
+    </div>`;
+
   $('result').innerHTML=`
     <div class="kpis">
       ${kpi(s.firstContactPct==null?'na':fcPass?'pass':'fail','Resolved at first contact',pct(s.firstContactPct),
             s.firstContactPct==null?'NO DATA':fcPass?'ON TARGET':'BELOW TARGET',
             `${s.firstContact} of ${s.population} cases · target ${s.firstContactTarget}%`,s.firstContactPct,s.firstContactTarget)}
-      ${kpi(s.withinTargetPct==null?'na':w2Pass?'pass':'fail',`Of the rest, resolved ≤ ${r.withinDays} days`,pct(s.withinTargetPct),
+      ${kpi(s.withinTargetPct==null?'na':w2Pass?'pass':'fail',`Of the rest, resolved ≤ ${w} days`,pct(s.withinTargetPct),
             s.withinTargetPct==null?'NO DATA':w2Pass?'ON TARGET':'BELOW TARGET',
             `${s.withinTarget} of ${s.remainder} cases · target ${s.withinTargetTarget}%`,s.withinTargetPct,s.withinTargetTarget)}
     </div>
-    <div class="mix">
-      ${seg(s.firstContact,'var(--good)','First contact')}
-      ${seg(s.withinTarget,'var(--primary)','Resolved within target')}
-      ${seg(s.lateResolved,'var(--warn)','Resolved late')}
-      ${seg(s.unresolved,'var(--bad)','Never resolved')}
-    </div>
-    <div class="legend">
-      <div><i style="background:var(--good)"></i>First contact ${s.firstContact}</div>
-      <div><i style="background:var(--primary)"></i>Resolved ≤ ${r.withinDays} days ${s.withinTarget}</div>
-      <div><i style="background:var(--warn)"></i>Resolved &gt; ${r.withinDays} days ${s.lateResolved}</div>
-      <div><i style="background:var(--bad)"></i>Never resolved ${s.unresolved}${s.unresolvedExcluded?' (excluded '+s.unresolvedExcluded+')':''}</div>
-    </div>
-    <div class="chips">${chip('all','All')}${chip('first','First contact')}${chip('ontime','≤ '+r.withinDays+' days')}${chip('late','&gt; '+r.withinDays+' days')}${chip('none','Never resolved')}</div>
+    ${banner}
+    ${renderChart(counts,s.population,w)}
+    <div class="chips">${chip('all','All')}${chip('first','First contact')}${chip('ontime','≤ '+w+' days')}${chip('late','&gt; '+w+' days')}${chip('none','Never resolved')}${counts.over?chip('over','✎ Overridden'):''}</div>
     <div class="table-wrap">
       <table>
         <thead><tr><th>Case</th><th class="num">Contacts</th><th>Initial contact</th><th>Outcome</th><th>Resolved on</th><th class="num">Calendar days</th><th>Matched phrase</th></tr></thead>
@@ -792,19 +973,187 @@ function render(){
       <li>Rows are grouped by case number and sorted by <code>Created On</code> ascending; the earliest row is the initial contact.</li>
       <li>A case with a <strong>single row</strong> counts as <strong>resolved at first contact</strong> whatever the note says — one touch with no follow-up is closed, even if it reads "escalated" or "member didn't respond".</li>
       <li>A case with <strong>two or more rows</strong> was re-opened, so it can never be a first-contact resolution. Rows 2, 3, 4 … are scanned in order and the first one carrying resolution language is the moment of resolution; placeholder rows ("LMOM", "no answer") and rows that simply state no outcome are skipped.</li>
-      <li>Elapsed time is <strong>calendar days</strong> from the initial contact's date to the resolving row's date — 13 Aug 23:50 → 14 Aug 00:10 is 1 day, not 0. ≤ ${r.withinDays} days counts toward the ${s.withinTargetTarget}% sub-target.</li>
+      <li>Elapsed time is <strong>calendar days</strong> from the initial contact's date to the resolving row's date — 13 Aug 23:50 → 14 Aug 00:10 is 1 day, not 0. ≤ ${w} days counts toward the ${s.withinTargetTarget}% sub-target.</li>
       <li>A case where no row ever shows resolution language ${r.unresolvedMode==='exclude'?'is <strong>excluded from the population</strong> (it leaves both denominators)':'counts as a <strong>breach</strong> and stays in the denominator'}.</li>
-    </ol>
-    <p style="margin-top:8px">Click any case to read its notes with the classification of each row. <strong>↻</strong> marks a case that received further notes after its resolution row.</p>`;
+      <li>Any case can be <strong>re-bucketed by hand</strong> — open it and use the override bar. Overrides are marked ✎, drive the percentages, and are exported next to the automatic verdict they replaced.</li>
+    </ol>`;
 
+  renderExceptions();
+  wireResult(counts,s.population,w);
+}
+
+/* ── the override bar, inside a case's timeline ────────── */
+function overrideBar(c,w){
+  const cur=c.override||{};
+  const opt=(v,txt,sel)=>`<option value="${v}"${sel?' selected':''}>${esc(txt)}</option>`;
+  const autoLabel=c.auto?({ 'first-contact':'resolved at first contact',
+                            'unresolved':'never resolved' }[c.auto.status]
+                          || `resolved at contact #${c.auto.resolutionSeq} (${c.auto.days} calendar day${c.auto.days===1?'':'s'})`)
+                        : ({ 'first-contact':'resolved at first contact',
+                             'unresolved':'never resolved' }[c.status]
+                           || `resolved at contact #${c.resolutionSeq} (${c.days} calendar day${c.days===1?'':'s'})`);
+  const curVal=!c.overridden?'auto':cur.bucket==='resolved'?('r:'+cur.seq):cur.bucket;
+  let opts=opt('auto','Automatic — '+autoLabel,curVal==='auto');
+  opts+=opt('first','Resolved at first contact',curVal==='first');
+  c.contacts.forEach((x,i)=>{
+    if(i===0) return;
+    const d=crrCalendarDays(c.contacts[0].createdOn,x.createdOn);
+    opts+=opt('r:'+x.seq,`Resolved at contact #${x.seq} — ${fmtDT(x.createdOn)} (${d} calendar day${d===1?'':'s'})`,curVal==='r:'+x.seq);
+  });
+  opts+=opt('unresolved','Never resolved',curVal==='unresolved');
+  return `<div class="ov-bar">
+    <div class="field"><label for="ovsel-${esc(c.caseNumber)}">Bucket for case ${esc(c.caseNumber)}</label>
+      <select id="ovsel-${esc(c.caseNumber)}" data-ovsel="${esc(c.caseNumber)}">${opts}</select></div>
+    <div class="field"><label for="ovwhy-${esc(c.caseNumber)}">Reason (kept in the export)</label>
+      <input id="ovwhy-${esc(c.caseNumber)}" data-ovwhy="${esc(c.caseNumber)}" value="${esc(cur.reason||'')}" placeholder="e.g. agent logged the fix on the wrong row"></div>
+    <button class="btn btn-primary btn-sm" data-ovsave="${esc(c.caseNumber)}">Apply</button>
+    <button class="btn btn-sm" data-ovclear="${esc(c.caseNumber)}"${c.overridden?'':' disabled'}>Clear</button>
+    <div class="ov-state">${c.overridden
+      ? `✎ Manually set${cur.at?' on '+esc(cur.at):''}. Automatic verdict was <strong>${esc(autoLabel)}</strong>.`
+      : 'Classified automatically. Change this only when the phrase matching got the case wrong.'}</div>
+  </div>`;
+}
+
+/* ── cases that fall outside the KPI definition ────────── */
+/* Plain-text reasons, so the panel and the CSV say exactly the same thing. */
+function reviewFlags(c,r,earliestDay){
+  const w=r.withinDays, why=[]; let rank=9;
+  const b=bucketOf(c);
+  if(b==='none'){
+    why.push('Never resolved — no row shows resolution language'+(r.unresolvedMode==='exclude'?', excluded from the population':', counted as a breach'));
+    rank=0;
+  } else if(b==='late'){
+    why.push(`Resolved after ${w} calendar days — misses the ${r.summary.withinTargetTarget}% sub-target`);
+    rank=1;
+  }
+  if(c.reopenedAfterResolution){ why.push(`Notes continue after the resolving row (#${c.resolutionSeq}) — the case came back`); rank=Math.min(rank,2); }
+  if(earliestDay && c.firstContactOn.toDateString()===earliestDay && c.rows>1){
+    why.push('Initial contact falls on the export\u2019s first day — the case may have started before this window'); rank=Math.min(rank,3);
+  }
+  if(c.overridden){ why.push('Manually re-bucketed'+(c.override&&c.override.reason?' — '+c.override.reason:'')); rank=Math.min(rank,2); }
+  return { why, rank };
+}
+function flaggedCases(){
+  const r=state.result; if(!r) return [];
+  const earliest=r.cases.length?Math.min(...r.cases.map(c=>+c.firstContactOn)):null;
+  const earliestDay=earliest?new Date(earliest).toDateString():null;
+  const out=[];
+  r.cases.forEach(c=>{
+    const f=reviewFlags(c,r,earliestDay);
+    if(f.why.length) out.push({c,why:f.why,rank:f.rank});
+  });
+  out.sort((a,b)=>a.rank-b.rank || (b.c.days||0)-(a.c.days||0));
+  return out;
+}
+
+function renderExceptions(){
+  const r=state.result; if(!r) return;
+  const flagged=flaggedCases();
+  const last=c=>c.contacts[c.contacts.length-1].createdOn;
+  const rows=flagged.map(({c,why})=>{
+    const openTo=c.resolvedOn||last(c);
+    return `<tr>
+      <td><span class="case-id" data-copy="${esc(c.caseNumber)}" title="Click to copy">${esc(c.caseNumber)}</span>
+          <div class="cell-sub">${c.rows} contact${c.rows===1?'':'s'}${c.agent?' · opened by '+esc(c.agent):''}</div></td>
+      <td class="exc-frame">${fmtDT(c.firstContactOn)}</td>
+      <td class="exc-frame">${c.resolvedOn?fmtDT(c.resolvedOn):'<em>not resolved</em>'}
+          <span class="exact">last note ${fmtDT(last(c))}</span></td>
+      <td class="exc-frame"><strong>${c.days==null?exactSpan(c.firstContactOn,last(c))+' open':c.days+' calendar day'+(c.days===1?'':'s')}</strong>
+          <span class="exact">${exactSpan(c.firstContactOn,openTo)} elapsed</span></td>
+      <td class="exc-why"><strong>${esc(why[0])}</strong>${why.length>1?'<br>'+why.slice(1).map(esc).join('<br>'):''}</td>
+      <td><button class="btn btn-sm" data-review="${esc(c.caseNumber)}">Review ▸</button></td>
+    </tr>`;
+  }).join('');
+
+  $('excSub').textContent=flagged.length
+    ? `${flagged.length} case${flagged.length===1?'':'s'} to check by hand — case number and exact timeframe below, then Review to read the notes or re-bucket.`
+    : 'Nothing flagged: every case is inside the KPI definition and no classification looks doubtful.';
+  $('exceptions').innerHTML = flagged.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Case</th><th>Initial contact</th><th>Resolution</th><th>Timeframe</th><th>Why it is flagged</th><th></th></tr></thead>
+      <tbody>${rows}</tbody></table></div>`
+    : '<div class="exc-none">✓ No exceptions — nothing needs a manual check.</div>';
+
+  document.querySelectorAll('#exceptions [data-review]').forEach(b=>
+    b.addEventListener('click',()=>openCase(b.dataset.review)));
+  document.querySelectorAll('#exceptions [data-copy]').forEach(el=>
+    el.addEventListener('click',()=>{
+      const t=el.dataset.copy;
+      (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject())
+        .then(()=>toast('Case '+t+' copied')).catch(()=>toast('Case '+t,''));
+    }));
+}
+
+function openCase(caseNumber){
+  state.filter='all';
+  state.open.add(caseNumber);
+  render();
+  const row=document.getElementById('row-'+caseNumber);
+  if(row){
+    row.scrollIntoView({behavior:'smooth',block:'center'});
+    row.style.transition='background .3s'; row.style.background='var(--primary-light)';
+    setTimeout(()=>{ row.style.background=''; },1400);
+  }
+}
+
+/* ── wiring for the freshly rendered result block ──────── */
+function wireResult(counts,total,w){
   document.querySelectorAll('#result [data-filter]').forEach(b=>
     b.addEventListener('click',()=>{ state.filter=b.dataset.filter; render(); }));
+
   document.querySelectorAll('#result [data-case]').forEach(tr=>
-    tr.addEventListener('click',()=>{
+    tr.addEventListener('click',e=>{
+      if(e.target.closest('.ov-bar')) return;
       const k=tr.dataset.case;
       state.open.has(k)?state.open.delete(k):state.open.add(k);
       render();
     }));
+
+  /* chart hover / focus */
+  const tip=$('chTip');
+  const place=(ev,el)=>{
+    const r=el.getBoundingClientRect();
+    const x=ev?ev.clientX:r.left+r.width/2, y=ev?ev.clientY:r.top;
+    tip.classList.add('show');
+    const tr=tip.getBoundingClientRect();
+    tip.style.left=Math.min(Math.max(8,x+14),innerWidth-tr.width-8)+'px';
+    tip.style.top =Math.min(Math.max(8,y-tr.height-12),innerHeight-tr.height-8)+'px';
+  };
+  document.querySelectorAll('#result .ch-row').forEach(row=>{
+    const show=ev=>{ chartTooltip(row.dataset.bucket,counts,total,w); place(ev,row); };
+    row.addEventListener('pointerenter',show);
+    row.addEventListener('pointermove',show);
+    row.addEventListener('focus',()=>show(null));
+    row.addEventListener('pointerleave',()=>tip.classList.remove('show'));
+    row.addEventListener('blur',()=>tip.classList.remove('show'));
+  });
+
+  /* overrides */
+  document.querySelectorAll('#result [data-ovsave]').forEach(b=>
+    b.addEventListener('click',e=>{
+      e.stopPropagation();
+      const k=b.dataset.ovsave;
+      const val=document.querySelector(`[data-ovsel="${CSS.escape(k)}"]`).value;
+      const why=document.querySelector(`[data-ovwhy="${CSS.escape(k)}"]`).value.trim();
+      if(val==='auto'){ setOverride(k,null); toast('Case '+k+' back to the automatic verdict'); }
+      else{
+        const ov = val.startsWith('r:') ? {bucket:'resolved',seq:parseInt(val.slice(2))} : {bucket:val};
+        ov.reason=why; ov.at=fmtDT(new Date());
+        setOverride(k,ov); toast('Case '+k+' re-bucketed');
+      }
+      run();
+    }));
+  document.querySelectorAll('#result [data-ovclear]').forEach(b=>
+    b.addEventListener('click',e=>{
+      e.stopPropagation();
+      setOverride(b.dataset.ovclear,null);
+      toast('Override cleared'); run();
+    }));
+  const showBtn=$('ovShow'), clearAll=$('ovClearAll');
+  if(showBtn) showBtn.addEventListener('click',()=>{ state.filter='over'; render(); });
+  if(clearAll) clearAll.addEventListener('click',()=>{
+    if(!confirm('Remove every manual override and go back to the automatic verdicts?')) return;
+    clearOverrides(); toast('All overrides cleared'); run();
+  });
 }
 
 /* ── CSV export ────────────────────────────────────────── */
@@ -830,11 +1179,28 @@ function exportCsv(){
     [`Resolved after ${r.withinDays} days`,s.lateResolved],
     ['Never resolved',s.unresolved],
     ['Never resolved (excluded)',s.unresolvedExcluded],
+    ['Manual overrides applied',s.overridden],
     [],
-    ['Case Number','Contacts','Initial contact','Outcome','Resolved on','Calendar days','Resolution row #','Matched phrase','Re-opened after resolution']
+    ['Case Number','Contacts','Initial contact','Outcome','Resolved on','Calendar days','Exact elapsed','Resolution row #','Matched phrase','Re-opened after resolution','Classified by','Automatic outcome','Automatic calendar days','Override reason','Override set at','Needs review','Why flagged']
   ];
-  r.cases.forEach(c=>rows.push([c.caseNumber,c.rows,iso(c.firstContactOn),outcome(c),iso(c.resolvedOn),
-    c.days==null?'':c.days,c.resolutionSeq||'',c.matchedPhrase||'',c.reopenedAfterResolution?'Yes':'No']));
+  const flagged=new Map(flaggedCases().map(f=>[f.c.caseNumber,f.why]));
+  const last=c=>c.contacts[c.contacts.length-1].createdOn;
+  const autoOutcome=c=>{
+    if(!c.auto) return '';
+    return c.auto.status==='first-contact'?'Resolved at first contact'
+         : c.auto.status==='unresolved'   ?'Never resolved'
+         : c.auto.withinTarget            ?`Resolved within ${r.withinDays} days`
+                                          :`Resolved after ${r.withinDays} days`;
+  };
+  r.cases.forEach(c=>{
+    const why=flagged.get(c.caseNumber);
+    rows.push([c.caseNumber,c.rows,iso(c.firstContactOn),outcome(c),iso(c.resolvedOn),
+      c.days==null?'':c.days, exactSpan(c.firstContactOn,c.resolvedOn||last(c)),
+      c.resolutionSeq||'',c.matchedPhrase||'',c.reopenedAfterResolution?'Yes':'No',
+      c.overridden?'Manual':'Automatic', autoOutcome(c), c.auto&&c.auto.days!=null?c.auto.days:'',
+      c.override&&c.override.reason?c.override.reason:'', c.override&&c.override.at?c.override.at:'',
+      why?'Yes':'No', why?why.join(' | '):'']);
+  });
   const csv='﻿'+rows.map(row=>row.map(cell=>`"${String(cell==null?'':cell).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   downloadFile('contact-resolution-rate.csv','text/csv;charset=utf-8',csv);
 }
@@ -881,7 +1247,8 @@ function loadDemo(){
     state={ rows:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, hasOrigin:false, filter:'all', open:new Set() };
     $('opts').style.display='none'; $('filebar').style.display='none';
     $('resultCard').style.display='none'; $('kwCard').style.display='none';
-    $('result').innerHTML='';
+    $('excCard').style.display='none';
+    $('result').innerHTML=''; $('exceptions').innerHTML='';
   });
   $('kwSave').addEventListener('click',()=>{
     lsSet(LS_RES,$('kwRes').value); lsSet(LS_PH,$('kwPh').value);

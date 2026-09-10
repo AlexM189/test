@@ -23,8 +23,31 @@ want to see the output before using a real export.
 | % of cases resolved at **first contact** | 80% |
 | of the remainder, % resolved **within 2 calendar days** | 90% |
 
-Plus a per-case table showing the phrase that classified each case, expandable to the
-full note timeline with every row labelled, a CSV export and a print/PDF layout.
+Below the two KPI tiles:
+
+- **Where the cases fall** — a bar per bucket (first contact / within the window /
+  late / never resolved) with the case count and share of the population on each bar,
+  hover or keyboard focus for what the bucket means.
+- **Needs manual review** — every case that misses the KPI definition or whose
+  classification is worth a second look, with the case number (click to copy) and the
+  **exact timeframe**: both timestamps, the calendar days the metric used, and the real
+  elapsed time (`13d 19h 44m`). A case is flagged when it was resolved after the
+  window, was never resolved, kept receiving notes after its resolution row, or opens
+  on the export's first day (so it may have started before the window).
+- **Per-case table** with the phrase that classified each case, expandable to the full
+  note timeline with every row labelled.
+- CSV export and a print/PDF layout.
+
+## Overriding a classification
+
+Phrase matching gets cases wrong. **Review ▸** on any flagged case (or clicking the
+case in the table) opens its notes with an override bar: pick the right bucket — or the
+exact contact row that resolved it, which recomputes the timeframe — type a reason, and
+apply. Overridden cases are marked ✎, the percentages and the chart follow them
+immediately, and the CSV carries both the manual verdict and the automatic one it
+replaced, with the reason and when it was set. Overrides are keyed by case number, so
+they survive re-loading the same export; **Clear all overrides** returns everything to
+the automatic verdicts.
 
 ## Input
 
