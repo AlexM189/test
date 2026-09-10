@@ -50,3 +50,10 @@ nothing is uploaded to the server or stored.
 
 Rules, the phrase lists and the decisions behind them:
 [`docs/contact-resolution-metric.md`](docs/contact-resolution-metric.md).
+
+## Sales CRM
+
+This repository also contains a standalone **[Sales CRM](crm/)** — a single HTML
+file (`crm/index.html`) with pipeline, deals, contacts, companies, activities and
+reports. It has no server and no dependencies: open the file in a browser. See
+[`crm/README.md`](crm/README.md).
