@@ -255,6 +255,56 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
 .fp-cell.access .fp-num{color:#1d4ed8}
 .fp-cell.access.mine .fp-num{color:#065f46}
 .fp-parking-wrap{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px}
+
+/* ── Contact Resolution panel ─────────────────────────────────── */
+/* badge ink that stays readable on the *-light fills in both themes */
+:root{--crr-ink-ok:#166534;--crr-ink-warn:#92400e;--crr-ink-bad:#991b1b}
+[data-theme="dark"]{--crr-ink-ok:#6ee7b7;--crr-ink-warn:#fcd34d;--crr-ink-bad:#fca5a5}
+.crr-drop{border:2px dashed var(--border);border-radius:10px;padding:26px 18px;text-align:center;display:flex;flex-direction:column;gap:8px;align-items:center;transition:border-color .15s,background .15s}
+.crr-drop.over{border-color:var(--primary);background:var(--primary-light)}
+.crr-drop-ic{font-size:26px;line-height:1}
+.crr-drop-hint{font-size:12px;color:var(--text-muted)}
+.crr-drop code{background:var(--surface-2);border-radius:4px;padding:1px 5px;font-size:11px}
+.crr-opts{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-top:14px}
+.crr-check{display:flex;align-items:center;gap:6px;font-size:13px;padding-bottom:9px;white-space:nowrap}
+.crr-kw-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.crr-kw-grid textarea{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.5;resize:vertical}
+.crr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:14px;margin-bottom:16px}
+.crr-kpi{border:1px solid var(--border);border-left-width:4px;border-radius:10px;padding:15px 17px;background:var(--surface-2)}
+.crr-kpi.pass{border-left-color:var(--success)}
+.crr-kpi.fail{border-left-color:var(--danger)}
+.crr-kpi.na{border-left-color:var(--border)}
+.crr-kpi .k-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)}
+.crr-kpi .k-val{font-size:34px;font-weight:700;line-height:1.1;margin:4px 0 2px}
+.crr-kpi.pass .k-val{color:var(--success)}
+.crr-kpi.fail .k-val{color:var(--danger)}
+.crr-kpi .k-sub{font-size:12px;color:var(--text-muted)}
+.crr-kpi .k-tag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;border-radius:10px;padding:2px 8px;margin-left:8px;vertical-align:middle}
+.crr-kpi.pass .k-tag{background:var(--success-light);color:var(--crr-ink-ok)}
+.crr-kpi.fail .k-tag{background:var(--danger-light);color:var(--crr-ink-bad)}
+.crr-kpi.na .k-tag{background:var(--surface-2);color:var(--text-muted)}
+.crr-mix{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:6px 0 4px;background:var(--surface-2)}
+.crr-mix span{display:block}
+.crr-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:11px;color:var(--text-muted);margin-bottom:16px}
+.crr-legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:middle;font-style:normal}
+.crr-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.crr-chip{border:1px solid var(--border);background:var(--surface);border-radius:14px;padding:4px 11px;font-size:12px;cursor:pointer;color:var(--text-muted)}
+.crr-chip.on{background:var(--primary);border-color:var(--primary);color:#fff;font-weight:600}
+.crr-badge{display:inline-block;font-size:10px;font-weight:700;border-radius:10px;padding:2px 8px;white-space:nowrap}
+.crr-badge.first{background:var(--success-light);color:var(--crr-ink-ok)}
+.crr-badge.ontime{background:var(--primary-light);color:var(--primary)}
+.crr-badge.late{background:var(--warning-light);color:var(--crr-ink-warn)}
+.crr-badge.none{background:var(--danger-light);color:var(--crr-ink-bad)}
+#crrTable tbody tr.crr-row{cursor:pointer}
+#crrTable tbody tr.crr-row:hover{background:var(--surface-2)}
+.crr-tl{background:var(--surface-2)}
+.crr-tl-item{border-left:2px solid var(--border);padding:0 0 10px 12px;margin-left:6px}
+.crr-tl-item:last-child{padding-bottom:2px}
+.crr-tl-item.res{border-left-color:var(--success)}
+.crr-tl-item.ph{border-left-color:var(--warning)}
+.crr-tl-hdr{font-size:11px;color:var(--text-muted);margin-bottom:2px}
+.crr-tl-txt{font-size:12px;white-space:pre-wrap;max-height:104px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:7px 9px}
+.crr-note{font-size:12px;color:var(--text-muted);margin-top:12px;padding:10px 13px;background:var(--surface-2);border-radius:8px;line-height:1.6}
 </style>
 </head>
 <body>
@@ -268,6 +318,7 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
     <button data-panel="calendar" class="active">Calendar</button>
     <button data-panel="today">Today</button>
     <button data-panel="dashboard">Dashboard</button>
+    <button data-panel="crr">📞 Resolution</button>
     <button data-panel="reports" class="admin-only" style="display:none">Reports</button>
     <button data-panel="employees" class="admin-only" style="display:none">Employees</button>
     <button data-panel="settings" class="admin-only" style="display:none">Settings</button>
@@ -375,6 +426,57 @@ tr.rpt-today td:first-child{box-shadow:inset 3px 0 0 var(--primary)}
     <div class="sub" id="presPublicSub"></div>
     <div id="presPublicChart" style="overflow-x:auto"></div>
     <div id="presPublicStats" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:16px"></div>
+  </div>
+</section>
+
+<!-- CONTACT RESOLUTION -->
+<section class="panel" id="panel-crr">
+  <div class="card">
+    <h2>Contact Resolution Rate</h2>
+    <div class="sub">Upload the raw case-note export (one row per case note). The file is read in your browser — nothing is uploaded to the server or stored.</div>
+
+    <div class="crr-drop" id="crrDrop">
+      <div class="crr-drop-ic">📞</div>
+      <div><strong>Drop the case export here</strong> or <button class="btn sec sm" id="crrPickBtn">choose a file</button></div>
+      <div class="crr-drop-hint">.xlsx / .xls / .csv — needs a <code>Case Number</code>, <code>Created On</code> and <code>Description</code> column (extra words in the header are fine)</div>
+      <input type="file" id="crrFile" accept=".xlsx,.xls,.csv" style="display:none">
+    </div>
+
+    <div id="crrOpts" class="crr-opts" style="display:none">
+      <label class="field" style="margin:0;flex:0 0 150px"><span>Resolve-within (calendar days)</span><input type="number" id="crrDays" min="1" max="30" value="2"></label>
+      <label class="field" style="margin:0;flex:0 0 250px"><span>Case never showing resolution language</span>
+        <select id="crrUnres">
+          <option value="breach">Counts as a breach (in denominator)</option>
+          <option value="exclude">Excluded from the population</option>
+        </select>
+      </label>
+      <label class="crr-check"><input type="checkbox" id="crrPhoneOnly" checked> Phone-origin cases only</label>
+      <div style="display:flex;gap:8px;align-items:flex-end;margin-left:auto">
+        <button class="btn sec" id="crrReload">↻ Re-run</button>
+        <button class="btn sec" id="crrExport">⬇ Export CSV</button>
+        <button class="btn sec" id="crrClear">✕ Clear</button>
+      </div>
+    </div>
+
+    <div id="crrFileLbl" style="display:none;padding:9px 13px;background:var(--primary-light);color:var(--primary);border-radius:6px;font-size:13px;margin:14px 0"></div>
+    <div id="crrResult"></div>
+  </div>
+
+  <div class="card" id="crrKwCard" style="display:none">
+    <h2>Phrase lists</h2>
+    <div class="sub">Free text can't be judged by tone, so classification is pure phrase matching. <strong>Only the resolution list changes the numbers</strong> — the placeholder list just labels why a follow-up row was skipped. One phrase per line; matching is case-insensitive and ignores punctuation.</div>
+    <div class="crr-kw-grid">
+      <label class="field" style="margin:0"><span>Resolution language (an outcome — the case is resolved at this row)</span>
+        <textarea id="crrKwRes" rows="10" spellcheck="false"></textarea>
+      </label>
+      <label class="field" style="margin:0"><span>Placeholder / another attempt (no outcome — keep scanning)</span>
+        <textarea id="crrKwPh" rows="10" spellcheck="false"></textarea>
+      </label>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn" id="crrKwSave">Save &amp; re-run</button>
+      <button class="btn sec" id="crrKwReset">Reset to defaults</button>
+    </div>
   </div>
 </section>
 
@@ -886,6 +988,7 @@ document.querySelectorAll('nav button').forEach(b=>{
     if(activePanel==='calendar')   renderCalendar();
     if(activePanel==='today')      renderToday();
     if(activePanel==='dashboard')  renderDashboard();
+    if(activePanel==='crr')        initCRR();
     if(activePanel==='reports')    initReports();
     if(activePanel==='employees')  renderEmployees();
     if(activePanel==='settings')   renderSettings();
@@ -2644,6 +2747,517 @@ document.querySelectorAll('nav button').forEach(b=>{
     if(isAdmin) loadFeedback();
   });
 });
+
+/* ====================================================================
+   CONTACT RESOLUTION RATE — analysis engine
+   --------------------------------------------------------------------
+   Metric: % of phone contacts resolved and closed.
+     Target A — 80% of incoming calls resolved on the FIRST contact.
+     Target B — of the remaining 20%, 90% resolved within 2 CALENDAR
+                days of the initial contact.
+
+   Rules (see docs/contact-resolution-metric.md for the full write-up):
+     1. Rows are grouped by case number and sorted by Created On ASC.
+     2. One row only            -> Resolved at first contact. The note is
+                                   never read: a single touch with no
+                                   follow-up is a closed first contact,
+                                   even if it says "escalated".
+     3. Two or more rows        -> NOT first contact (the extra rows are
+                                   the re-opens). Scan rows 2, 3, 4 … in
+                                   order; the first one containing
+                                   resolution language is the moment of
+                                   resolution. Placeholder notes ("LMOM",
+                                   "no answer") record another try, not an
+                                   outcome, so scanning continues.
+     4. No row ever shows resolution language -> case never resolved.
+                                   Counted as a breach by default
+                                   (unresolvedMode:'breach'); can be
+                                   dropped from the population instead
+                                   (unresolvedMode:'exclude').
+
+   Only the RESOLUTION phrase list drives the numbers. The placeholder
+   list is explanatory: it labels why a row was skipped, and a row that
+   matches neither list is skipped just the same (substantive note, no
+   outcome stated).
+   ==================================================================== */
+
+const CRR_DEFAULT_RESOLUTION = [
+  // explicit closure
+  'closing case','closing the case','closing this case','case closed','closed the case','case is closed',
+  'ticket closed','closing out','case resolved','resolved','resolution provided','marked as resolved',
+  // problem fixed
+  'issue fixed','fixed the issue','issue is fixed','problem solved','solved the issue','problem fixed',
+  'issue has been fixed','no longer an issue','sorted out',
+  // confirmed working again
+  'working now','works now','is working now','working properly','working fine','working as expected',
+  'up and running','back online','came back online','became active','now active','shows as active',
+  'confirmed working','verified working','confirmed resolved','confirmed the issue was resolved',
+  'connected successfully','successfully connected','managed to connect','connection restored',
+  'service restored','restored service','reconnected successfully','devices are online',
+  // completed actions that close the contact
+  'successfully completed','completed successfully','successfully installed','installation completed',
+  'installation was completed','setup completed','setup complete','replacement shipped','replacement delivered',
+  'replacement processed','return label sent','points credited','points were credited','refund processed',
+  'credit applied','request completed','completed the request',
+  // member signs off
+  'no further assistance','no further action','no further questions','nothing further',
+  'member thanked','pm thanked','thanked us','thanking us','thanked and the call ended',
+  'call ended','member confirmed no other concerns','member was satisfied','member is satisfied'
+];
+
+const CRR_DEFAULT_PLACEHOLDER = [
+  // classic call-attempt shorthand
+  'lmom','lmtcb','lvm','lm','left voicemail','left a voicemail','left message','left a message',
+  'voicemail left','vm left','voicemail full','mailbox full',
+  // no contact made
+  'no answer','no response','did not answer','didn t answer','did not pick up','didn t pick up',
+  'no pick up','unable to reach','could not reach','couldn t reach','tried to reach','tried calling',
+  'call dropped','line busy','busy signal','wrong number','number not in service',
+  // another try recorded, no outcome
+  'attempt','attempted','attempted contact','attempted to contact','attempt to contact','call attempt',
+  'second attempt','2nd attempt','third attempt','3rd attempt','follow up attempt','follow up call',
+  'following up','follow up','checking in',
+  // explicitly waiting on someone
+  'awaiting response','awaiting member response','pending member response','waiting for member',
+  'waiting on member','will call back','advised to call back','call back scheduled','callback scheduled',
+  'follow up scheduled','pending follow up','case remains owned','no contact made'
+];
+
+/* Boilerplate telemetry that Screenwise notes carry after the free text.
+   Stripped before matching so "Status: ACTIVE" in a device dump cannot be
+   read as "the member's problem is now fixed". */
+const CRR_TELEMETRY_PATTERNS = [
+  /^\s*[-–•]?\s*(last\s+(heartbeat|activity|cookie|check|pairing|tv\s*meter)|status\s*:|state\s*:|mno\s*:|device\s+(name|source)|last\s+check\s*in)/i,
+  /^\s*(screenwise\s+(router|routers|mobile|browser|tv)|ctv\s+devices|tv\s+devices|panelist\s+screenwise|browser\s+extensions)/i,
+  /^\s*[-–•]?\s*(phone|tablet|chrome|firefox|safari|edge)\s*[:–-]/i,
+  /^\s*[A-Z0-9]{10,}\s*$/,                        // bare device/serial ids
+  /^\s*\d{4}-\d{2}-\d{2}T[\d:.]+Z?\s*$/i,         // bare ISO timestamps
+  /^\s*(active|inactive|paused|downstream|upstream|paired[_ ]by[_ ]flow)\s*$/i
+];
+
+function crrStripTelemetry(text){
+  return String(text||'').split(/\r?\n/)
+    .filter(line=>!CRR_TELEMETRY_PATTERNS.some(re=>re.test(line)))
+    .join('\n');
+}
+
+/* Lowercase, punctuation -> single spaces. Both the note and the phrases
+   go through this, so a phrase match is always on whole words. */
+function crrNormalize(text){
+  return ' '+String(text||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()+' ';
+}
+
+function crrMatchPhrase(normText, phrases){
+  for(const p of phrases){
+    const np=crrNormalize(p);
+    if(np.trim() && normText.includes(np)) return p;
+  }
+  return null;
+}
+
+/* Accepts Date objects (SheetJS cellDates), Excel serials and strings. */
+function crrParseDate(v){
+  if(v instanceof Date) return isNaN(v)?null:v;
+  if(typeof v==='number' && isFinite(v)){
+    const ms=Math.round((v-25569)*86400000);      // Excel serial -> epoch
+    const d=new Date(ms);
+    return isNaN(d)?null:d;
+  }
+  const s=String(v||'').trim();
+  if(!s) return null;
+  let m=s.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5],+(m[6]||0));
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3]);
+  m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:[, ]+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?)?/i);
+  if(m){                                          // M/D/YYYY (CRM default)
+    let h=+(m[4]||0);
+    const ap=(m[7]||'').toLowerCase();
+    if(ap==='pm'&&h<12) h+=12;
+    if(ap==='am'&&h===12) h=0;
+    return new Date(+m[3],+m[1]-1,+m[2],h,+(m[5]||0),+(m[6]||0));
+  }
+  const d=new Date(s);
+  return isNaN(d)?null:d;
+}
+
+/* Calendar days, not 24h periods: 13 Aug 23:50 -> 14 Aug 00:10 is 1 day. */
+function crrCalendarDays(from,to){
+  const a=new Date(from.getFullYear(),from.getMonth(),from.getDate());
+  const b=new Date(to.getFullYear(),to.getMonth(),to.getDate());
+  return Math.round((b-a)/86400000);
+}
+
+/* rows: [{caseNumber, createdOn:Date, description, agent, origin}] */
+function crrAnalyze(rows, opts){
+  opts = opts || {};
+  const resolutionList  = opts.resolution  || CRR_DEFAULT_RESOLUTION;
+  const placeholderList = opts.placeholder || CRR_DEFAULT_PLACEHOLDER;
+  const unresolvedMode  = opts.unresolvedMode || 'breach';
+  const withinDays      = opts.withinDays==null ? 2 : opts.withinDays;
+
+  const groups=new Map();
+  for(const r of rows){
+    const key=String(r.caseNumber||'').trim();
+    if(!key || !r.createdOn) continue;
+    if(!groups.has(key)) groups.set(key,[]);
+    groups.get(key).push(r);
+  }
+
+  const cases=[];
+  for(const [caseNumber,list] of groups){
+    list.sort((a,b)=>a.createdOn-b.createdOn);
+    const first=list[0];
+    const contacts=list.map((r,i)=>{
+      const clean=crrStripTelemetry(r.description);
+      const norm=crrNormalize(clean);
+      const res=i===0?null:crrMatchPhrase(norm,resolutionList);
+      const ph =(i===0||res)?null:crrMatchPhrase(norm,placeholderList);
+      return {
+        seq:i+1, createdOn:r.createdOn, agent:r.agent||'', description:r.description||'',
+        resolutionPhrase:res, placeholderPhrase:ph,
+        label: i===0 ? 'Initial contact'
+             : res   ? 'Resolution'
+             : ph    ? 'Placeholder / another attempt'
+                     : 'Follow-up, no outcome stated'
+      };
+    });
+
+    const c={ caseNumber, contacts, rows:list.length, firstContactOn:first.createdOn,
+              agent:first.agent||'', household:first.household||'' };
+
+    if(list.length===1){
+      // Rule 2 — one touch, no follow-up: closed on first contact whatever the note says.
+      c.status='first-contact'; c.resolvedOn=first.createdOn; c.resolutionSeq=1;
+      c.days=0; c.withinTarget=true; c.matchedPhrase='(single contact — no follow-up)';
+    } else {
+      const hit=contacts.find(x=>x.resolutionPhrase);
+      if(hit){
+        c.status='resolved-later'; c.resolvedOn=hit.createdOn; c.resolutionSeq=hit.seq;
+        c.days=crrCalendarDays(first.createdOn,hit.createdOn);
+        c.withinTarget=c.days<=withinDays;
+        c.matchedPhrase=hit.resolutionPhrase;
+        c.reopenedAfterResolution=hit.seq<list.length;
+      } else {
+        c.status='unresolved'; c.resolvedOn=null; c.resolutionSeq=null;
+        c.days=null; c.withinTarget=false;
+        c.matchedPhrase=null;
+        c.lastPhrase=contacts[contacts.length-1].placeholderPhrase;
+      }
+    }
+    cases.push(c);
+  }
+  cases.sort((a,b)=>a.firstContactOn-b.firstContactOn);
+
+  const unresolved  = cases.filter(c=>c.status==='unresolved');
+  const excluded    = unresolvedMode==='exclude' ? unresolved.length : 0;
+  const population  = unresolvedMode==='exclude' ? cases.filter(c=>c.status!=='unresolved') : cases;
+
+  const firstContact = population.filter(c=>c.status==='first-contact');
+  const remainder    = population.filter(c=>c.status!=='first-contact');
+  const within       = remainder.filter(c=>c.status==='resolved-later' && c.withinTarget);
+  const late         = remainder.filter(c=>c.status==='resolved-later' && !c.withinTarget);
+
+  const pct=(n,d)=>d?(n/d*100):null;
+  return {
+    cases, unresolvedMode, withinDays, excluded,
+    summary:{
+      totalRows: rows.length,
+      totalCases: cases.length,
+      population: population.length,
+      firstContact: firstContact.length,
+      firstContactPct: pct(firstContact.length,population.length),
+      firstContactTarget: 80,
+      remainder: remainder.length,
+      withinTarget: within.length,
+      lateResolved: late.length,
+      unresolved: unresolvedMode==='exclude'?0:unresolved.length,
+      unresolvedExcluded: excluded,
+      withinTargetPct: pct(within.length,remainder.length),
+      withinTargetTarget: 90
+    }
+  };
+}
+
+
+/* ====================================================================
+   CONTACT RESOLUTION — file handling, UI, rendering
+   ==================================================================== */
+const CRR_LS_RES='crr_kw_resolution', CRR_LS_PH='crr_kw_placeholder', CRR_LS_OPT='crr_options';
+let crrState={ rows:[], cases:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, filter:'all', open:new Set() };
+let crrBooted=false;
+
+const crrEsc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const crrLines=s=>String(s||'').split('\n').map(x=>x.trim()).filter(Boolean);
+const crrFmtDT=d=>d?`${String(d.getDate()).padStart(2,'0')} ${MONTHS[d.getMonth()].slice(0,3)} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'—';
+const crrPct=v=>v==null?'—':(Math.round(v*10)/10).toFixed(1)+'%';
+
+function crrPhrases(){
+  return {
+    resolution : crrLines(localStorage.getItem(CRR_LS_RES)) .length ? crrLines(localStorage.getItem(CRR_LS_RES)) : CRR_DEFAULT_RESOLUTION,
+    placeholder: crrLines(localStorage.getItem(CRR_LS_PH))  .length ? crrLines(localStorage.getItem(CRR_LS_PH))  : CRR_DEFAULT_PLACEHOLDER
+  };
+}
+function crrOpts(){
+  let o={}; try{ o=JSON.parse(localStorage.getItem(CRR_LS_OPT)||'{}'); }catch(e){}
+  return { withinDays:o.withinDays||2, unresolvedMode:o.unresolvedMode||'breach', phoneOnly:o.phoneOnly!==false };
+}
+function crrSaveOpts(){
+  const o={ withinDays:Math.max(1,parseInt(document.getElementById('crrDays').value)||2),
+            unresolvedMode:document.getElementById('crrUnres').value,
+            phoneOnly:document.getElementById('crrPhoneOnly').checked };
+  localStorage.setItem(CRR_LS_OPT,JSON.stringify(o));
+  return o;
+}
+
+function initCRR(){
+  const o=crrOpts();
+  document.getElementById('crrDays').value=o.withinDays;
+  document.getElementById('crrUnres').value=o.unresolvedMode;
+  document.getElementById('crrPhoneOnly').checked=o.phoneOnly;
+  const p=crrPhrases();
+  document.getElementById('crrKwRes').value=p.resolution.join('\n');
+  document.getElementById('crrKwPh').value=p.placeholder.join('\n');
+  if(crrBooted) return;
+  crrBooted=true;
+
+  const drop=document.getElementById('crrDrop'), input=document.getElementById('crrFile');
+  document.getElementById('crrPickBtn').addEventListener('click',()=>input.click());
+  drop.addEventListener('click',e=>{ if(e.target===drop||e.target.classList.contains('crr-drop-ic')) input.click(); });
+  input.addEventListener('change',e=>{ const f=e.target.files[0]; e.target.value=''; if(f) crrLoadFile(f); });
+  ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.add('over'); }));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{ e.preventDefault(); drop.classList.remove('over'); }));
+  drop.addEventListener('drop',e=>{ const f=e.dataTransfer.files[0]; if(f) crrLoadFile(f); });
+
+  document.getElementById('crrReload').addEventListener('click',()=>{ crrSaveOpts(); crrRun(); });
+  ['crrDays','crrUnres','crrPhoneOnly'].forEach(id=>
+    document.getElementById(id).addEventListener('change',()=>{ crrSaveOpts(); crrRun(); }));
+  document.getElementById('crrExport').addEventListener('click',crrExportCsv);
+  document.getElementById('crrClear').addEventListener('click',()=>{
+    crrState={ rows:[], cases:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, filter:'all', open:new Set() };
+    document.getElementById('crrOpts').style.display='none';
+    document.getElementById('crrKwCard').style.display='none';
+    document.getElementById('crrFileLbl').style.display='none';
+    document.getElementById('crrResult').innerHTML='';
+  });
+  document.getElementById('crrKwSave').addEventListener('click',()=>{
+    localStorage.setItem(CRR_LS_RES,document.getElementById('crrKwRes').value);
+    localStorage.setItem(CRR_LS_PH ,document.getElementById('crrKwPh').value);
+    toast('Phrase lists saved','ok'); crrRun();
+  });
+  document.getElementById('crrKwReset').addEventListener('click',()=>{
+    localStorage.removeItem(CRR_LS_RES); localStorage.removeItem(CRR_LS_PH);
+    document.getElementById('crrKwRes').value=CRR_DEFAULT_RESOLUTION.join('\n');
+    document.getElementById('crrKwPh').value=CRR_DEFAULT_PLACEHOLDER.join('\n');
+    toast('Phrase lists reset to defaults','ok'); crrRun();
+  });
+}
+
+/* Header matching: "Case Number (Regarding) (Case)" -> casenumberregardingcase */
+const crrNormHdr=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function crrFindCol(headers,candidates){
+  for(const c of candidates){
+    const hit=headers.find(h=>crrNormHdr(h).includes(c));
+    if(hit) return hit;
+  }
+  return null;
+}
+
+async function crrLoadFile(file){
+  try{
+    const buf=await file.arrayBuffer();
+    const wb=XLSX.read(buf,{type:'array',cellDates:true});
+    let picked=null;
+    for(const name of wb.SheetNames){
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{defval:''});
+      if(!rows.length) continue;
+      const headers=Object.keys(rows[0]);
+      const caseCol=crrFindCol(headers,['casenumber','caseid','caseno','ticketnumber']);
+      const dateCol=crrFindCol(headers,['createdon','createddate','createdat','datecreated','timestamp']);
+      const descCol=crrFindCol(headers,['description','note','comment','details']);
+      if(caseCol&&dateCol&&descCol){
+        picked={name,rows,caseCol,dateCol,descCol,
+                agentCol:crrFindCol(headers,['createdby','agent','owner','user']),
+                originCol:crrFindCol(headers,['caseorigin','origin','channel']),
+                hhCol:crrFindCol(headers,['household','hh'])};
+        break;
+      }
+    }
+    if(!picked){ toast('No sheet with Case Number / Created On / Description columns','err'); return; }
+
+    let skipped=0;
+    const rows=[];
+    for(const r of picked.rows){
+      const caseNumber=String(r[picked.caseCol]==null?'':r[picked.caseCol]).trim();
+      const createdOn=crrParseDate(r[picked.dateCol]);
+      if(!caseNumber||!createdOn){ if(caseNumber||String(r[picked.descCol]||'').trim()) skipped++; continue; }
+      rows.push({ caseNumber, createdOn, description:String(r[picked.descCol]||''),
+                  agent:picked.agentCol?String(r[picked.agentCol]||''):'',
+                  origin:picked.originCol?String(r[picked.originCol]||''):'',
+                  household:picked.hhCol?String(r[picked.hhCol]||''):'' });
+    }
+    if(!rows.length){ toast('No usable rows found in the file','err'); return; }
+
+    crrState.rows=rows; crrState.fileName=file.name; crrState.sheetName=picked.name;
+    crrState.skippedRows=skipped; crrState.hasOrigin=!!picked.originCol; crrState.filter='all'; crrState.open=new Set();
+    document.getElementById('crrOpts').style.display='flex';
+    document.getElementById('crrKwCard').style.display='';
+    crrRun();
+    toast(`Loaded ${rows.length} case notes`,'ok');
+  }catch(err){ toast('Failed to read file: '+err.message,'err'); }
+}
+
+function crrRun(){
+  if(!crrState.rows.length) return;
+  const o=crrOpts(), p=crrPhrases();
+
+  /* Phone-origin filter is applied per case (origin is a case attribute):
+     the case is kept or dropped whole, so a case is never half-analysed. */
+  let rows=crrState.rows, skippedCases=0;
+  if(o.phoneOnly && crrState.hasOrigin){
+    const originOf=new Map();
+    for(const r of rows){
+      const cur=originOf.get(r.caseNumber);
+      if(!cur||r.createdOn<cur.on) originOf.set(r.caseNumber,{on:r.createdOn,origin:r.origin});
+    }
+    const keep=new Set([...originOf].filter(([,v])=>/phone/i.test(v.origin)).map(([k])=>k));
+    skippedCases=originOf.size-keep.size;
+    rows=rows.filter(r=>keep.has(r.caseNumber));
+  }
+  crrState.skippedCases=skippedCases;
+  crrState.result=crrAnalyze(rows,{resolution:p.resolution,placeholder:p.placeholder,
+                                   unresolvedMode:o.unresolvedMode,withinDays:o.withinDays});
+  const lbl=document.getElementById('crrFileLbl');
+  lbl.style.display='';
+  lbl.innerHTML=`📄 <strong>${crrEsc(crrState.fileName)}</strong> — sheet “${crrEsc(crrState.sheetName)}”, `
+    +`${crrState.result.summary.totalRows} case notes over ${crrState.result.summary.totalCases} cases`
+    +(crrState.skippedRows?` · ${crrState.skippedRows} row(s) skipped (no case number or unreadable date)`:'')
+    +(skippedCases?` · ${skippedCases} non-phone case(s) excluded`:'');
+  crrRender();
+}
+
+function crrRender(){
+  const r=crrState.result; if(!r){ document.getElementById('crrResult').innerHTML=''; return; }
+  const s=r.summary;
+  const fcPass=s.firstContactPct!=null&&s.firstContactPct>=s.firstContactTarget;
+  const w2Pass=s.withinTargetPct!=null&&s.withinTargetPct>=s.withinTargetTarget;
+  const kpi=(cls,lbl,val,tag,sub)=>`<div class="crr-kpi ${cls}">
+      <div class="k-lbl">${lbl}<span class="k-tag">${tag}</span></div>
+      <div class="k-val">${val}</div><div class="k-sub">${sub}</div></div>`;
+
+  const tot=s.population||1;
+  const seg=(n,c)=>n?`<span style="width:${(n/tot*100).toFixed(2)}%;background:${c}"></span>`:'';
+  const mix=`<div class="crr-mix">${seg(s.firstContact,'var(--success)')}${seg(s.withinTarget,'var(--primary)')}${seg(s.lateResolved,'var(--warning)')}${seg(s.unresolved,'var(--danger)')}</div>
+    <div class="crr-legend">
+      <div><i style="background:var(--success)"></i>First contact ${s.firstContact}</div>
+      <div><i style="background:var(--primary)"></i>Resolved ≤ ${r.withinDays} days ${s.withinTarget}</div>
+      <div><i style="background:var(--warning)"></i>Resolved &gt; ${r.withinDays} days ${s.lateResolved}</div>
+      <div><i style="background:var(--danger)"></i>Never resolved ${s.unresolved}${s.unresolvedExcluded?' (excluded: '+s.unresolvedExcluded+')':''}</div>
+    </div>`;
+
+  const counts={ all:r.cases.length,
+    first:r.cases.filter(c=>c.status==='first-contact').length,
+    ontime:r.cases.filter(c=>c.status==='resolved-later'&&c.withinTarget).length,
+    late:r.cases.filter(c=>c.status==='resolved-later'&&!c.withinTarget).length,
+    none:r.cases.filter(c=>c.status==='unresolved').length };
+  const chip=(k,l)=>`<button class="crr-chip${crrState.filter===k?' on':''}" data-crrfilter="${k}">${l} (${counts[k]})</button>`;
+
+  const shown=r.cases.filter(c=>{
+    switch(crrState.filter){
+      case 'first' : return c.status==='first-contact';
+      case 'ontime': return c.status==='resolved-later'&&c.withinTarget;
+      case 'late'  : return c.status==='resolved-later'&&!c.withinTarget;
+      case 'none'  : return c.status==='unresolved';
+      default      : return true;
+    }
+  });
+
+  const badge=c=> c.status==='first-contact' ? '<span class="crr-badge first">First contact</span>'
+                : c.status==='unresolved'    ? '<span class="crr-badge none">Never resolved</span>'
+                : c.withinTarget             ? `<span class="crr-badge ontime">≤ ${r.withinDays} days</span>`
+                                             : `<span class="crr-badge late">&gt; ${r.withinDays} days</span>`;
+
+  const body=shown.map(c=>{
+    const open=crrState.open.has(c.caseNumber);
+    const tl=!open?'':`<tr class="crr-tl"><td colspan="7"><div style="padding:10px 4px">`+
+      c.contacts.map(x=>`<div class="crr-tl-item ${x.resolutionPhrase?'res':x.placeholderPhrase?'ph':''}">
+          <div class="crr-tl-hdr"><strong>#${x.seq}</strong> · ${crrFmtDT(x.createdOn)}${x.agent?' · '+crrEsc(x.agent):''} · ${x.label}${x.resolutionPhrase?' → matched “'+crrEsc(x.resolutionPhrase)+'”':x.placeholderPhrase?' → matched “'+crrEsc(x.placeholderPhrase)+'”':''}</div>
+          <div class="crr-tl-txt">${crrEsc(x.description.trim())||'<em>(empty note)</em>'}</div></div>`).join('')+
+      `</div></td></tr>`;
+    return `<tr class="crr-row" data-crrcase="${crrEsc(c.caseNumber)}">
+        <td>${open?'▾':'▸'} <strong>${crrEsc(c.caseNumber)}</strong>${c.reopenedAfterResolution?' <span title="More notes were added after the resolution row">↻</span>':''}</td>
+        <td>${c.rows}</td>
+        <td>${crrFmtDT(c.firstContactOn)}</td>
+        <td>${badge(c)}</td>
+        <td>${crrFmtDT(c.resolvedOn)}</td>
+        <td>${c.days==null?'—':c.days}</td>
+        <td style="color:var(--text-muted)">${crrEsc(c.matchedPhrase||(c.lastPhrase?'last note: “'+c.lastPhrase+'”':'no resolution language found'))}</td>
+      </tr>${tl}`;
+  }).join('');
+
+  document.getElementById('crrResult').innerHTML=`
+    <div class="crr-kpis">
+      ${kpi(s.firstContactPct==null?'na':fcPass?'pass':'fail','Resolved at first contact',crrPct(s.firstContactPct),
+            s.firstContactPct==null?'NO DATA':fcPass?'ON TARGET':'BELOW TARGET',
+            `${s.firstContact} of ${s.population} cases · target ${s.firstContactTarget}%`)}
+      ${kpi(s.withinTargetPct==null?'na':w2Pass?'pass':'fail',`Of the rest, resolved ≤ ${r.withinDays} days`,crrPct(s.withinTargetPct),
+            s.withinTargetPct==null?'NO DATA':w2Pass?'ON TARGET':'BELOW TARGET',
+            `${s.withinTarget} of ${s.remainder} cases · target ${s.withinTargetTarget}%`)}
+    </div>
+    ${mix}
+    <div class="crr-chips">${chip('all','All')}${chip('first','First contact')}${chip('ontime','≤ '+r.withinDays+' days')}${chip('late','&gt; '+r.withinDays+' days')}${chip('none','Never resolved')}</div>
+    <div style="overflow-x:auto">
+      <table id="crrTable">
+        <thead><tr><th>Case</th><th>Contacts</th><th>Initial contact</th><th>Outcome</th><th>Resolved on</th><th>Calendar days</th><th>Matched phrase</th></tr></thead>
+        <tbody>${body||'<tr><td colspan="7" style="color:var(--text-muted)">No cases in this filter.</td></tr>'}</tbody>
+      </table>
+    </div>
+    <div class="crr-note">
+      <strong>How a case is counted.</strong> Rows are grouped by case number and sorted oldest first.
+      A case with a <strong>single row</strong> counts as resolved at first contact whatever the note says — one touch, no follow-up.
+      A case with <strong>two or more rows</strong> was re-opened, so it can never be a first-contact resolution; rows 2, 3, 4 … are scanned in order and the first one carrying resolution language is the moment of resolution.
+      Calendar days are counted from the initial contact’s date to that row’s date.
+      Cases where no row ever shows resolution language ${r.unresolvedMode==='exclude'?'are <strong>excluded from the population</strong>':'count as a <strong>breach</strong> and stay in the denominator'}.
+      ↻ marks a case that received further notes after its resolution row.
+    </div>`;
+
+  document.querySelectorAll('#crrResult [data-crrfilter]').forEach(b=>
+    b.addEventListener('click',()=>{ crrState.filter=b.dataset.crrfilter; crrRender(); }));
+  document.querySelectorAll('#crrResult [data-crrcase]').forEach(tr=>
+    tr.addEventListener('click',()=>{
+      const k=tr.dataset.crrcase;
+      crrState.open.has(k)?crrState.open.delete(k):crrState.open.add(k);
+      crrRender();
+    }));
+}
+
+function crrExportCsv(){
+  const r=crrState.result; if(!r){ toast('Load a case export first','err'); return; }
+  const s=r.summary;
+  const rows=[
+    ['Metric','Value','Target','Status'],
+    ['Resolved at first contact',crrPct(s.firstContactPct),s.firstContactTarget+'%',s.firstContactPct>=s.firstContactTarget?'MET':'NOT MET'],
+    [`Of the rest, resolved within ${r.withinDays} calendar days`,crrPct(s.withinTargetPct),s.withinTargetTarget+'%',s.withinTargetPct>=s.withinTargetTarget?'MET':'NOT MET'],
+    ['Cases in population',s.population,'',''],
+    ['First-contact resolutions',s.firstContact,'',''],
+    ['Re-opened cases (the remainder)',s.remainder,'',''],
+    [`Resolved within ${r.withinDays} days`,s.withinTarget,'',''],
+    [`Resolved after ${r.withinDays} days`,s.lateResolved,'',''],
+    ['Never resolved',s.unresolved,'',''],
+    ['Never resolved (excluded)',s.unresolvedExcluded,'',''],
+    [],
+    ['Case Number','Contacts','Initial contact','Outcome','Resolved on','Calendar days','Resolution row #','Matched phrase','Re-opened after resolution']
+  ];
+  const outcome=c=> c.status==='first-contact'?'Resolved at first contact'
+                  : c.status==='unresolved'   ?'Never resolved'
+                  : c.withinTarget            ?`Resolved within ${r.withinDays} days`
+                                              :`Resolved after ${r.withinDays} days`;
+  const iso=d=>d?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'';
+  r.cases.forEach(c=>rows.push([c.caseNumber,c.rows,iso(c.firstContactOn),outcome(c),iso(c.resolvedOn),
+    c.days==null?'':c.days,c.resolutionSeq||'',c.matchedPhrase||'',c.reopenedAfterResolution?'Yes':'No']));
+  const csv=rows.map(row=>row.map(cell=>`"${String(cell==null?'':cell).replace(/"/g,'""')}"`).join(',')).join('\n');
+  download('contact-resolution-rate.csv','text/csv',csv);
+}
 
 init();
 </script>

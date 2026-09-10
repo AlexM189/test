@@ -35,3 +35,18 @@ The data file (`reservations.json`) is written atomically so concurrent reads ar
 
 Edit the `DEFAULT_DATA` dictionary at the top of `app.py` to match your floor plan.  
 Delete `data/reservations.json` to reset all reservations.
+
+## Contact Resolution Rate (📞 Resolution tab)
+
+Upload a raw case-note export (one row per case note, with `Case Number`,
+`Created On` and `Description` columns) and the tab reports:
+
+- **% resolved at first contact** against the 80% target
+- **of the remainder, % resolved within 2 calendar days** against the 90% target
+
+plus a per-case table with the phrase that decided each classification, an expandable
+note timeline, and a CSV export. The file is parsed in the browser with SheetJS —
+nothing is uploaded to the server or stored.
+
+Rules, the phrase lists and the decisions behind them:
+[`docs/contact-resolution-metric.md`](docs/contact-resolution-metric.md).
