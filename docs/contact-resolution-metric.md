@@ -9,10 +9,12 @@
 | A | 80% of incoming calls resolved on the **first contact** | first-contact cases ÷ all cases |
 | B | Of the remaining 20%, **90% resolved within 2 calendar days** of the initial contact | cases resolved ≤ 2 calendar days ÷ all re-opened cases |
 
-Where it lives: the **📞 Resolution** tab of the app (`templates/index.html`). The
-export is parsed in the browser with SheetJS — the file is never uploaded to the
-server and nothing is written to `reservations.json`. Member notes therefore never
-leave the analyst's machine.
+Where it lives: **`contact-resolution/index.html`** — one self-contained page that runs
+from disk, with the spreadsheet reader vendored inside it so it works offline. The
+export is parsed by the page itself: nothing is uploaded, and no case note is written
+to disk or to browser storage. The same rules also back the **📞 Resolution** tab of the
+reservations app (`templates/index.html`); the standalone report is the one that gets
+new work.
 
 ## Input
 
@@ -133,73 +135,79 @@ to call back", "follow-up scheduled" — those describe work still owed to the m
 
 ## Output
 
-Two KPI tiles (actual vs. target, on/below target, with the target marked on the bar),
-a bucket chart, an exceptions panel, and a per-case table: case number, note count,
-initial contact, status, resolution timestamp, calendar days and **the phrase that
-matched**. The table sorts on any of those columns — click a header or focus it and
-press Enter, click again to reverse. **Status sorts by severity** (first contact →
-within the window → late → never resolved) rather than alphabetically, so one click
-puts the worst cases on top; **note count** sorts the most-worked cases to the top the
-same way. Clicking a case opens the full note timeline with each row
-labelled (initial contact / resolution / placeholder / follow-up with no outcome
-stated) so a number can always be traced back to the words that produced it. `↻` marks
-a case that received further notes *after* its resolution row. **Export CSV** writes
-the summary plus one line per case.
+The report is one self-contained HTML file (`contact-resolution/index.html`) that runs
+from disk with no server and no network — the spreadsheet reader is vendored inside it.
 
-### Where the cases fall (chart)
+- **KPI row** — both rates against their targets, the target marked on each bar, and a
+  scope tile reporting what was excluded or reclassified.
+- **At a glance** — written takeaways (each rate in percentage points against its
+  target, median follow-up time, the slowest case, how many cases breach), a
+  composition bar over all four buckets carrying the 80% line, the same for the
+  remainder carrying the 90% line, and a resolution-time profile (same day / 1 / 2 /
+  3+ days).
+- **Falls outside the KPI window** — the breaches, in detail (below).
+- **Inside the window, still worth a look** — cases that pass but whose read is
+  doubtful (below).
+- **Case-level detail** — every case, sortable on any column; expanding a row shows the
+  automatic verdict and every note, each labelled with what the classifier made of it.
+- **Export CSV** — one line per case carrying both the final and the automatic verdict.
 
-One bar per bucket — first contact, resolved within the window, resolved late, never
-resolved — in severity order, with a hover/focus readout explaining what the bucket
-means for the targets. The **share sits inside its own bar in white**; where white would
-not clear 3:1 against that fill (the amber bar) the label switches to dark ink, and when
-a bar is too short to hold the text the label moves outside rather than being clipped —
-measured after every render and on resize. The case count sits at the bar's tip.
+### Chart colours
 
-Colour is severity (green → blue → amber → red) and is never the only channel: each bar
-carries its name and value, and the case table repeats every number. The two palettes
-(light and dark) each pass the CVD-separation, contrast and lightness checks on their
-own surface.
+The four buckets need to stay apart from each other, and the report's own brand green,
+amber and red do not: set side by side they fail the colour-blind separation and
+normal-vision floors, and a second green built from the first reads as grey. So chart
+marks carry their own tokens — green, blue, amber, red — validated against the report's
+surface for CVD separation, contrast and lightness, while the page's brand colours stay
+untouched for text, badges and borders. Each segment is labelled with its count (white
+on the fill, dark ink where white would not clear 3:1, dropped when the segment is too
+narrow), the legend repeats name, count and share, and the case table carries every
+value — so colour never has to carry the meaning alone.
 
-### Needs manual review (exceptions)
+### Falls outside the KPI window
 
-Standing question for a team leader: *which cases do I go and check in the CRM?* The
-panel lists every case that falls outside the KPI definition or whose classification is
-doubtful, with the case number (click to copy) and the **exact timeframe** — initial
-contact, resolution (or "not resolved" plus the last note), the calendar days the
-metric counted, and the true elapsed time (`13d 19h 44m`), which is deliberately shown
-next to the calendar-day figure because the two differ.
+Standing question for a team leader: *which cases do I go and check in the CRM?* This
+section lists every breach — resolved after the window, or never resolved — with the
+case number, the exact first-contact and resolution timestamps, the calendar days the
+metric counted, and the **true elapsed time** beside it, because the two differ (case
+11997868: 14 calendar days, 13d 19h 44m).
 
-Each flagged row carries an excerpt of **the note the verdict rests on** — the resolving
-note, or the last note when the case was never resolved. Expanding the row shows that
-note and the initial-contact note in full, with "Read all N notes" to open the whole
-timeline. The words behind a breach are visible without leaving the panel.
+Each card also carries **the notes the verdict rests on**: the initial contact, the
+deciding note (the resolving note, or the last note when nothing resolved it), and a
+drawer holding the rest. The words behind a breach are visible without leaving the
+section.
 
-A case is flagged when it:
+Two actions per card: **reclassify** it (below), or **confirm the breach is genuine**,
+which clears it from the list into a "reviewed & cleared" drawer. Confirming changes
+nothing about the metric — the case still counts against the KPI; it only records that
+a human has checked it.
+
+### Inside the window, still worth a look
+
+Cases that pass the KPI but whose classification is doubtful, each with the same
+timestamps, elapsed time, deciding note and reclassify control:
 
 | Flag | Why it matters |
 |---|---|
-| Resolved after the window | Misses the 90% sub-target — the breach itself |
-| Never resolved | No resolution language in any row; a breach (or excluded) |
-| Notes continue after the resolution row | The case came back; the metric timed the first closure |
-| Initial contact on the export's first day | The case may have started before the window, so its "initial contact" may be wrong |
-| Manually re-bucketed | Someone overrode the automatic verdict — shown with their reason |
+| Notes continue after the resolving note | The case came back; the metric timed the first closure |
+| First note on the export's earliest day | The case may have started before the window, so its "initial contact" may be wrong |
+| Reclassified by hand | Someone overrode the automatic verdict — shown with their reason |
 
 ### Overriding a classification
 
-Phrase matching will misjudge some cases, so the verdict is editable. Opening a case
-shows an override bar: choose **the automatic verdict**, *resolved at first contact*,
-*resolved at contact #N* (each option shows that row's timestamp and the calendar days
-it would produce), or *never resolved*, add a reason, and apply.
+Phrase matching will misjudge some cases, so the verdict is editable from the flag
+cards, the watch cards, or any expanded table row. The choices are: the automatic
+verdict, *resolved on first contact*, *resolved at note N* (each option shows that
+note's date and the calendar days it would produce), or *still unresolved* — plus a
+free-text reason.
 
-- Overrides drive the KPIs, the chart and the exceptions panel immediately.
-- The automatic verdict is never discarded: the case keeps it, and the CSV exports
-  `Classified by`, `Automatic outcome`, `Automatic calendar days`, `Override reason`
-  and `Override set at` beside the final numbers — so a reader of the export can always
-  see what was changed by hand and why.
-- Overridden cases are marked ✎, filterable with their own chip, and a banner reports
-  how many are in force with a one-click **Clear all**.
-- Overrides are keyed by case number and stored in the browser, so they survive
-  re-loading the same export next month.
+- Overrides drive the KPIs, the charts and both review sections immediately.
+- The automatic verdict is never discarded: the CSV exports `Classified By`,
+  `Automatic Status`, `Automatic Days` and `Override Reason` beside the final numbers,
+  so a reader of the export can always see what was changed by hand and why.
+- Overrides live in the page for as long as the tab is open. The report states that
+  nothing it touches is stored, and that promise is kept literally — closing the tab or
+  loading another file clears them. Export the CSV to keep a record.
 
 ## Worked example — August 2026 sample (15 notes, 5 cases)
 
@@ -224,12 +232,12 @@ full month's export before reading anything into the percentages.
   to the list rather than hand-correcting the output.
 - Case 11997868 shows the pattern to watch: it was closed on 27 Aug and picked up again
   on 31 Aug. The metric times resolution to the *first* resolving row, per the spec, and
-  flags the case with `↻` and in the exceptions panel. If a re-open after closure should
+  flags the case with `↻` and in the "still worth a look" section. If a re-open after closure should
   re-start the clock, that is a rule change, not a bug fix — until then, the override bar
   is the escape hatch for individual cases.
-- Overrides live in the browser that made them. They are not shared between people, so a
-  published number should come from one person's run (or from the exported CSV, which
-  carries every override and its reason).
+- Overrides last only while the tab is open, by design — the report promises it stores
+  nothing. A published number should come from one person's run, with the CSV exported
+  as the record: it carries every override and its reason.
 - Cases whose initial contact falls outside the export's window are analysed on the rows
   present, so a case that started in July will look like it began on its first August
   note. Export a window wide enough to carry each case's opening note.

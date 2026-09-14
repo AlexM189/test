@@ -36,17 +36,21 @@ The data file (`reservations.json`) is written atomically so concurrent reads ar
 Edit the `DEFAULT_DATA` dictionary at the top of `app.py` to match your floor plan.  
 Delete `data/reservations.json` to reset all reservations.
 
-## Contact Resolution Rate (📞 Resolution tab)
+## Contact Resolution Rate
 
-Upload a raw case-note export (one row per case note, with `Case Number`,
-`Created On` and `Description` columns) and the tab reports:
+**[`contact-resolution/index.html`](contact-resolution/)** is a standalone local report:
+open the file, drop in a raw case-note export (one row per case note, with `Case Number`,
+`Created On` and `Description` columns) and it reports
 
-- **% resolved at first contact** against the 80% target
+- **% resolved on first contact** against the 80% target
 - **of the remainder, % resolved within 2 calendar days** against the 90% target
 
-plus a per-case table with the phrase that decided each classification, an expandable
-note timeline, and a CSV export. The file is parsed in the browser with SheetJS —
-nothing is uploaded to the server or stored.
+with a breakdown chart, a review section for every case outside the KPI window (exact
+timeframes and the notes behind the verdict), per-case reclassification, a sortable case
+table and a CSV export. It runs entirely in the browser — no server, no upload, and it
+works offline. See [`contact-resolution/README.md`](contact-resolution/README.md).
+
+The reservations app carries the same logic in its admin **📞 Resolution** tab.
 
 Rules, the phrase lists and the decisions behind them:
 [`docs/contact-resolution-metric.md`](docs/contact-resolution-metric.md).
