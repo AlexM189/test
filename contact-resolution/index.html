@@ -145,6 +145,10 @@ html[data-theme="dark"] .chart{ --c-first:#0ca30c; --c-ontime:#3987e5; --c-late:
 .ch-bar.zero{width:2px!important;background:var(--border-strong)!important;border-radius:1px}
 .ch-val{font-size:13px;font-weight:650;font-variant-numeric:tabular-nums;white-space:nowrap;flex:0 0 auto}
 .ch-val .ch-pct{color:var(--text-muted);font-weight:500;margin-left:6px}
+/* the share, set inside its own bar — colour is picked at render time so it
+   always clears 3:1 against that fill (white everywhere it can be) */
+.ch-bar{display:flex;align-items:center;justify-content:flex-end;overflow:hidden}
+.ch-in{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums;padding-right:9px;white-space:nowrap;color:#fff}
 .ch-cap{font-size:12px;color:var(--text-muted);margin-top:8px}
 .ch-tip{
   position:fixed;z-index:60;pointer-events:none;opacity:0;transition:opacity .12s;
@@ -187,6 +191,28 @@ html[data-theme="dark"] .chart{ --c-first:#0ca30c; --c-ontime:#3987e5; --c-late:
 }
 .case-id:hover{color:var(--primary);border-bottom-color:var(--primary)}
 .exc-none{padding:22px;text-align:center;color:var(--text-muted);font-size:13px}
+.exc-row{cursor:pointer}
+.exc-row:hover{background:var(--surface-2)}
+.exc-row .caret{color:var(--text-faint);font-size:10px;margin-right:5px}
+.exc-excerpt{
+  margin-top:6px;font-size:12px;color:var(--text);background:var(--surface-2);
+  border-left:2px solid var(--border-strong);border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+  padding:5px 9px;max-width:440px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.exc-open>td{background:var(--surface-2);padding:14px}
+.exc-note{margin-bottom:12px}
+.exc-note:last-of-type{margin-bottom:0}
+.exc-note-hdr{font-size:11.5px;color:var(--text-muted);margin-bottom:4px}
+.exc-note-hdr strong{color:var(--text)}
+.exc-more{margin-top:10px}
+
+/* sortable headers */
+th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+th.sortable:hover,th.sortable:focus-visible{color:var(--text)}
+th.sortable.on{color:var(--primary)}
+th.sortable .arrow{font-size:9px;opacity:.5;margin-left:5px}
+th.sortable.on .arrow{opacity:1}
 
 /* ── Results ───────────────────────────────────────────── */
 .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px}
@@ -257,6 +283,12 @@ details.rules-box .rules{margin-top:10px}
   .page{padding:16px 14px 40px}
   .topbar{padding:14px}
   .opts .spacer{margin-left:0;width:100%}
+  /* narrow: the bucket name sits above its bar so the bar keeps its length
+     (and the share keeps its room inside the bar) */
+  .ch-row{grid-template-columns:1fr;gap:3px;padding:7px 4px}
+  .ch-lbl{font-size:12px}
+  .ov-bar select,.ov-bar input{min-width:0;width:100%}
+  .ov-bar .field{flex:1 1 100%}
 }
 @media print{
   .topbar-actions,.drop,.opts,.chips,#kwCard,.foot{display:none!important}
@@ -728,7 +760,46 @@ function saveOptions(){
   }));
 }
 
-let state={ rows:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, hasOrigin:false, filter:'all', open:new Set() };
+/* One place that knows the shape of the page state, so loading a file or
+   clearing can never drop a field the renderers rely on. */
+function freshState(extra){
+  return Object.assign({
+    rows:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, hasOrigin:false,
+    filter:'all', open:new Set(), excOpen:new Set(), sort:'firstContact', dir:1
+  }, extra||{});
+}
+let state=freshState();
+
+/* Sortable columns. Status sorts by severity — first contact, inside the
+   window, late, never resolved — not alphabetically, so the worst cases can be
+   brought to the top in one click. */
+const STATUS_ORDER={first:0,ontime:1,late:2,none:3};
+const SORTS={
+  caseNumber  : { label:'Case',            get:c=>c.caseNumber, cmp:(a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}) },
+  notes       : { label:'Notes',           get:c=>c.rows },
+  firstContact: { label:'Initial contact', get:c=>+c.firstContactOn },
+  status      : { label:'Status',          get:c=>STATUS_ORDER[bucketOf(c)] },
+  resolvedOn  : { label:'Resolved on',     get:c=>c.resolvedOn?+c.resolvedOn:Infinity },
+  days        : { label:'Calendar days',   get:c=>c.days==null?Infinity:c.days }
+};
+function sortCases(cases){
+  const s=SORTS[state.sort]||SORTS.firstContact;
+  const cmp=s.cmp||((a,b)=>a<b?-1:a>b?1:0);
+  return cases.slice().sort((x,y)=>{
+    const r=cmp(s.get(x),s.get(y));
+    return (r||(+x.firstContactOn - +y.firstContactOn))*state.dir;
+  });
+}
+function setSort(key){
+  if(state.sort===key) state.dir=-state.dir;
+  else { state.sort=key; state.dir=1; }
+  render();
+}
+const sortTh=(key,label,cls)=>{
+  const on=state.sort===key;
+  return `<th class="sortable${cls?' '+cls:''}${on?' on':''}" data-sort="${key}" tabindex="0" role="button"
+      aria-sort="${on?(state.dir===1?'ascending':'descending'):'none'}" title="Sort by ${esc(label.replace(/&[a-z]+;/g,''))}">${label}<span class="arrow">${on?(state.dir===1?'▲':'▼'):'↕'}</span></th>`;
+};
 
 /* ── manual overrides ──────────────────────────────────────
    Keyed by case number so they survive a re-export of the same period.
@@ -789,7 +860,9 @@ async function loadFile(file){
 }
 
 function setRows(rows,fileName,sheetName,skipped,hasOrigin){
-  state={ rows, result:null, fileName, sheetName, skippedRows:skipped, skippedCases:0, hasOrigin, filter:'all', open:new Set() };
+  /* a new file keeps the sort the reader chose, drops everything else */
+  state=freshState({ rows, fileName, sheetName, skippedRows:skipped, hasOrigin,
+                     sort:state.sort, dir:state.dir });
   $('opts').style.display='flex';
   $('kwCard').style.display='';
   $('resultCard').style.display='';
@@ -858,15 +931,17 @@ function renderChart(counts,total,w){
   const rows=BUCKETS.map(b=>{
     const n=counts[b.k], p=total?(n/total*100):0;
     const lbl=b.label(w);
-    /* bars are scaled against the largest bucket and capped at 78% of the
-       track, so the value always has room to sit at the bar's tip */
+    /* Bars are scaled against the largest bucket and capped at 78% of the
+       track, so the count always has room at the bar's tip. The share rides
+       inside the bar; fitChartLabels() moves it out again when the bar is too
+       short for it, so a label is never clipped. */
     const width=n?Math.max(1.5,n/max*78):0;
     return `<div class="ch-row" tabindex="0" role="img" data-bucket="${b.k}"
         aria-label="${esc(lbl)}: ${n} case${n===1?'':'s'}, ${p.toFixed(1)} percent of ${total}">
       <div class="ch-lbl">${esc(lbl)}</div>
       <div class="ch-track">
-        <div class="ch-bar${n?'':' zero'}" style="width:${width}%;background:${b.color}"></div>
-        <div class="ch-val">${n}<span class="ch-pct">· ${p.toFixed(1)}%</span></div>
+        <div class="ch-bar${n?'':' zero'}" style="width:${width}%;background:${b.color}"><span class="ch-in">${p.toFixed(1)}%</span></div>
+        <div class="ch-val">${n}<span class="ch-pct" hidden>· ${p.toFixed(1)}%</span></div>
       </div>
     </div>`;
   }).join('');
@@ -874,6 +949,32 @@ function renderChart(counts,total,w){
     <div class="ch-cap">${total} case${total===1?'':'s'} in the population — the top two buckets meet a target, the bottom two miss it. Bar length is the case count; every value is labelled and repeated in the table below.</div>
   </div>`;
 }
+
+/* WCAG contrast of two colours, used to keep an in-bar label readable */
+function relLum(rgb){
+  const f=v=>{ v/=255; return v<=0.03928?v/12.92:Math.pow((v+0.055)/1.055,2.4); };
+  return 0.2126*f(rgb[0])+0.7152*f(rgb[1])+0.0722*f(rgb[2]);
+}
+function contrast(a,b){ const l1=relLum(a),l2=relLum(b); return (Math.max(l1,l2)+0.05)/(Math.min(l1,l2)+0.05); }
+function parseRGB(s){ const m=String(s).match(/(\d+(?:\.\d+)?)/g); return m?m.slice(0,3).map(Number):[255,255,255]; }
+
+/* The share sits inside its bar in white. Two things can make that wrong, and
+   both are handled here rather than left to luck:
+   - the bar is too short for the text  -> the label moves outside the bar
+   - white on that fill is under 3:1    -> the label switches to dark ink
+   Re-run on every render and on resize. */
+const CH_WHITE=[255,255,255], CH_INK=[11,11,11];
+function fitChartLabels(){
+  document.querySelectorAll('#result .ch-row').forEach(row=>{
+    const bar=row.querySelector('.ch-bar'), inside=row.querySelector('.ch-in'), outside=row.querySelector('.ch-pct');
+    if(!bar||!inside||!outside) return;
+    inside.hidden=false; outside.hidden=true;
+    const fill=parseRGB(getComputedStyle(bar).backgroundColor);
+    inside.style.color = contrast(CH_WHITE,fill)>=3 ? '#fff' : '#0b0b0b';
+    if(inside.scrollWidth+18 > bar.clientWidth){ inside.hidden=true; outside.hidden=false; }
+  });
+}
+addEventListener('resize',()=>{ if(state.result) fitChartLabels(); });
 
 function chartTooltip(bucketKey,counts,total,w){
   const b=BUCKETS.find(x=>x.k===bucketKey); if(!b) return null;
@@ -913,9 +1014,9 @@ function render(){
   counts.all=r.cases.length;
   const chip=(k,l)=>`<button class="chip${state.filter===k?' on':''}" data-filter="${k}">${l} (${counts[k]})</button>`;
 
-  const shown=r.cases.filter(c=>state.filter==='all'?true
+  const shown=sortCases(r.cases.filter(c=>state.filter==='all'?true
                               :state.filter==='over'?c.overridden
-                              :bucketOf(c)===state.filter);
+                              :bucketOf(c)===state.filter));
 
   const badge=c=>({ first :'<span class="badge good">First contact</span>',
                     ontime:`<span class="badge info">≤ ${w} days</span>`,
@@ -963,7 +1064,7 @@ function render(){
     <div class="chips">${chip('all','All')}${chip('first','First contact')}${chip('ontime','≤ '+w+' days')}${chip('late','&gt; '+w+' days')}${chip('none','Never resolved')}${counts.over?chip('over','✎ Overridden'):''}</div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Case</th><th class="num">Contacts</th><th>Initial contact</th><th>Outcome</th><th>Resolved on</th><th class="num">Calendar days</th><th>Matched phrase</th></tr></thead>
+        <thead><tr>${sortTh('caseNumber','Case')}${sortTh('notes','Notes','num')}${sortTh('firstContact','Initial contact')}${sortTh('status','Status')}${sortTh('resolvedOn','Resolved on')}${sortTh('days','Calendar days','num')}<th>Matched phrase</th></tr></thead>
         <tbody>${body||'<tr><td colspan="7" class="empty">No cases in this filter.</td></tr>'}</tbody>
       </table>
     </div>`;
@@ -980,6 +1081,7 @@ function render(){
 
   renderExceptions();
   wireResult(counts,s.population,w);
+  fitChartLabels();
 }
 
 /* ── the override bar, inside a case's timeline ────────── */
@@ -1049,34 +1151,59 @@ function flaggedCases(){
 function renderExceptions(){
   const r=state.result; if(!r) return;
   const flagged=flaggedCases();
-  const last=c=>c.contacts[c.contacts.length-1].createdOn;
+  const last=c=>c.contacts[c.contacts.length-1];
+  /* the note the verdict rests on: the resolving row, or the last one if the
+     case was never resolved */
+  const deciding=c=>(c.resolutionSeq&&c.contacts[c.resolutionSeq-1])||last(c);
+
   const rows=flagged.map(({c,why})=>{
-    const openTo=c.resolvedOn||last(c);
-    return `<tr>
-      <td><span class="case-id" data-copy="${esc(c.caseNumber)}" title="Click to copy">${esc(c.caseNumber)}</span>
-          <div class="cell-sub">${c.rows} contact${c.rows===1?'':'s'}${c.agent?' · opened by '+esc(c.agent):''}</div></td>
+    const open=state.excOpen.has(c.caseNumber);
+    const dec=deciding(c), first=c.contacts[0];
+    const openTo=c.resolvedOn||last(c).createdOn;
+    const note=(x,role)=>`<div class="exc-note">
+        <div class="exc-note-hdr"><strong>${role}</strong> · #${x.seq} · ${fmtDT(x.createdOn)}${x.agent?' · '+esc(x.agent):''} · ${x.label}`
+        +(x.resolutionPhrase?` → matched “${esc(x.resolutionPhrase)}”`:x.placeholderPhrase?` → matched “${esc(x.placeholderPhrase)}”`:'')
+        +`</div><div class="tl-txt">${esc(x.description.trim())||'<em>(empty note)</em>'}</div></div>`;
+    const notesRow=!open?'':`<tr class="exc-open"><td colspan="6">
+        ${note(first,'Initial contact')}
+        ${dec.seq!==first.seq?note(dec,c.status==='unresolved'?'Last note':'Resolution'):''}
+        <div class="exc-more">${c.rows>(dec.seq!==first.seq?2:1)
+          ? `<button class="btn btn-sm" data-review="${esc(c.caseNumber)}">Read all ${c.rows} notes ▸</button>`
+          : ''}</div></td></tr>`;
+    return `<tr class="exc-row" data-exc="${esc(c.caseNumber)}">
+      <td><span class="caret">${open?'▼':'▶'}</span><span class="case-id" data-copy="${esc(c.caseNumber)}" title="Click to copy">${esc(c.caseNumber)}</span>
+          <div class="cell-sub">${c.rows} note${c.rows===1?'':'s'}${c.agent?' · opened by '+esc(c.agent):''}</div></td>
       <td class="exc-frame">${fmtDT(c.firstContactOn)}</td>
       <td class="exc-frame">${c.resolvedOn?fmtDT(c.resolvedOn):'<em>not resolved</em>'}
-          <span class="exact">last note ${fmtDT(last(c))}</span></td>
-      <td class="exc-frame"><strong>${c.days==null?exactSpan(c.firstContactOn,last(c))+' open':c.days+' calendar day'+(c.days===1?'':'s')}</strong>
+          <span class="exact">last note ${fmtDT(last(c).createdOn)}</span></td>
+      <td class="exc-frame"><strong>${c.days==null?exactSpan(c.firstContactOn,last(c).createdOn)+' open':c.days+' calendar day'+(c.days===1?'':'s')}</strong>
           <span class="exact">${exactSpan(c.firstContactOn,openTo)} elapsed</span></td>
-      <td class="exc-why"><strong>${esc(why[0])}</strong>${why.length>1?'<br>'+why.slice(1).map(esc).join('<br>'):''}</td>
+      <td class="exc-why"><strong>${esc(why[0])}</strong>${why.length>1?'<br>'+why.slice(1).map(esc).join('<br>'):''}
+          <div class="exc-excerpt" title="${esc(dec.description.trim())}">${esc(dec.description.trim().replace(/\s+/g,' '))||'(empty note)'}</div></td>
       <td><button class="btn btn-sm" data-review="${esc(c.caseNumber)}">Review ▸</button></td>
-    </tr>`;
+    </tr>${notesRow}`;
   }).join('');
 
   $('excSub').textContent=flagged.length
-    ? `${flagged.length} case${flagged.length===1?'':'s'} to check by hand — case number and exact timeframe below, then Review to read the notes or re-bucket.`
+    ? `${flagged.length} case${flagged.length===1?'':'s'} to check by hand — case number, exact timeframe and the note the verdict rests on. Click a row for the full comments, Review to open the case.`
     : 'Nothing flagged: every case is inside the KPI definition and no classification looks doubtful.';
   $('exceptions').innerHTML = flagged.length ? `<div class="table-wrap"><table>
-      <thead><tr><th>Case</th><th>Initial contact</th><th>Resolution</th><th>Timeframe</th><th>Why it is flagged</th><th></th></tr></thead>
+      <thead><tr><th>Case</th><th>Initial contact</th><th>Resolution</th><th>Timeframe</th><th>Why it is flagged &amp; the note behind it</th><th></th></tr></thead>
       <tbody>${rows}</tbody></table></div>`
     : '<div class="exc-none">✓ No exceptions — nothing needs a manual check.</div>';
 
+  document.querySelectorAll('#exceptions .exc-row').forEach(tr=>
+    tr.addEventListener('click',e=>{
+      if(e.target.closest('[data-review]')||e.target.closest('[data-copy]')) return;
+      const k=tr.dataset.exc;
+      state.excOpen.has(k)?state.excOpen.delete(k):state.excOpen.add(k);
+      renderExceptions();
+    }));
   document.querySelectorAll('#exceptions [data-review]').forEach(b=>
-    b.addEventListener('click',()=>openCase(b.dataset.review)));
+    b.addEventListener('click',e=>{ e.stopPropagation(); openCase(b.dataset.review); }));
   document.querySelectorAll('#exceptions [data-copy]').forEach(el=>
-    el.addEventListener('click',()=>{
+    el.addEventListener('click',e=>{
+      e.stopPropagation();
       const t=el.dataset.copy;
       (navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject())
         .then(()=>toast('Case '+t+' copied')).catch(()=>toast('Case '+t,''));
@@ -1099,6 +1226,11 @@ function openCase(caseNumber){
 function wireResult(counts,total,w){
   document.querySelectorAll('#result [data-filter]').forEach(b=>
     b.addEventListener('click',()=>{ state.filter=b.dataset.filter; render(); }));
+
+  document.querySelectorAll('#result th[data-sort]').forEach(th=>{
+    th.addEventListener('click',()=>setSort(th.dataset.sort));
+    th.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setSort(th.dataset.sort); } });
+  });
 
   document.querySelectorAll('#result [data-case]').forEach(tr=>
     tr.addEventListener('click',e=>{
@@ -1244,7 +1376,7 @@ function loadDemo(){
   $('printBtn').addEventListener('click',()=>window.print());
   $('demoBtn').addEventListener('click',loadDemo);
   $('clearBtn').addEventListener('click',()=>{
-    state={ rows:[], result:null, fileName:'', sheetName:'', skippedRows:0, skippedCases:0, hasOrigin:false, filter:'all', open:new Set() };
+    state=freshState();
     $('opts').style.display='none'; $('filebar').style.display='none';
     $('resultCard').style.display='none'; $('kwCard').style.display='none';
     $('excCard').style.display='none';

@@ -26,16 +26,22 @@ want to see the output before using a real export.
 Below the two KPI tiles:
 
 - **Where the cases fall** — a bar per bucket (first contact / within the window /
-  late / never resolved) with the case count and share of the population on each bar,
-  hover or keyboard focus for what the bucket means.
+  late / never resolved). The share sits inside its bar in white (dark ink where white
+  would not clear contrast, outside the bar when it is too short), the case count at the
+  tip; hover or keyboard focus for what the bucket means.
 - **Needs manual review** — every case that misses the KPI definition or whose
-  classification is worth a second look, with the case number (click to copy) and the
-  **exact timeframe**: both timestamps, the calendar days the metric used, and the real
-  elapsed time (`13d 19h 44m`). A case is flagged when it was resolved after the
+  classification is worth a second look, with the case number (click to copy), the
+  **exact timeframe** (both timestamps, the calendar days the metric used, and the real
+  elapsed time — `13d 19h 44m`) and **the note the verdict rests on**: an excerpt in the
+  row, the full initial-contact and deciding comments when the row is expanded, and
+  "Read all N notes" for the rest. A case is flagged when it was resolved after the
   window, was never resolved, kept receiving notes after its resolution row, or opens
   on the export's first day (so it may have started before the window).
 - **Per-case table** with the phrase that classified each case, expandable to the full
-  note timeline with every row labelled.
+  note timeline with every row labelled. **Sortable** by case, note count, initial
+  contact, status, resolution date or calendar days — click a header (or focus it and
+  press Enter) to sort, click again to reverse. Status sorts by severity, so one click
+  brings the worst cases to the top.
 - CSV export and a print/PDF layout.
 
 ## Overriding a classification

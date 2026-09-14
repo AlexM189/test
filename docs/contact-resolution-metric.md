@@ -134,9 +134,13 @@ to call back", "follow-up scheduled" — those describe work still owed to the m
 ## Output
 
 Two KPI tiles (actual vs. target, on/below target, with the target marked on the bar),
-a bucket chart, an exceptions panel, and a per-case table: case number, number of
-contacts, initial contact, outcome, resolution timestamp, calendar days and **the
-phrase that matched**. Clicking a case opens the full note timeline with each row
+a bucket chart, an exceptions panel, and a per-case table: case number, note count,
+initial contact, status, resolution timestamp, calendar days and **the phrase that
+matched**. The table sorts on any of those columns — click a header or focus it and
+press Enter, click again to reverse. **Status sorts by severity** (first contact →
+within the window → late → never resolved) rather than alphabetically, so one click
+puts the worst cases on top; **note count** sorts the most-worked cases to the top the
+same way. Clicking a case opens the full note timeline with each row
 labelled (initial contact / resolution / placeholder / follow-up with no outcome
 stated) so a number can always be traced back to the words that produced it. `↻` marks
 a case that received further notes *after* its resolution row. **Export CSV** writes
@@ -145,12 +149,16 @@ the summary plus one line per case.
 ### Where the cases fall (chart)
 
 One bar per bucket — first contact, resolved within the window, resolved late, never
-resolved — in severity order, with the case count and share of the population labelled
-at each bar's tip and a hover/focus readout explaining what the bucket means for the
-targets. Colour is severity (green → blue → amber → red) and is never the only channel:
-each bar carries its name and value, and the case table repeats every number. The two
-palettes (light and dark) each pass the CVD-separation, contrast and lightness checks
-on their own surface.
+resolved — in severity order, with a hover/focus readout explaining what the bucket
+means for the targets. The **share sits inside its own bar in white**; where white would
+not clear 3:1 against that fill (the amber bar) the label switches to dark ink, and when
+a bar is too short to hold the text the label moves outside rather than being clipped —
+measured after every render and on resize. The case count sits at the bar's tip.
+
+Colour is severity (green → blue → amber → red) and is never the only channel: each bar
+carries its name and value, and the case table repeats every number. The two palettes
+(light and dark) each pass the CVD-separation, contrast and lightness checks on their
+own surface.
 
 ### Needs manual review (exceptions)
 
@@ -160,6 +168,11 @@ doubtful, with the case number (click to copy) and the **exact timeframe** — i
 contact, resolution (or "not resolved" plus the last note), the calendar days the
 metric counted, and the true elapsed time (`13d 19h 44m`), which is deliberately shown
 next to the calendar-day figure because the two differ.
+
+Each flagged row carries an excerpt of **the note the verdict rests on** — the resolving
+note, or the last note when the case was never resolved. Expanding the row shows that
+note and the initial-contact note in full, with "Read all N notes" to open the whole
+timeline. The words behind a breach are visible without leaving the panel.
 
 A case is flagged when it:
 
