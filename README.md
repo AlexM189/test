@@ -47,8 +47,9 @@ open the file, drop in a raw case-note export (one row per case note, with `Case
 
 with a breakdown chart, a review section for every case outside the KPI window (exact
 timeframes and the notes behind the verdict), per-case reclassification, a sortable case
-table and a CSV export. It runs entirely in the browser — no server, no upload, and it
-works offline. See [`contact-resolution/README.md`](contact-resolution/README.md).
+table, a CSV export and a one-click presentation (on-screen deck, print to PDF, or a
+standalone .html deck). It runs entirely in the browser with **no outbound request of any
+kind** — reader, fonts and all are embedded, and a CSP in the file enforces it. See [`contact-resolution/README.md`](contact-resolution/README.md).
 
 The reservations app carries the same logic in its admin **📞 Resolution** tab.
 

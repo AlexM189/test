@@ -10,7 +10,8 @@
 | B | Of the remaining 20%, **90% resolved within 2 calendar days** of the initial contact | cases resolved ≤ 2 calendar days ÷ all re-opened cases |
 
 Where it lives: **`contact-resolution/index.html`** — one self-contained page that runs
-from disk, with the spreadsheet reader vendored inside it so it works offline. The
+from disk with the network off: the spreadsheet reader and the fonts are embedded, and a
+Content-Security-Policy in the file blocks any request the page might otherwise make. The
 export is parsed by the page itself: nothing is uploaded, and no case note is written
 to disk or to browser storage. The same rules also back the **📞 Resolution** tab of the
 reservations app (`templates/index.html`); the standalone report is the one that gets
@@ -151,6 +152,7 @@ from disk with no server and no network — the spreadsheet reader is vendored i
 - **Case-level detail** — every case, sortable on any column; expanding a row shows the
   automatic verdict and every note, each labelled with what the classifier made of it.
 - **Export CSV** — one line per case carrying both the final and the automatic verdict.
+- **Presentation** — a slide deck of the whole report (below).
 
 ### Chart colours
 
@@ -192,6 +194,28 @@ timestamps, elapsed time, deciding note and reclassify control:
 | Notes continue after the resolving note | The case came back; the metric timed the first closure |
 | First note on the export's earliest day | The case may have started before the window, so its "initial contact" may be wrong |
 | Reclassified by hand | Someone overrode the automatic verdict — shown with their reason |
+
+### Presentation export
+
+The **Presentation** button builds a deck from the current state — the same numbers, the
+same overrides, the same phrase lists:
+
+1. Title: period covered, cases in scope, notes read, date prepared.
+2. Scorecard: both rates against their targets with an on/below-target verdict, and the
+   takeaways in percentage points.
+3. Where the cases fall: the composition bar with the 80% line.
+4. Speed of the remainder: the 90% line, plus the resolution-time profile.
+5. Falls outside the KPI window: case number, household, both timestamps, days and the
+   reason — six per slide, paginated.
+6. How these numbers are produced: the rules, the scope, the phrase-list sizes, and
+   every manual reclassification with its reason.
+
+Arrow keys move, Esc leaves, **Print / PDF** gives one slide per page in landscape, and
+**Save deck (.html)** writes a standalone file. That saved file carries **no script** and
+no external reference, with its own `default-src 'none'` policy — it opens on any
+machine, offline, and prints the same way. A reader who only ever sees the deck still
+gets the method slide, so the figures can be challenged on the rule rather than the
+arithmetic.
 
 ### Overriding a classification
 

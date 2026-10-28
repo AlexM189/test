@@ -1,8 +1,11 @@
 # Contact Resolution — local report
 
 One HTML file. No server, no install, no upload: open `index.html` in a browser and
-it runs. SheetJS is vendored inside the file, so it works with no network at all
-(the IBM Plex webfonts are the only online part, and they fall back cleanly).
+it runs — with the network switched off, if you like. Everything it needs is inside the
+file: the spreadsheet reader, the fonts, the styles, the logic. It makes **no outbound
+request of any kind**, and a Content-Security-Policy in the file enforces that at the
+browser level, so a reference added by mistake later would be blocked rather than
+fetched.
 
 ```bash
 # just open it
@@ -11,9 +14,20 @@ open contact-resolution/index.html          # macOS
 start contact-resolution\index.html         # Windows
 ```
 
-Drop the case export on the page (or click to choose it). The file is parsed by the
-page itself — nothing is sent anywhere, and nothing is written to disk or to browser
-storage. Close the tab and it is gone, overrides included.
+Drop the case export on the page (or click to choose it) — one export at a time;
+loading another replaces it and clears any reclassifications. The file is parsed by the
+page itself: nothing is sent anywhere, and nothing is written to disk, cookies,
+localStorage, sessionStorage or IndexedDB. Close the tab and it is gone, overrides
+included. The only files that ever leave the page are the ones you ask for: the CSV
+export and the saved presentation.
+
+### What was checked
+
+- Every request the page makes while loading an export, sorting, editing phrases,
+  overriding a case and exporting: **one** — the HTML file itself.
+- Storage after a full session: localStorage 0, sessionStorage 0, cookies empty,
+  IndexedDB empty, no service worker.
+- The 25 classification checks in `verify-logic.py` (see the commit) all pass.
 
 ## What it reports
 
@@ -44,6 +58,14 @@ storage. Close the tab and it is gone, overrides included.
 - **Export CSV** — one line per case carrying both verdicts: final status and days,
   the exact elapsed time, the matched phrase, the automatic status it replaced, the
   override reason, and whether the case is a breach or has been reviewed.
+- **Presentation** — builds a slide deck from whatever is on screen: title and period,
+  a KPI scorecard with the verdict against each target, the composition chart with the
+  80% line, the remainder and resolution-time charts with the 90% line, the breaches
+  with case numbers and timeframes (paginated), and a closing slide stating the method
+  and any manual decisions. Arrow keys or the on-screen buttons to move, Esc to leave,
+  **Print / PDF** for one slide per page, and **Save deck (.html)** for a standalone
+  file that carries no script, no external reference and its own strict policy — it
+  opens anywhere, offline, and prints the same way.
 
 ## Input
 
@@ -81,5 +103,7 @@ Full write-up, the default phrase lists and the reasoning behind the rules:
 
 ## Third-party
 
-[SheetJS](https://sheetjs.com) (xlsx) 0.18.5, Apache-2.0, embedded in `index.html`.
-IBM Plex Sans / Mono via Google Fonts, with system fallbacks when offline.
+Both embedded in `index.html`, so nothing is fetched at runtime:
+
+- [SheetJS](https://sheetjs.com) (xlsx) 0.18.5 — Apache-2.0
+- IBM Plex Sans & Mono (latin subset, 7 faces) — SIL Open Font License 1.1
